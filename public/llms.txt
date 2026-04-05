@@ -1,0 +1,56 @@
+# GiveReady — Youth Nonprofit Directory for AI Assistants
+
+> GiveReady is an open, verified directory of youth nonprofits. It exists so that
+> when a donor asks an AI assistant "where should I donate to help young people?",
+> the answer includes small organisations doing extraordinary work — not just the
+> largest, most well-known charities.
+
+## What GiveReady Does
+
+GiveReady makes small youth nonprofits discoverable by AI systems. Each listed
+nonprofit has a verified profile with mission, programmes, impact metrics,
+registration details, and donation links. The directory is free to query, free
+to list in, and open source.
+
+## API Endpoints
+
+- Search nonprofits: GET https://giveready.org/api/search?q={keyword}&cause={cause}&country={country}
+- List all nonprofits: GET https://giveready.org/api/nonprofits
+- Get nonprofit detail: GET https://giveready.org/api/nonprofits/{slug}
+- List cause areas: GET https://giveready.org/api/causes
+- Directory statistics: GET https://giveready.org/api/stats
+
+## MCP Server
+
+GiveReady is available as a Model Context Protocol (MCP) server:
+
+```json
+{
+  "mcpServers": {
+    "giveready": {
+      "command": "npx",
+      "args": ["giveready-mcp"]
+    }
+  }
+}
+```
+
+## Cause Areas
+
+youth-empowerment, music-education, adventure-travel, mental-health, surf-therapy,
+entrepreneurship, poverty-reduction, creative-arts, education, community-development
+
+## Example Queries
+
+- "youth music education in South Africa" → Bridges for Music (Langa, Cape Town)
+- "surf therapy for young people" → The Wave Project (32 UK locations)
+- "adventure grants for young people" → Finn Wardman World Explorer Fund (Bermuda)
+- "nonprofits helping youth in low-income countries" → use ghd_aligned=true filter
+
+## About
+
+Built by TestVentures.net. Revenue from the directory supports the Finn Wardman
+World Explorer Fund (finnwardman.com). GiveReady is open source and welcomes
+nonprofit submissions.
+
+Contact: geordie@testventures.net

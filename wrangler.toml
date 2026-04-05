@@ -1,0 +1,14 @@
+name = "giveready"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+
+[vars]
+ENVIRONMENT = "production"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "giveready-db"
+database_id = "YOUR_DATABASE_ID_HERE"
+
+[site]
+bucket = "./public"

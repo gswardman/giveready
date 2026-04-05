@@ -1,0 +1,19 @@
+{
+  "name": "giveready-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for GiveReady — search and discover youth nonprofits through AI assistants",
+  "main": "index.js",
+  "type": "module",
+  "bin": {
+    "giveready-mcp": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "keywords": ["mcp", "nonprofit", "charity", "giving", "ai", "youth"],
+  "author": "TestVentures.net",
+  "license": "MIT"
+}
