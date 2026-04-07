@@ -77,7 +77,7 @@ INSERT OR IGNORE INTO nonprofits (
 
 -- Finn Wardman World Explorer Fund
 INSERT OR IGNORE INTO nonprofits (
-  id, slug, name, tagline, mission, description, website, donation_url,
+  id, slug, name, tagline, mission, description, website, donation_url, usdc_wallet,
   country, city, region, founded_year, annual_budget_usd, budget_year,
   team_size, beneficiaries_per_year, contact_email, verified, ghd_aligned
 ) VALUES (
@@ -89,6 +89,7 @@ INSERT OR IGNORE INTO nonprofits (
   'The WEF was established in memory of Finn Wardman, who died in 2023 at age 20. Finn was an avid freeride skier in Verbier, a surfer, and someone who lived fully in every moment. The fund honours that spirit by giving other young people the chance to explore the world. Based in Bermuda with an endowment at the Bermuda Community Foundation, the WEF awards grants to young people for adventure travel and cultural exploration. Past grantees have used funds for international travel, outdoor education, and immersive experiences that changed their trajectory. The fund is run by Geordie Wardman, Finn''s father, who also writes about adventure, presence, and grief on the WEF blog.',
   'https://www.finnwardman.com',
   'https://www.finnwardman.com/donate',
+  'J4F3RwWiCnAvyeMqnrxMb7RC8CVg2kk8VyPFfzbfn3CH',
   'Bermuda',
   'Hamilton',
   'Bermuda',

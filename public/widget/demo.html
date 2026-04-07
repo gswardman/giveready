@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GiveReady Donate Widget Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+      color: #1f2937;
+      line-height: 1.6;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    header h1 {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p {
+      font-size: 16px;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #9ca3af;
+      margin-top: 12px;
+    }
+
+    .demo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 40px;
+      margin-bottom: 60px;
+    }
+
+    .demo-card {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+      border: 1px solid #e5e7eb;
+    }
+
+    .demo-card h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #1f2937;
+    }
+
+    .demo-card p {
+      font-size: 14px;
+      color: #6b7280;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .demo-card .widget-container {
+      padding: 20px;
+      background: #f9fafb;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      text-align: center;
+    }
+
+    .code-block {
+      background: #1f2937;
+      color: #e5e7eb;
+      padding: 16px;
+      border-radius: 8px;
+      font-family: "Monaco", "Courier New", monospace;
+      font-size: 12px;
+      overflow-x: auto;
+      margin: 20px 0;
+      line-height: 1.4;
+    }
+
+    .features {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+      border: 1px solid #e5e7eb;
+      margin-bottom: 40px;
+    }
+
+    .features h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      color: #1f2937;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 24px;
+    }
+
+    .feature-item {
+      padding: 20px;
+      background: #f9fafb;
+      border-radius: 8px;
+      border-left: 4px solid #1f2937;
+    }
+
+    .feature-item h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #1f2937;
+    }
+
+    .feature-item p {
+      font-size: 13px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+
+    .tech-specs {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+      border: 1px solid #e5e7eb;
+      margin-bottom: 40px;
+    }
+
+    .tech-specs h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      color: #1f2937;
+    }
+
+    .spec-list {
+      list-style: none;
+    }
+
+    .spec-list li {
+      padding: 12px 0;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 14px;
+    }
+
+    .spec-list li:last-child {
+      border-bottom: none;
+    }
+
+    .spec-list code {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: "Monaco", "Courier New", monospace;
+      font-size: 12px;
+      color: #1f2937;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 40px 20px;
+      color: #9ca3af;
+      font-size: 13px;
+    }
+
+    .footer a {
+      color: #6b7280;
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .footer a:hover {
+      color: #1f2937;
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #f0f9ff;
+      color: #0369a1;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+      header h1 {
+        font-size: 28px;
+      }
+
+      .demo-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>GiveReady Donate Widget</h1>
+      <p>Open-source embeddable donation button for nonprofits</p>
+      <p class="subtitle">Add a USDC donation button to any website with a single script tag</p>
+    </header>
+
+    <div class="features">
+      <h2>Widget Features</h2>
+      <div class="features-grid">
+        <div class="feature-item">
+          <h3>Zero Dependencies</h3>
+          <p>Self-contained, no frameworks or external libraries. Single 15KB JavaScript file.</p>
+        </div>
+        <div class="feature-item">
+          <h3>Live Data</h3>
+          <p>Fetches nonprofit data and wallet address from GiveReady API in real-time.</p>
+        </div>
+        <div class="feature-item">
+          <h3>Solana Pay QR</h3>
+          <p>Generates Solana Pay QR codes dynamically for any donation amount.</p>
+        </div>
+        <div class="feature-item">
+          <h3>Mobile Optimized</h3>
+          <p>Deep links to Phantom and Coinbase Wallet for seamless mobile donations.</p>
+        </div>
+        <div class="feature-item">
+          <h3>No Intermediary</h3>
+          <p>Direct USDC transfers. No platform fees. Nonprofit keeps 100%.</p>
+        </div>
+        <div class="feature-item">
+          <h3>Fully Branded</h3>
+          <p>Clean, modern UI that matches any website. Inline CSS, no stylesheets.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-grid">
+      <div class="demo-card">
+        <span class="badge">Live Demo</span>
+        <h2>Finn Wardman World Explorer Fund</h2>
+        <p>The widget below is a live example. Click the button to see the donation modal, select an amount, and scan the Solana Pay QR code with Phantom or Coinbase Wallet.</p>
+        <div class="widget-container">
+          <div id="giveready-donate" data-slug="finn-wardman-world-explorer-fund"></div>
+          <script src="./donate.js"></script>
+        </div>
+      </div>
+
+      <div class="demo-card">
+        <h2>How to Embed</h2>
+        <p>Add this HTML snippet to your website to enable USDC donations:</p>
+        <div class="code-block">
+&lt;div id="giveready-donate"
+     data-slug="your-nonprofit-slug"&gt;
+&lt;/div&gt;
+&lt;script src="https://giveready.org/widget/donate.js"&gt;&lt;/script&gt;
+        </div>
+        <p style="margin-top: 16px; font-size: 13px;">Replace <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 3px;">your-nonprofit-slug</code> with your organization's GiveReady slug. <a href="https://giveready.org/docs" style="color: #0369a1; text-decoration: none;">Find your slug →</a></p>
+      </div>
+    </div>
+
+    <div class="tech-specs">
+      <h2>Technical Specifications</h2>
+      <ul class="spec-list">
+        <li><strong>File Size:</strong> ~15KB (minified, gzipped: ~5KB)</li>
+        <li><strong>Browser Support:</strong> All modern browsers (ES6+), mobile optimized</li>
+        <li><strong>API Base:</strong> <code>https://giveready.org/api</code></li>
+        <li><strong>QR Code Generator:</strong> QR Server API (free, no auth required)</li>
+        <li><strong>Solana Network:</strong> Mainnet Beta (USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v)</li>
+        <li><strong>Supported Wallets:</strong> Phantom Wallet, Coinbase Wallet, any Solana Pay compatible wallet</li>
+        <li><strong>Data Fetched:</strong> Nonprofit name, mission, USDC wallet address</li>
+        <li><strong>Permissions Required:</strong> None (read-only API calls)</li>
+        <li><strong>CSS Injection:</strong> Single <code>&lt;style&gt;</code> tag inserted once per page load</li>
+        <li><strong>Modal Scope:</strong> All CSS classes prefixed with <code>giveready-</code> to prevent conflicts</li>
+      </ul>
+    </div>
+
+    <div class="demo-grid">
+      <div class="demo-card">
+        <h2>Testing the Widget</h2>
+        <p>To test the donation flow:</p>
+        <ol style="padding-left: 20px; font-size: 14px; color: #6b7280; line-height: 1.8;">
+          <li>Click "Donate with USDC" button above</li>
+          <li>Select an amount ($1, $5, $10, $25, or custom)</li>
+          <li>Scan the QR code with Phantom or Coinbase Wallet</li>
+          <li>Or click "Phantom Wallet" or "Coinbase Wallet" on mobile</li>
+          <li>Sign the transaction in your wallet</li>
+          <li>Donation settles on Solana blockchain</li>
+        </ol>
+      </div>
+
+      <div class="demo-card">
+        <h2>Open Source</h2>
+        <p>The GiveReady widget is open-source and available on GitHub.</p>
+        <p style="margin-bottom: 16px;">Licensed under MIT. Fork, customize, and deploy on your own infrastructure.</p>
+        <div class="code-block">
+git clone https://github.com/giveready/widget.git
+cd widget
+npm install
+npm run build
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Built by <a href="https://testventures.net" target="_blank">TestVentures.net</a> • Powered by <a href="https://giveready.org" target="_blank">GiveReady</a></p>
+      <p style="margin-top: 12px; font-size: 12px;">GiveReady is making small nonprofits discoverable by AI and donatable directly through cryptocurrency.</p>
+    </div>
+  </div>
+</body>
+</html>

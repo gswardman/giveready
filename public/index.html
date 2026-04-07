@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GiveReady — AI agents can find your nonprofit and pay it directly</title>
+  <meta name="description" content="Free infrastructure for youth nonprofits. Get discovered by AI agents. Receive direct USDC donations. No intermediary. No fees. Keep 100%." />
+  <link rel="canonical" href="https://giveready.org/" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --text: #111;
+      --muted: #666;
+      --light: #999;
+      --border: #e5e5e5;
+      --bg: #fff;
+      --code-bg: #fafafa;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--sans); font-size: 15px; line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* NAV */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      height: 48px; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      max-width: 100%;
+    }
+    .nav-left { display: flex; align-items: center; gap: 8px; }
+    .nav-name {
+      font-weight: 700; font-size: 14px; color: var(--text);
+      text-decoration: none; letter-spacing: -0.01em;
+    }
+    .nav-tag {
+      font-size: 10px; font-weight: 600; color: var(--light);
+      border: 1px solid var(--border); padding: 2px 6px; border-radius: 3px;
+      letter-spacing: 0.02em;
+    }
+    .nav-right { display: flex; align-items: center; gap: 20px; }
+    .nav-link {
+      font-size: 13px; color: var(--muted); text-decoration: none;
+    }
+    .nav-link:hover { color: var(--text); }
+    .nav-cta {
+      font-size: 13px; font-weight: 600; color: #fff;
+      background: var(--text); text-decoration: none;
+      padding: 5px 12px; border-radius: 5px;
+    }
+    .nav-cta:hover { opacity: 0.8; }
+
+    /* LAYOUT */
+    .wrap { max-width: 640px; margin: 0 auto; padding: 0 24px; }
+    .wrap-wide { max-width: 800px; margin: 0 auto; padding: 0 24px; }
+    .section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+    .section:last-of-type { border-bottom: none; }
+
+    /* HERO */
+    .hero { padding: 80px 24px 64px; text-align: center; border-bottom: 1px solid var(--border); }
+    .hero-inner { max-width: 580px; margin: 0 auto; }
+    .hero h1 {
+      font-size: clamp(28px, 6vw, 44px); font-weight: 800;
+      line-height: 1.1; letter-spacing: -0.03em;
+      margin-bottom: 16px;
+    }
+    .hero p {
+      font-size: 16px; color: var(--muted); line-height: 1.7;
+      margin-bottom: 32px;
+    }
+    .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
+    .btn {
+      display: inline-block; font-size: 14px; font-weight: 600;
+      text-decoration: none; padding: 10px 20px; border-radius: 6px;
+      transition: all 0.15s;
+    }
+    .btn-dark { background: var(--text); color: #fff; }
+    .btn-dark:hover { opacity: 0.8; }
+    .btn-ghost { background: none; color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--text); }
+    .hero-meta {
+      font-size: 12px; color: var(--light);
+      display: flex; gap: 16px; justify-content: center;
+    }
+
+    /* TEXT SECTIONS */
+    .section h2 {
+      font-size: clamp(22px, 4vw, 28px); font-weight: 700;
+      letter-spacing: -0.02em; line-height: 1.2;
+      margin-bottom: 12px;
+    }
+    .section h2 em { font-style: normal; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 4px; }
+    .section .lead {
+      font-size: 15px; color: var(--muted); line-height: 1.7;
+      margin-bottom: 8px;
+    }
+    .tag {
+      display: inline-block; font-size: 11px; font-weight: 600;
+      color: var(--light); letter-spacing: 0.05em; text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    /* STEPS */
+    .steps { margin-top: 24px; }
+    .step {
+      display: flex; gap: 16px; padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .step:last-child { border-bottom: none; }
+    .step-num {
+      font-size: 12px; font-weight: 700; color: var(--light);
+      min-width: 24px; padding-top: 2px;
+    }
+    .step-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+    .step-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+    /* VALUE TABLE */
+    .value-table {
+      width: 100%; border-collapse: collapse; margin-top: 24px;
+      font-size: 14px;
+    }
+    .value-table th {
+      text-align: left; font-size: 11px; font-weight: 600;
+      color: var(--light); letter-spacing: 0.04em; text-transform: uppercase;
+      padding: 0 0 8px; border-bottom: 1px solid var(--border);
+    }
+    .value-table th:last-child { text-align: right; }
+    .value-table td {
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .value-table tr:last-child td { border-bottom: none; }
+    .val-name { font-weight: 600; color: var(--text); }
+    .val-detail { font-size: 12px; color: var(--light); margin-top: 1px; }
+    .val-elsewhere {
+      text-align: right; font-size: 12px; color: var(--light);
+      text-decoration: line-through;
+    }
+    .val-price {
+      text-align: right; font-weight: 700; color: var(--text);
+      font-size: 15px;
+    }
+    .val-total-row td {
+      padding-top: 16px; border-bottom: none;
+    }
+    .val-total {
+      text-align: right; font-size: 32px; font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+    .val-total-note {
+      text-align: right; font-size: 12px; color: var(--light);
+      margin-top: 2px;
+    }
+
+    /* WIDGET DEMO */
+    .demo-layout {
+      display: grid; grid-template-columns: 1fr; gap: 24px;
+      margin-top: 24px;
+    }
+    .demo-box {
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 24px; background: var(--bg);
+    }
+    .demo-box h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .demo-box > p { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+    .demo-widget-area {
+      padding: 20px; background: var(--code-bg);
+      border: 1px solid var(--border); border-radius: 6px;
+      text-align: center; min-height: 60px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .code {
+      background: #111; color: #ccc; padding: 16px 18px;
+      border-radius: 6px; font-family: var(--mono);
+      font-size: 12px; line-height: 1.6; overflow-x: auto;
+    }
+    .code .cm { color: #555; }
+    .code .tg { color: #7ec8e3; }
+    .code .at { color: #c4b5fd; }
+    .code .st { color: #86efac; }
+    .code-note {
+      margin-top: 10px; font-size: 12px; color: var(--light);
+    }
+    .code-note code {
+      background: var(--code-bg); padding: 1px 5px; border-radius: 3px;
+      font-family: var(--mono); font-size: 11px; border: 1px solid var(--border);
+    }
+
+    /* STATS */
+    .stats {
+      display: flex; justify-content: center; gap: 48px;
+      text-align: center; margin: 24px 0 32px;
+    }
+    .stat-num {
+      font-size: 28px; font-weight: 800; letter-spacing: -0.03em;
+      color: var(--text);
+    }
+    .stat-label { font-size: 12px; color: var(--light); margin-top: 2px; }
+    .logos {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+    }
+    .logo-chip {
+      font-size: 12px; font-weight: 500; color: var(--muted);
+      padding: 6px 12px; border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+
+    /* QUALIFIER */
+    .qual-row {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 8px 0;
+    }
+    .qual-icon {
+      font-size: 13px; font-weight: 700; flex-shrink: 0;
+      width: 20px; text-align: center; padding-top: 2px;
+    }
+    .qual-yes { color: var(--text); }
+    .qual-no { color: var(--light); }
+    .qual-text { font-size: 14px; color: #444; line-height: 1.6; }
+    .qual-text strong { color: var(--text); font-weight: 600; }
+
+    /* CTA */
+    .final-cta {
+      text-align: center; padding: 80px 24px;
+      background: var(--text); color: #fff;
+    }
+    .final-cta h2 {
+      font-size: clamp(24px, 5vw, 36px); font-weight: 800;
+      letter-spacing: -0.03em; line-height: 1.1;
+      margin-bottom: 12px; color: #fff;
+    }
+    .final-cta p {
+      font-size: 15px; color: rgba(255,255,255,0.5);
+      margin-bottom: 28px; max-width: 400px;
+      margin-left: auto; margin-right: auto; line-height: 1.6;
+    }
+    .btn-white {
+      display: inline-block; background: #fff; color: var(--text);
+      font-size: 14px; font-weight: 700; text-decoration: none;
+      padding: 12px 28px; border-radius: 6px; transition: opacity 0.15s;
+    }
+    .btn-white:hover { opacity: 0.9; }
+    .cta-note { font-size: 12px; color: rgba(255,255,255,0.3); margin-top: 12px; }
+
+    /* FOOTER */
+    footer {
+      padding: 24px; text-align: center;
+      font-size: 12px; color: var(--light);
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+
+    /* RESPONSIVE */
+    @media (min-width: 640px) {
+      .demo-layout { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 480px) {
+      .stats { gap: 24px; }
+      .hero-cta { flex-direction: column; align-items: stretch; }
+      .hero-cta .btn { text-align: center; }
+      .value-table { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-left">
+    <a href="/" class="nav-name">GiveReady</a>
+    <span class="nav-tag">open source</span>
+  </div>
+  <div class="nav-right">
+    <a href="#how" class="nav-link">How It Works</a>
+    <a href="#widget" class="nav-link">Widget</a>
+    <a href="https://github.com/gswardman/giveready" class="nav-link" target="_blank">GitHub</a>
+    <a href="#cta" class="nav-cta">Get Listed</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-inner">
+    <h1>Donors are asking AI where to give.</h1>
+    <p>When they ask to donate $5 to a youth charity, your nonprofit should be the answer. GiveReady makes you discoverable by AI agents and lets donors pay your wallet directly. No intermediary. No fees.</p>
+    <div class="hero-cta">
+      <a href="#cta" class="btn btn-dark">Get Listed — Free Forever</a>
+      <a href="#widget" class="btn btn-ghost">See the Widget</a>
+    </div>
+    <div class="hero-meta">
+      <span>162 nonprofits</span>
+      <span>MIT licensed</span>
+      <span>$0 fees</span>
+    </div>
+  </div>
+</div>
+
+<div class="section" id="problem">
+  <div class="wrap">
+    <span class="tag">The problem</span>
+    <h2>Every donation platform is <em>a middleman</em></h2>
+    <p class="lead">Every.org, The Giving Block, Endaoment — they hold your donations, convert them, and take a cut. None of them make your nonprofit visible to AI agents.</p>
+    <p class="lead">Donors are asking AI assistants to find causes, compare impact, and send money. If your nonprofit isn't in the answer, you're invisible to the fastest-growing donor channel on the planet.</p>
+  </div>
+</div>
+
+<div class="section" id="how">
+  <div class="wrap">
+    <span class="tag">How it works</span>
+    <h2>Three steps. Under 45 minutes.</h2>
+    <div class="steps">
+      <div class="step">
+        <span class="step-num">01</span>
+        <div>
+          <div class="step-name">Set up a USDC wallet</div>
+          <div class="step-desc">Download Phantom or Coinbase Wallet. Create a wallet. Copy your USDC address. Three minutes, no KYC. Works in any country.</div>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">02</span>
+        <div>
+          <div class="step-name">Register on GiveReady</div>
+          <div class="step-desc">Name, mission, programmes, impact data, wallet address. Ten minutes. AI agents worldwide find you through our MCP server, llms.txt, and API.</div>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">03</span>
+        <div>
+          <div class="step-name">Embed the donate button</div>
+          <div class="step-desc">One script tag. Paste into your website. Generates Solana Pay QR codes, links to Phantom and Coinbase Wallet, sends USDC straight to your wallet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" id="value">
+  <div class="wrap">
+    <span class="tag">What you get</span>
+    <h2>The offer</h2>
+    <table class="value-table">
+      <thead>
+        <tr>
+          <th>Included</th>
+          <th style="text-align:right">Elsewhere</th>
+          <th style="text-align:right">GiveReady</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <div class="val-name">AI Agent Discovery</div>
+            <div class="val-detail">MCP server, llms.txt, agents.md, API</div>
+          </td>
+          <td class="val-elsewhere">Doesn't exist</td>
+          <td class="val-price">$0</td>
+        </tr>
+        <tr>
+          <td>
+            <div class="val-name">Direct USDC Donations</div>
+            <div class="val-detail">Donors pay your wallet. You control the funds.</div>
+          </td>
+          <td class="val-elsewhere">3–8% fees</td>
+          <td class="val-price">$0</td>
+        </tr>
+        <tr>
+          <td>
+            <div class="val-name">Open-Source Donate Widget</div>
+            <div class="val-detail">One script tag. QR codes. Mobile wallet links.</div>
+          </td>
+          <td class="val-elsewhere">$29–99/mo</td>
+          <td class="val-price">$0</td>
+        </tr>
+        <tr>
+          <td>
+            <div class="val-name">Full Nonprofit Profile</div>
+            <div class="val-detail">Impact data, programmes — structured for AI</div>
+          </td>
+          <td class="val-elsewhere">$0–500/yr</td>
+          <td class="val-price">$0</td>
+        </tr>
+        <tr>
+          <td>
+            <div class="val-name">Zero Platform Fees</div>
+            <div class="val-detail">No transaction fees. No monthly fees. Ever.</div>
+          </td>
+          <td class="val-elsewhere">1–3%</td>
+          <td class="val-price">$0</td>
+        </tr>
+        <tr class="val-total-row">
+          <td></td>
+          <td></td>
+          <td>
+            <div class="val-total">$0</div>
+            <div class="val-total-note">Free forever. MIT licensed.</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section" id="widget">
+  <div class="wrap-wide">
+    <span class="tag">Live widget</span>
+    <h2>This is what your donors see</h2>
+    <p class="lead" style="margin-bottom:0;">Live donate button. Pulls from the GiveReady API. Generates Solana Pay QR codes. Zero dependencies, 15KB.</p>
+    <div class="demo-layout">
+      <div class="demo-box">
+        <h3>Finn Wardman World Explorer Fund</h3>
+        <p>Youth adventure grants. Click the button, pick an amount, scan with your wallet.</p>
+        <div class="demo-widget-area">
+          <div id="giveready-donate" data-slug="finn-wardman-world-explorer-fund"></div>
+        </div>
+      </div>
+      <div class="demo-box">
+        <h3>Embed on your site</h3>
+        <p>Two lines of HTML. That's it.</p>
+        <div class="code"><span class="cm">&lt;!-- GiveReady donate button --&gt;</span>
+<span class="tg">&lt;div</span> <span class="at">id</span>=<span class="st">"giveready-donate"</span>
+     <span class="at">data-slug</span>=<span class="st">"your-slug"</span><span class="tg">&gt;&lt;/div&gt;</span>
+<span class="tg">&lt;script</span> <span class="at">src</span>=<span class="st">"https://giveready.org/widget/donate.js"</span><span class="tg">&gt;&lt;/script&gt;</span></div>
+        <p class="code-note">Replace <code>your-slug</code> with your GiveReady slug.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" id="proof">
+  <div class="wrap" style="text-align:center;">
+    <span class="tag">Consortium</span>
+    <h2>Built with real nonprofits</h2>
+    <div class="stats">
+      <div>
+        <div class="stat-num">162</div>
+        <div class="stat-label">Nonprofits</div>
+      </div>
+      <div>
+        <div class="stat-num">0%</div>
+        <div class="stat-label">Fees</div>
+      </div>
+      <div>
+        <div class="stat-num">100%</div>
+        <div class="stat-label">To the nonprofit</div>
+      </div>
+    </div>
+    <div class="logos">
+      <span class="logo-chip">Bridges for Music</span>
+      <span class="logo-chip">The Wave Project</span>
+      <span class="logo-chip">Finn Wardman WEF</span>
+      <span class="logo-chip">TestVentures.net</span>
+    </div>
+  </div>
+</div>
+
+<div class="section" id="who">
+  <div class="wrap">
+    <span class="tag">Who this is for</span>
+    <h2>Youth nonprofits. Any size. Any country.</h2>
+    <div style="margin-top:16px;">
+      <div class="qual-row">
+        <span class="qual-icon qual-yes">✓</span>
+        <span class="qual-text"><strong>Youth nonprofits</strong> that want AI agents to find them and donors to pay them directly.</span>
+      </div>
+      <div class="qual-row">
+        <span class="qual-icon qual-yes">✓</span>
+        <span class="qual-text"><strong>Any size.</strong> 50 young people a year or 50,000. If you work with youth, you qualify.</span>
+      </div>
+      <div class="qual-row">
+        <span class="qual-icon qual-yes">✓</span>
+        <span class="qual-text"><strong>Any country.</strong> USDC works globally. No bank account needed to receive. Optional fiat off-ramp.</span>
+      </div>
+      <div class="qual-row">
+        <span class="qual-icon qual-no">✗</span>
+        <span class="qual-text"><strong>Not for enterprise nonprofits</strong> with seven-figure fundraising teams. They have distribution. This is for the ones that don't.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="final-cta" id="cta">
+  <h2>Get found. Get funded.<br>Keep 100%.</h2>
+  <p>Free forever. Under 45 minutes. AI agents start finding you immediately.</p>
+  <a href="mailto:geordie@testventures.net?subject=GiveReady%20—%20List%20our%20nonprofit&body=Organisation%20name%3A%0AMission%3A%0AWebsite%3A%0ACountry%3A%0A" class="btn-white">Get Listed</a>
+  <div class="cta-note">geordie@testventures.net</div>
+</div>
+
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/gswardman/giveready" target="_blank">GitHub</a>
+    <a href="/widget/demo">Widget Demo</a>
+    <a href="/AGENTS.md">agents.md</a>
+    <a href="/llms.txt">llms.txt</a>
+    <a href="https://testventures.net" target="_blank">TestVentures.net</a>
+  </div>
+  <p>Open-source infrastructure for AI-assisted charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. Revenue supports the <a href="https://finnwardman.com">Finn Wardman World Explorer Fund</a>.</p>
+</footer>
+
+<script src="/widget/donate.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Wrangler / Cloudflare
+.wrangler/
+.dev.vars
+.mf/
+dist/
+
+# Local D1 database
+*.sqlite
+*.sqlite-journal
+
+# Environment
+.env
+.env.local
+.env.production
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build artifacts
+*.tgz
+
+# Registry tokens (MCP publishing)
+.mcpregistry_*
+
+# MCP publisher binary
+mcp-publisher

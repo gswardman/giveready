@@ -1,0 +1,347 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "GiveReady API",
+    "version": "0.1.0",
+    "description": "AI-readable directory of verified youth nonprofits. Search by cause, country, or keyword. Donate USDC directly to nonprofit wallets via x402.",
+    "contact": {
+      "email": "geordie@testventures.net"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://giveready.org"
+    }
+  ],
+  "paths": {
+    "/api/search": {
+      "get": {
+        "operationId": "searchNonprofits",
+        "summary": "Search for youth nonprofits",
+        "description": "Search by keyword, cause area, or country. Returns verified organisations with impact data and donation links.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search keyword (e.g. \"music education\", \"surf therapy\")",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "cause",
+            "in": "query",
+            "description": "Cause area ID (e.g. \"youth-empowerment\", \"music-education\")",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "description": "Country name (e.g. \"South Africa\", \"United Kingdom\")",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ghd_aligned",
+            "in": "query",
+            "description": "Filter for global health & development aligned organisations",
+            "schema": { "type": "string", "enum": ["1", "true"] }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Max results (default 20, max 50)",
+            "schema": { "type": "integer", "default": 20, "maximum": 50 }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Pagination offset",
+            "schema": { "type": "integer", "default": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "query": { "type": "object" },
+                    "count": { "type": "integer" },
+                    "nonprofits": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/NonprofitSummary" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/nonprofits": {
+      "get": {
+        "operationId": "listNonprofits",
+        "summary": "List all verified nonprofits",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "default": 50, "maximum": 100 }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": { "type": "integer", "default": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of nonprofits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": { "type": "integer" },
+                    "count": { "type": "integer" },
+                    "nonprofits": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/NonprofitSummary" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/nonprofits/{slug}": {
+      "get": {
+        "operationId": "getNonprofit",
+        "summary": "Get detailed nonprofit profile",
+        "description": "Returns full profile including mission, programmes, impact metrics, registrations, and donation links.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nonprofit detail",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NonprofitDetail" }
+              }
+            }
+          },
+          "404": {
+            "description": "Nonprofit not found"
+          }
+        }
+      }
+    },
+    "/api/causes": {
+      "get": {
+        "operationId": "listCauses",
+        "summary": "List all cause areas",
+        "description": "Returns cause areas with nonprofit counts.",
+        "responses": {
+          "200": {
+            "description": "List of causes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "causes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "name": { "type": "string" },
+                          "description": { "type": "string" },
+                          "nonprofit_count": { "type": "integer" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stats": {
+      "get": {
+        "operationId": "getStats",
+        "summary": "Directory statistics",
+        "description": "Returns counts of nonprofits, countries, causes, beneficiaries, and query volume.",
+        "responses": {
+          "200": {
+            "description": "Stats object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nonprofits": { "type": "integer" },
+                    "countries": { "type": "integer" },
+                    "causes": { "type": "integer" },
+                    "total_beneficiaries_per_year": { "type": "integer" },
+                    "total_queries": { "type": "integer" },
+                    "queries_this_week": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/donate/{slug}": {
+      "get": {
+        "operationId": "initiateDonation",
+        "summary": "Initiate x402 USDC donation",
+        "description": "Returns HTTP 402 with payment requirements. Include signed X-PAYMENT header to settle.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "amount",
+            "in": "query",
+            "description": "Donation amount in USDC (default 1.00, max 10000)",
+            "schema": { "type": "number", "default": 1.0 }
+          }
+        ],
+        "responses": {
+          "402": {
+            "description": "Payment required — includes X-PAYMENT-REQUIRED header with base64-encoded payment requirements"
+          },
+          "200": {
+            "description": "Donation settled (when X-PAYMENT header provided)"
+          },
+          "404": {
+            "description": "Nonprofit not found"
+          },
+          "422": {
+            "description": "Nonprofit has no wallet configured"
+          }
+        }
+      },
+      "post": {
+        "operationId": "settleDonation",
+        "summary": "Settle x402 donation with signed payment",
+        "description": "Submit signed x402 payment via X-PAYMENT header to complete a USDC donation.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "amount",
+            "in": "query",
+            "schema": { "type": "number", "default": 1.0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Donation settled successfully"
+          }
+        }
+      }
+    },
+    "/api/donations/{slug}": {
+      "get": {
+        "operationId": "getDonationHistory",
+        "summary": "Donation history for a nonprofit",
+        "description": "Returns total USDC received, donation count, and recent transactions.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Donation history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nonprofit": { "type": "string" },
+                    "total_donated_usdc": { "type": "number" },
+                    "donation_count": { "type": "integer" },
+                    "recent_donations": { "type": "array" }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nonprofit not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "NonprofitSummary": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "slug": { "type": "string" },
+          "name": { "type": "string" },
+          "tagline": { "type": "string" },
+          "country": { "type": "string" },
+          "city": { "type": "string" },
+          "website": { "type": "string" },
+          "donation_url": { "type": "string" },
+          "beneficiaries_per_year": { "type": "integer" },
+          "founded_year": { "type": "integer" },
+          "ghd_aligned": { "type": "integer" }
+        }
+      },
+      "NonprofitDetail": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "slug": { "type": "string" },
+          "name": { "type": "string" },
+          "tagline": { "type": "string" },
+          "mission": { "type": "string" },
+          "description": { "type": "string" },
+          "country": { "type": "string" },
+          "city": { "type": "string" },
+          "website": { "type": "string" },
+          "donation_url": { "type": "string" },
+          "usdc_wallet": { "type": "string" },
+          "beneficiaries_per_year": { "type": "integer" },
+          "founded_year": { "type": "integer" },
+          "annual_budget_usd": { "type": "number" },
+          "ghd_aligned": { "type": "integer" },
+          "causes": { "type": "array" },
+          "programs": { "type": "array" },
+          "impact_metrics": { "type": "array" },
+          "registrations": { "type": "array" }
+        }
+      }
+    }
+  }
+}

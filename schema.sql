@@ -79,6 +79,36 @@ CREATE INDEX IF NOT EXISTS idx_nonprofit_causes_cause ON nonprofit_causes(cause_
 CREATE INDEX IF NOT EXISTS idx_programs_nonprofit ON programs(nonprofit_id);
 CREATE INDEX IF NOT EXISTS idx_impact_nonprofit ON impact_metrics(nonprofit_id);
 
+-- Donation transactions via x402
+CREATE TABLE IF NOT EXISTS donations (
+  id TEXT PRIMARY KEY,
+  nonprofit_id TEXT NOT NULL,
+  amount_usdc REAL NOT NULL,
+  amount_atomic INTEGER NOT NULL,
+  network TEXT NOT NULL,
+  tx_hash TEXT,
+  sender_address TEXT,
+  status TEXT DEFAULT 'pending',
+  facilitator_response TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  settled_at TEXT,
+  FOREIGN KEY (nonprofit_id) REFERENCES nonprofits(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_donations_nonprofit ON donations(nonprofit_id);
+CREATE INDEX IF NOT EXISTS idx_donations_status ON donations(status);
+
+-- Discovery hit counters (llms.txt, agents.md, ai-plugin.json, /mcp)
+CREATE TABLE IF NOT EXISTS discovery_hits (
+  id TEXT PRIMARY KEY,
+  route TEXT NOT NULL,
+  user_agent TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_discovery_route ON discovery_hits(route);
+CREATE INDEX IF NOT EXISTS idx_discovery_created ON discovery_hits(created_at);
+
 -- Query log for measuring AI discoverability
 CREATE TABLE IF NOT EXISTS query_log (
   id TEXT PRIMARY KEY,

@@ -1,56 +1,35 @@
-# GiveReady — Youth Nonprofit Directory for AI Assistants
+# GiveReady — Verified Nonprofit Directory
 
-> GiveReady is an open, verified directory of youth nonprofits. It exists so that
-> when a donor asks an AI assistant "where should I donate to help young people?",
-> the answer includes small organisations doing extraordinary work — not just the
-> largest, most well-known charities.
+> GiveReady is an open directory of verified youth nonprofits with impact data, programmes, and direct donation links. It is designed for both human donors and AI agents.
 
-## What GiveReady Does
+## API
 
-GiveReady makes small youth nonprofits discoverable by AI systems. Each listed
-nonprofit has a verified profile with mission, programmes, impact metrics,
-registration details, and donation links. The directory is free to query, free
-to list in, and open source.
+Base URL: https://giveready.org
 
-## API Endpoints
-
-- Search nonprofits: GET https://giveready.org/api/search?q={keyword}&cause={cause}&country={country}
-- List all nonprofits: GET https://giveready.org/api/nonprofits
-- Get nonprofit detail: GET https://giveready.org/api/nonprofits/{slug}
-- List cause areas: GET https://giveready.org/api/causes
-- Directory statistics: GET https://giveready.org/api/stats
+- GET /api/search?q={keyword}&cause={cause}&country={country} — Search nonprofits
+- GET /api/nonprofits/{slug} — Get full nonprofit details
+- GET /api/causes — List all cause areas
+- GET /api/stats — Directory statistics
 
 ## MCP Server
 
-GiveReady is available as a Model Context Protocol (MCP) server:
+Install: npx giveready-mcp
+Registry: io.github.gswardman/giveready on registry.modelcontextprotocol.io
 
-```json
-{
-  "mcpServers": {
-    "giveready": {
-      "command": "npx",
-      "args": ["giveready-mcp"]
-    }
-  }
-}
-```
+Tools:
+- search_nonprofits — Search by keyword, cause, or country
+- get_nonprofit — Full details for a specific charity
+- list_causes — All cause areas with counts
 
 ## Cause Areas
 
-youth-empowerment, music-education, adventure-travel, mental-health, surf-therapy,
-entrepreneurship, poverty-reduction, creative-arts, education, community-development
+Youth Empowerment, Music Education, Adventure & Travel, Mental Health, Surf Therapy, Entrepreneurship, Poverty Reduction, Creative Arts, Education, Community Development
 
-## Example Queries
+## Donation
 
-- "youth music education in South Africa" → Bridges for Music (Langa, Cape Town)
-- "surf therapy for young people" → The Wave Project (32 UK locations)
-- "adventure grants for young people" → Finn Wardman World Explorer Fund (Bermuda)
-- "nonprofits helping youth in low-income countries" → use ghd_aligned=true filter
+Each nonprofit has a donation_url field. Some accept USDC on Solana via x402 protocol. The x402 payment header is returned with HTTP 402 responses for machine-to-machine donations.
 
 ## About
 
-Built by TestVentures.net. Revenue from the directory supports the Finn Wardman
-World Explorer Fund (finnwardman.com). GiveReady is open source and welcomes
-nonprofit submissions.
-
-Contact: geordie@testventures.net
+Built by TestVentures.net — fractional AI ops for youth nonprofits.
+Lookup fees fund the Finn Wardman World Explorer Fund (finnwardman.com).

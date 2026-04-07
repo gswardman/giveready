@@ -13,6 +13,6 @@
     "db:seed:local": "wrangler d1 execute giveready-db --local --file=./seed.sql"
   },
   "devDependencies": {
-    "wrangler": "^3.0.0"
+    "wrangler": "^4.80.0"
   }
 }

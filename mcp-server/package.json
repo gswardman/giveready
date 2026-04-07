@@ -1,19 +1,46 @@
 {
   "name": "giveready-mcp",
-  "version": "0.1.0",
-  "description": "MCP server for GiveReady — search and discover youth nonprofits through AI assistants",
-  "main": "index.js",
+  "version": "0.1.3",
+  "description": "MCP server for nonprofit discovery — search a verified charity directory with donation links and fundraising data.",
+  "main": "dist/index.js",
   "type": "module",
   "bin": {
-    "giveready-mcp": "./index.js"
+    "giveready-mcp": "dist/index.js"
   },
+  "mcpName": "io.github.gswardman/giveready",
+  "files": [
+    "dist",
+    "README.md",
+    "server.json"
+  ],
   "scripts": {
-    "start": "node index.js"
+    "build": "mkdir -p dist && cp index.js dist/index.js",
+    "prepublishOnly": "npm run build",
+    "start": "node dist/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.22.0"
   },
-  "keywords": ["mcp", "nonprofit", "charity", "giving", "ai", "youth"],
+  "keywords": [
+    "mcp",
+    "nonprofit",
+    "charity",
+    "donation",
+    "fundraising",
+    "verified-directory",
+    "giving",
+    "youth",
+    "ai",
+    "x402",
+    "usdc",
+    "solana",
+    "philanthropy"
+  ],
   "author": "TestVentures.net",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gswardman/giveready"
+  }
 }
