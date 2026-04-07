@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Get Listed — GiveReady</title>
+  <meta name="description" content="Get your youth nonprofit listed on GiveReady in under 45 minutes. AI agents find you. Donors pay you directly. No intermediary. No fees." />
+  <link rel="canonical" href="https://giveready.org/onboard" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --text: #111;
+      --muted: #666;
+      --light: #999;
+      --border: #e5e5e5;
+      --bg: #fff;
+      --code-bg: #fafafa;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--sans); font-size: 15px; line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* NAV */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      height: 48px; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-left { display: flex; align-items: center; gap: 8px; }
+    .nav-name {
+      font-weight: 700; font-size: 14px; color: var(--text);
+      text-decoration: none; letter-spacing: -0.01em;
+    }
+    .nav-tag {
+      font-size: 10px; font-weight: 600; color: var(--light);
+      border: 1px solid var(--border); padding: 2px 6px; border-radius: 3px;
+      letter-spacing: 0.02em;
+    }
+    .nav-right { display: flex; align-items: center; gap: 20px; }
+    .nav-link { font-size: 13px; color: var(--muted); text-decoration: none; }
+    .nav-link:hover { color: var(--text); }
+
+    /* LAYOUT */
+    .wrap { max-width: 640px; margin: 0 auto; padding: 0 24px; }
+    .section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+    .section:last-of-type { border-bottom: none; }
+
+    /* HEADER */
+    .page-header {
+      padding: 64px 24px 48px; text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-header h1 {
+      font-size: clamp(26px, 5vw, 38px); font-weight: 800;
+      line-height: 1.1; letter-spacing: -0.03em;
+      margin-bottom: 12px;
+    }
+    .page-header p {
+      font-size: 15px; color: var(--muted); line-height: 1.7;
+      max-width: 480px; margin: 0 auto;
+    }
+
+    /* TAG */
+    .tag {
+      display: inline-block; font-size: 11px; font-weight: 600;
+      color: var(--light); letter-spacing: 0.05em; text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    /* SECTION HEADINGS */
+    .section h2 {
+      font-size: clamp(20px, 4vw, 26px); font-weight: 700;
+      letter-spacing: -0.02em; line-height: 1.2;
+      margin-bottom: 8px;
+    }
+    .section .lead {
+      font-size: 15px; color: var(--muted); line-height: 1.7;
+      margin-bottom: 8px;
+    }
+
+    /* STEPS */
+    .steps { margin-top: 20px; }
+    .step {
+      display: flex; gap: 16px; padding: 20px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .step:last-child { border-bottom: none; }
+    .step-num {
+      font-size: 12px; font-weight: 700; color: var(--light);
+      min-width: 24px; padding-top: 2px;
+    }
+    .step-content { flex: 1; }
+    .step-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .step-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .step-time {
+      display: inline-block; font-size: 11px; font-weight: 600;
+      color: var(--light); background: var(--code-bg);
+      border: 1px solid var(--border); padding: 2px 8px;
+      border-radius: 3px; margin-top: 6px;
+    }
+    .step-link {
+      color: var(--text); font-weight: 500;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+
+    /* WHAT YOU GET */
+    .outcome {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 10px 0;
+    }
+    .outcome-icon {
+      font-size: 13px; font-weight: 700; flex-shrink: 0;
+      width: 20px; text-align: center; padding-top: 2px;
+      color: var(--text);
+    }
+    .outcome-text { font-size: 14px; color: #444; line-height: 1.6; }
+    .outcome-text strong { color: var(--text); font-weight: 600; }
+
+    /* FORM */
+    .form-section {
+      padding: 48px 0 64px;
+    }
+    .form-intro {
+      font-size: 14px; color: var(--muted); line-height: 1.7;
+      margin-bottom: 24px;
+    }
+    .form-grid {
+      display: grid; grid-template-columns: 1fr; gap: 16px;
+    }
+    @media (min-width: 520px) {
+      .form-grid { grid-template-columns: 1fr 1fr; }
+      .form-full { grid-column: 1 / -1; }
+    }
+    .field label {
+      display: block; font-size: 12px; font-weight: 600;
+      color: var(--text); margin-bottom: 4px;
+      letter-spacing: 0.01em;
+    }
+    .field .hint {
+      font-size: 11px; color: var(--light); font-weight: 400;
+      margin-left: 4px;
+    }
+    .field input,
+    .field textarea,
+    .field select {
+      width: 100%; font-family: var(--sans); font-size: 14px;
+      color: var(--text); background: var(--bg);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 10px 12px; outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus,
+    .field textarea:focus,
+    .field select:focus {
+      border-color: var(--text);
+    }
+    .field textarea { resize: vertical; min-height: 80px; }
+    .field input::placeholder,
+    .field textarea::placeholder {
+      color: var(--light);
+    }
+
+    .checkbox-group {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px;
+    }
+    .checkbox-group label {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 400; color: var(--muted);
+      cursor: pointer;
+      padding: 4px 10px; border: 1px solid var(--border);
+      border-radius: 4px; transition: all 0.15s;
+    }
+    .checkbox-group label:hover { border-color: var(--text); }
+    .checkbox-group input:checked + span {
+      color: var(--text); font-weight: 500;
+    }
+    .checkbox-group input { width: auto; margin: 0; }
+
+    .submit-row {
+      display: flex; align-items: center; gap: 16px;
+      margin-top: 24px; flex-wrap: wrap;
+    }
+    .btn-submit {
+      font-family: var(--sans); font-size: 14px; font-weight: 700;
+      color: #fff; background: var(--text);
+      border: none; padding: 12px 28px; border-radius: 6px;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn-submit:hover { opacity: 0.8; }
+    .submit-note { font-size: 12px; color: var(--light); }
+    .email-alt {
+      margin-top: 16px; font-size: 13px; color: var(--light);
+    }
+    .email-alt a { color: var(--muted); }
+
+    /* CODE BLOCKS */
+    .code-block {
+      background: #111; color: #ccc; padding: 14px 16px;
+      border-radius: 6px; font-family: var(--mono);
+      font-size: 12px; line-height: 1.6; overflow-x: auto;
+      margin-top: 12px;
+    }
+    .code-block .cm { color: #555; }
+    .code-block .tg { color: #7ec8e3; }
+    .code-block .at { color: #c4b5fd; }
+    .code-block .st { color: #86efac; }
+
+    /* FOOTER */
+    footer {
+      padding: 24px; text-align: center;
+      font-size: 12px; color: var(--light);
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-left">
+    <a href="/" class="nav-name">GiveReady</a>
+    <span class="nav-tag">open source</span>
+  </div>
+  <div class="nav-right">
+    <a href="/" class="nav-link">Home</a>
+    <a href="https://github.com/gswardman/giveready" class="nav-link" target="_blank">GitHub</a>
+    <a href="/widget/demo" class="nav-link">Widget Demo</a>
+  </div>
+</nav>
+
+<div class="page-header">
+  <h1>Get your nonprofit listed on GiveReady</h1>
+  <p>Under 45 minutes. AI agents start finding you immediately. No fees, no intermediary, you keep 100% of every donation.</p>
+</div>
+
+<div class="section" id="steps">
+  <div class="wrap">
+    <span class="tag">The process</span>
+    <h2>Four steps. One afternoon.</h2>
+    <p class="lead">You don't need a developer. You don't need crypto experience. Each step has a link to exactly what you need.</p>
+
+    <div class="steps">
+      <div class="step">
+        <span class="step-num">01</span>
+        <div class="step-content">
+          <div class="step-name">Set up a USDC wallet</div>
+          <div class="step-desc">
+            Download <a href="https://phantom.app" class="step-link" target="_blank">Phantom</a> (mobile or browser extension) or <a href="https://www.coinbase.com/wallet" class="step-link" target="_blank">Coinbase Wallet</a>. Create a wallet. Copy your Solana USDC address. No KYC required to receive funds. Works in any country.
+          </div>
+          <span class="step-time">~3 minutes</span>
+        </div>
+      </div>
+
+      <div class="step">
+        <span class="step-num">02</span>
+        <div class="step-content">
+          <div class="step-name">Register on GiveReady</div>
+          <div class="step-desc">
+            Fill out the form below with your organisation name, mission, programmes, impact data, and wallet address. We verify your details and publish your profile. AI agents worldwide find you through our MCP server, API, llms.txt, and agents.md.
+          </div>
+          <span class="step-time">~10 minutes</span>
+        </div>
+      </div>
+
+      <div class="step">
+        <span class="step-num">03</span>
+        <div class="step-content">
+          <div class="step-name">Embed the donate button <span style="font-weight:400; color: var(--light);">(optional)</span></div>
+          <div class="step-desc">
+            Add two lines of HTML to your website. The widget reads your wallet address from GiveReady's API, generates Solana Pay QR codes and mobile wallet links. Donors scan, confirm, and USDC lands in your wallet. See the <a href="/widget/demo" class="step-link">live demo</a>.
+          </div>
+          <div class="code-block"><span class="cm">&lt;!-- GiveReady donate button --&gt;</span>
+<span class="tg">&lt;div</span> <span class="at">id</span>=<span class="st">"giveready-donate"</span>
+     <span class="at">data-slug</span>=<span class="st">"your-org-slug"</span><span class="tg">&gt;&lt;/div&gt;</span>
+<span class="tg">&lt;script</span> <span class="at">src</span>=<span class="st">"https://giveready.org/widget/donate.js"</span><span class="tg">&gt;&lt;/script&gt;</span></div>
+          <span class="step-time">~2 minutes</span>
+        </div>
+      </div>
+
+      <div class="step">
+        <span class="step-num">04</span>
+        <div class="step-content">
+          <div class="step-name">Set up a fiat off-ramp <span style="font-weight:400; color: var(--light);">(optional)</span></div>
+          <div class="step-desc">
+            If your nonprofit wants to auto-convert USDC to local currency: create an account on <a href="https://www.coinbase.com" class="step-link" target="_blank">Coinbase</a> (US, UK, EU), <a href="https://www.luno.com" class="step-link" target="_blank">Luno</a> (South Africa), or another local exchange. Link your bank account. USDC converts to fiat on arrival. This is the only step that requires KYC, and it's the exchange's KYC — not ours.
+          </div>
+          <span class="step-time">~30 minutes</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" id="after">
+  <div class="wrap">
+    <span class="tag">What happens next</span>
+    <h2>Once you're listed</h2>
+    <div style="margin-top: 16px;">
+      <div class="outcome">
+        <span class="outcome-icon">✓</span>
+        <span class="outcome-text"><strong>AI agents find you.</strong> When someone asks Claude, ChatGPT, or any MCP-connected assistant to find a youth charity, your nonprofit appears in the results with your mission, programmes, and impact data.</span>
+      </div>
+      <div class="outcome">
+        <span class="outcome-icon">✓</span>
+        <span class="outcome-text"><strong>Donors pay you directly.</strong> USDC goes straight to your wallet via x402 protocol. No intermediary touches the funds. No platform fees. You control the money from the moment it arrives.</span>
+      </div>
+      <div class="outcome">
+        <span class="outcome-icon">✓</span>
+        <span class="outcome-text"><strong>Your profile stays updated.</strong> Email us any time to update your programmes, impact metrics, or wallet address. We keep your data current so AI agents always have the latest.</span>
+      </div>
+      <div class="outcome">
+        <span class="outcome-icon">✓</span>
+        <span class="outcome-text"><strong>It stays free.</strong> No monthly fees. No transaction fees. No contract. GiveReady is open source and MIT licensed. If you ever want to leave, your wallet is yours — nothing to migrate.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="form-section" id="form">
+  <div class="wrap">
+    <span class="tag">Register</span>
+    <h2>Tell us about your nonprofit</h2>
+    <p class="form-intro">We'll verify your details and publish your GiveReady profile within 48 hours. All fields marked with * are required.</p>
+
+    <form action="https://formspree.io/f/meepnkdg" method="POST">
+      <input type="hidden" name="_subject" value="GiveReady — New nonprofit registration" />
+      <input type="hidden" name="_next" value="https://giveready.org/onboard#thanks" />
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Organisation name *</label>
+          <input type="text" name="org_name" placeholder="e.g. Bridges for Music" required />
+        </div>
+
+        <div class="field">
+          <label>Contact email *</label>
+          <input type="email" name="email" placeholder="you@nonprofit.org" required />
+        </div>
+
+        <div class="field">
+          <label>Country *</label>
+          <input type="text" name="country" placeholder="e.g. South Africa" required />
+        </div>
+
+        <div class="field">
+          <label>City</label>
+          <input type="text" name="city" placeholder="e.g. Cape Town" />
+        </div>
+
+        <div class="field">
+          <label>Website</label>
+          <input type="url" name="website" placeholder="https://yoursite.org" />
+        </div>
+
+        <div class="field">
+          <label>Founded year</label>
+          <input type="number" name="founded_year" placeholder="e.g. 2012" min="1900" max="2026" />
+        </div>
+
+        <div class="field form-full">
+          <label>Mission *</label>
+          <textarea name="mission" placeholder="What does your organisation do? Who do you serve? One or two sentences." required></textarea>
+        </div>
+
+        <div class="field form-full">
+          <label>Programmes</label>
+          <textarea name="programmes" placeholder="List your main programmes with a short description of each. Include beneficiary numbers if you have them."></textarea>
+        </div>
+
+        <div class="field form-full">
+          <label>Young people served per year</label>
+          <input type="number" name="beneficiaries_per_year" placeholder="e.g. 500" />
+        </div>
+
+        <div class="field form-full">
+          <label>Cause areas <span class="hint">(select all that apply)</span></label>
+          <div class="checkbox-group">
+            <label><input type="checkbox" name="causes" value="youth-empowerment" /><span>Youth Empowerment</span></label>
+            <label><input type="checkbox" name="causes" value="music-education" /><span>Music Education</span></label>
+            <label><input type="checkbox" name="causes" value="mental-health" /><span>Mental Health</span></label>
+            <label><input type="checkbox" name="causes" value="education" /><span>Education</span></label>
+            <label><input type="checkbox" name="causes" value="adventure-travel" /><span>Adventure & Travel</span></label>
+            <label><input type="checkbox" name="causes" value="surf-therapy" /><span>Surf Therapy</span></label>
+            <label><input type="checkbox" name="causes" value="entrepreneurship" /><span>Entrepreneurship</span></label>
+            <label><input type="checkbox" name="causes" value="creative-arts" /><span>Creative Arts</span></label>
+            <label><input type="checkbox" name="causes" value="community-development" /><span>Community Development</span></label>
+            <label><input type="checkbox" name="causes" value="poverty-reduction" /><span>Poverty Reduction</span></label>
+          </div>
+        </div>
+
+        <div class="field form-full">
+          <label>USDC wallet address <span class="hint">(Solana — from Phantom or Coinbase Wallet)</span></label>
+          <input type="text" name="usdc_wallet" placeholder="e.g. J4F3RwWiCnAvyeMqnrxMb7RC8CVg2kk8VyPFfzbfn3CH" />
+        </div>
+
+        <div class="field form-full">
+          <label>Registration number <span class="hint">(e.g. 501(c)(3) EIN, UK Charity number)</span></label>
+          <input type="text" name="registration" placeholder="e.g. 501(c)(3) 12-3456789" />
+        </div>
+
+        <div class="field form-full">
+          <label>Anything else?</label>
+          <textarea name="notes" placeholder="Impact metrics, existing donation page URL, questions — anything that helps us build your profile."></textarea>
+        </div>
+      </div>
+
+      <div class="submit-row">
+        <button type="submit" class="btn-submit">Submit Registration</button>
+        <span class="submit-note">We'll confirm within 48 hours.</span>
+      </div>
+
+      <p class="email-alt">Prefer email? Send the same info to <a href="mailto:geordie@testventures.net?subject=GiveReady%20—%20List%20our%20nonprofit">geordie@testventures.net</a></p>
+    </form>
+  </div>
+</div>
+
+<div id="thanks" style="display:none; padding: 64px 24px; text-align: center;">
+  <div style="max-width: 480px; margin: 0 auto;">
+    <h2 style="font-size: 28px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 12px;">Registration received.</h2>
+    <p style="font-size: 15px; color: var(--muted); line-height: 1.7;">We'll verify your details and publish your GiveReady profile within 48 hours. You'll get an email when your nonprofit is live and discoverable by AI agents.</p>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-links">
+    <a href="/">Home</a>
+    <a href="https://github.com/gswardman/giveready" target="_blank">GitHub</a>
+    <a href="/widget/demo">Widget Demo</a>
+    <a href="/llms.txt">llms.txt</a>
+    <a href="https://testventures.net" target="_blank">TestVentures.net</a>
+  </div>
+  <p>Open-source infrastructure for AI-assisted charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. Revenue supports the <a href="https://finnwardman.com">Finn Wardman World Explorer Fund</a>.</p>
+</footer>
+
+<script>
+  // Show thanks message if redirected back from Formspree
+  if (window.location.hash === '#thanks') {
+    document.getElementById('thanks').style.display = 'block';
+    document.getElementById('form').style.display = 'none';
+    window.scrollTo({ top: document.getElementById('thanks').offsetTop - 100, behavior: 'smooth' });
+  }
+</script>
+
+</body>
+</html>
