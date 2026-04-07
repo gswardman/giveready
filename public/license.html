@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>License — GiveReady</title>
+  <meta name="description" content="GiveReady is MIT licensed. Free to use, modify, and distribute." />
+  <link rel="canonical" href="https://giveready.org/license" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --text: #111;
+      --muted: #666;
+      --light: #999;
+      --border: #e5e5e5;
+      --bg: #fff;
+      --code-bg: #fafafa;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--sans); font-size: 15px; line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      height: 48px; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-left { display: flex; align-items: center; gap: 8px; }
+    .nav-name {
+      font-weight: 700; font-size: 14px; color: var(--text);
+      text-decoration: none; letter-spacing: -0.01em;
+    }
+    .nav-tag {
+      font-size: 10px; font-weight: 600; color: var(--light);
+      border: 1px solid var(--border); padding: 2px 6px; border-radius: 3px;
+      letter-spacing: 0.02em;
+    }
+    .nav-right { display: flex; align-items: center; gap: 20px; }
+    .nav-link { font-size: 13px; color: var(--muted); text-decoration: none; }
+    .nav-link:hover { color: var(--text); }
+    .nav-cta {
+      font-size: 13px; font-weight: 600; color: #fff;
+      background: var(--text); text-decoration: none;
+      padding: 5px 12px; border-radius: 5px;
+    }
+    .nav-cta:hover { opacity: 0.8; }
+
+    .wrap { max-width: 640px; margin: 0 auto; padding: 0 24px; }
+
+    .page-header {
+      padding: 64px 24px 32px; text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-header h1 {
+      font-size: clamp(26px, 5vw, 38px); font-weight: 800;
+      line-height: 1.1; letter-spacing: -0.03em;
+      margin-bottom: 12px;
+    }
+    .page-header p {
+      font-size: 15px; color: var(--muted); line-height: 1.7;
+      max-width: 480px; margin: 0 auto;
+    }
+
+    .license-text {
+      padding: 48px 0 64px;
+    }
+    .license-text pre {
+      font-family: var(--mono); font-size: 13px;
+      line-height: 1.8; color: var(--text);
+      white-space: pre-wrap; word-wrap: break-word;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px;
+    }
+
+    .what-this-means {
+      padding: 0 0 64px;
+    }
+    .what-this-means h2 {
+      font-size: 20px; font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+    }
+    .means-row {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 8px 0;
+    }
+    .means-icon {
+      font-size: 13px; font-weight: 700; flex-shrink: 0;
+      width: 20px; text-align: center; padding-top: 2px;
+      color: var(--text);
+    }
+    .means-text {
+      font-size: 14px; color: #444; line-height: 1.6;
+    }
+    .means-text strong { color: var(--text); font-weight: 600; }
+
+    footer {
+      padding: 24px; text-align: center;
+      font-size: 12px; color: var(--light);
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-left">
+    <a href="/" class="nav-name">GiveReady</a>
+    <span class="nav-tag">open source</span>
+  </div>
+  <div class="nav-right">
+    <a href="/" class="nav-link">Home</a>
+    <a href="https://github.com/gswardman/giveready" class="nav-link" target="_blank">GitHub</a>
+    <a href="/onboard" class="nav-cta">Get Listed</a>
+  </div>
+</nav>
+
+<div class="page-header">
+  <h1>MIT License</h1>
+  <p>GiveReady is free and open-source software. Use it, modify it, ship it.</p>
+</div>
+
+<div class="license-text">
+  <div class="wrap">
+    <pre>MIT License
+
+Copyright (c) 2026 TestVentures.net
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</pre>
+  </div>
+</div>
+
+<div class="what-this-means">
+  <div class="wrap">
+    <h2>What this means</h2>
+    <div class="means-row">
+      <span class="means-icon">✓</span>
+      <span class="means-text"><strong>Use it commercially.</strong> Run GiveReady for your own nonprofit network, foundation, or grant programme.</span>
+    </div>
+    <div class="means-row">
+      <span class="means-icon">✓</span>
+      <span class="means-text"><strong>Modify it.</strong> Fork the repo, change the code, adapt it for your sector or region.</span>
+    </div>
+    <div class="means-row">
+      <span class="means-icon">✓</span>
+      <span class="means-text"><strong>Distribute it.</strong> Share GiveReady with other organisations. Bundle it into your own tools.</span>
+    </div>
+    <div class="means-row">
+      <span class="means-icon">✓</span>
+      <span class="means-text"><strong>No fees. No permission needed.</strong> The only requirement is including the copyright notice.</span>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-links">
+    <a href="/">Home</a>
+    <a href="/onboard">Get Listed</a>
+    <a href="https://github.com/gswardman/giveready" target="_blank">GitHub</a>
+    <a href="/widget/demo">Widget Demo</a>
+    <a href="https://testventures.net" target="_blank">TestVentures.net</a>
+  </div>
+  <p>Open-source infrastructure for AI-assisted charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. Revenue supports the <a href="https://finnwardman.com">Finn Wardman World Explorer Fund</a>.</p>
+</footer>
+
+</body>
+</html>

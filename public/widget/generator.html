@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Widget Generator — GiveReady</title>
+  <meta name="description" content="Generate your GiveReady donate button. Enter your slug, copy the code, paste into your site." />
+  <link rel="canonical" href="https://giveready.org/widget/generator" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --text: #111;
+      --muted: #666;
+      --light: #999;
+      --border: #e5e5e5;
+      --bg: #fff;
+      --code-bg: #fafafa;
+      --green: #22c55e;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--sans); font-size: 15px; line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      height: 48px; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-left { display: flex; align-items: center; gap: 8px; }
+    .nav-name {
+      font-weight: 700; font-size: 14px; color: var(--text);
+      text-decoration: none; letter-spacing: -0.01em;
+    }
+    .nav-tag {
+      font-size: 10px; font-weight: 600; color: var(--light);
+      border: 1px solid var(--border); padding: 2px 6px; border-radius: 3px;
+      letter-spacing: 0.02em;
+    }
+    .nav-right { display: flex; align-items: center; gap: 20px; }
+    .nav-link { font-size: 13px; color: var(--muted); text-decoration: none; }
+    .nav-link:hover { color: var(--text); }
+    .nav-cta {
+      font-size: 13px; font-weight: 600; color: #fff;
+      background: var(--text); text-decoration: none;
+      padding: 5px 12px; border-radius: 5px;
+    }
+    .nav-cta:hover { opacity: 0.8; }
+
+    .wrap { max-width: 640px; margin: 0 auto; padding: 0 24px; }
+
+    .page-header {
+      padding: 64px 24px 32px; text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-header h1 {
+      font-size: clamp(26px, 5vw, 38px); font-weight: 800;
+      line-height: 1.1; letter-spacing: -0.03em;
+      margin-bottom: 12px;
+    }
+    .page-header p {
+      font-size: 15px; color: var(--muted); line-height: 1.7;
+      max-width: 480px; margin: 0 auto;
+    }
+
+    .generator {
+      padding: 48px 0 64px;
+    }
+
+    .input-group {
+      margin-bottom: 32px;
+    }
+    .input-group label {
+      display: block; font-size: 13px; font-weight: 600;
+      color: var(--text); margin-bottom: 6px;
+    }
+    .input-group .hint {
+      font-size: 12px; color: var(--light); font-weight: 400;
+      margin-bottom: 8px; display: block;
+    }
+    .slug-input-row {
+      display: flex; gap: 8px;
+    }
+    .slug-input-row input {
+      flex: 1; font-family: var(--mono); font-size: 14px;
+      color: var(--text); background: var(--bg);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 10px 12px; outline: none;
+      transition: border-color 0.15s;
+    }
+    .slug-input-row input:focus { border-color: var(--text); }
+    .slug-input-row input::placeholder { color: var(--light); }
+
+    .section-label {
+      font-size: 11px; font-weight: 600; color: var(--light);
+      letter-spacing: 0.05em; text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    /* Preview */
+    .preview-area {
+      padding: 32px; background: var(--code-bg);
+      border: 1px solid var(--border); border-radius: 8px;
+      text-align: center; min-height: 80px;
+      margin-bottom: 32px;
+    }
+    .preview-empty {
+      font-size: 13px; color: var(--light); padding: 20px 0;
+    }
+
+    /* Code output */
+    .code-output {
+      position: relative;
+      background: #111; color: #ccc; padding: 20px;
+      border-radius: 8px; font-family: var(--mono);
+      font-size: 13px; line-height: 1.7;
+      overflow-x: auto; margin-bottom: 8px;
+      white-space: pre; tab-size: 2;
+    }
+    .code-output .tg { color: #7ec8e3; }
+    .code-output .at { color: #c4b5fd; }
+    .code-output .st { color: #86efac; }
+    .code-output .cm { color: #555; }
+
+    .copy-btn {
+      position: absolute; top: 12px; right: 12px;
+      font-family: var(--sans); font-size: 12px; font-weight: 600;
+      color: #999; background: #222;
+      border: 1px solid #333; border-radius: 4px;
+      padding: 5px 12px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { color: #fff; border-color: #555; }
+    .copy-btn.copied { color: var(--green); border-color: var(--green); }
+
+    .code-note {
+      font-size: 12px; color: var(--light); margin-top: 4px;
+    }
+
+    /* How it works */
+    .how-section {
+      padding: 32px 0 0;
+      border-top: 1px solid var(--border);
+      margin-top: 16px;
+    }
+    .how-section h2 {
+      font-size: 18px; font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+    .how-text {
+      font-size: 14px; color: var(--muted); line-height: 1.7;
+      margin-bottom: 8px;
+    }
+
+    footer {
+      padding: 24px; text-align: center;
+      font-size: 12px; color: var(--light);
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-left">
+    <a href="/" class="nav-name">GiveReady</a>
+    <span class="nav-tag">open source</span>
+  </div>
+  <div class="nav-right">
+    <a href="/" class="nav-link">Home</a>
+    <a href="/onboard" class="nav-link">Get Listed</a>
+    <a href="https://github.com/gswardman/giveready" class="nav-link" target="_blank">GitHub</a>
+  </div>
+</nav>
+
+<div class="page-header">
+  <h1>Generate your donate button</h1>
+  <p>Enter your GiveReady slug. Copy the code. Paste it into your website. Done.</p>
+</div>
+
+<div class="generator">
+  <div class="wrap">
+
+    <div class="input-group">
+      <label>Your GiveReady slug</label>
+      <span class="hint">This is the URL-friendly version of your org name. If you're listed as "Bridges for Music" your slug is "bridges-for-music".</span>
+      <div class="slug-input-row">
+        <input type="text" id="slug-input" placeholder="e.g. bridges-for-music" spellcheck="false" autocomplete="off" />
+      </div>
+    </div>
+
+    <div class="section-label">Live preview</div>
+    <div class="preview-area" id="preview-area">
+      <div class="preview-empty" id="preview-empty">Enter your slug above to see the live widget</div>
+      <div id="giveready-donate" style="display:none;"></div>
+    </div>
+
+    <div class="section-label">Your code</div>
+    <div class="code-output" id="code-output"><button class="copy-btn" id="copy-btn" onclick="copyCode()">Copy</button><span class="cm">&lt;!-- GiveReady donate button --&gt;</span>
+<span class="tg">&lt;div</span> <span class="at">id</span>=<span class="st">"giveready-donate"</span>
+     <span class="at">data-slug</span>=<span class="st">"<span id="code-slug">your-slug</span>"</span><span class="tg">&gt;&lt;/div&gt;</span>
+<span class="tg">&lt;script</span> <span class="at">src</span>=<span class="st">"https://giveready.org/widget/donate.js"</span><span class="tg">&gt;&lt;/script&gt;</span></div>
+    <p class="code-note">Paste this anywhere in your website's HTML. The widget loads automatically.</p>
+
+    <div class="how-section">
+      <h2>How it works</h2>
+      <p class="how-text">The script fetches your nonprofit's USDC wallet address from the GiveReady API and renders a donate button. When a donor clicks it, they choose an amount and get a Solana Pay QR code or a direct link to Phantom or Coinbase Wallet. The donation goes straight to your wallet. No backend required on your end. No fees.</p>
+      <p class="how-text">The widget is 15KB, has zero dependencies, and works on any website — WordPress, Squarespace, Ghost, static HTML, anything that lets you paste a script tag.</p>
+      <p class="how-text">Not listed yet? <a href="/onboard" style="color:var(--text);font-weight:500;">Get listed on GiveReady</a> first — it takes 10 minutes.</p>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <div class="footer-links">
+    <a href="/">Home</a>
+    <a href="/onboard">Get Listed</a>
+    <a href="/widget/demo">Widget Demo</a>
+    <a href="https://github.com/gswardman/giveready" target="_blank">GitHub</a>
+    <a href="https://testventures.net" target="_blank">TestVentures.net</a>
+  </div>
+  <p>Open-source infrastructure for AI-assisted charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. Revenue supports the <a href="https://finnwardman.com">Finn Wardman World Explorer Fund</a>.</p>
+</footer>
+
+<script src="/widget/donate.js"></script>
+<script>
+  const slugInput = document.getElementById('slug-input');
+  const codeSlug = document.getElementById('code-slug');
+  const previewArea = document.getElementById('preview-area');
+  const previewEmpty = document.getElementById('preview-empty');
+  const donateDiv = document.getElementById('giveready-donate');
+  let debounceTimer;
+
+  slugInput.addEventListener('input', function() {
+    const slug = this.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+    codeSlug.textContent = slug || 'your-slug';
+
+    clearTimeout(debounceTimer);
+    if (slug.length > 2) {
+      debounceTimer = setTimeout(() => {
+        // Update the widget with the new slug
+        previewEmpty.style.display = 'none';
+        donateDiv.style.display = 'block';
+        donateDiv.setAttribute('data-slug', slug);
+        donateDiv.innerHTML = '';
+        // Re-initialize the widget by re-running its init
+        if (window.GiveReadyWidget && window.GiveReadyWidget.init) {
+          window.GiveReadyWidget.init();
+        } else {
+          // Reload the script to re-trigger initialization
+          const oldScript = document.querySelector('script[src="/widget/donate.js"]');
+          const newScript = document.createElement('script');
+          newScript.src = '/widget/donate.js?t=' + Date.now();
+          oldScript.parentNode.insertBefore(newScript, oldScript.nextSibling);
+        }
+      }, 500);
+    } else {
+      previewEmpty.style.display = 'block';
+      donateDiv.style.display = 'none';
+      donateDiv.innerHTML = '';
+    }
+  });
+
+  function copyCode() {
+    const slug = slugInput.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '') || 'your-slug';
+    const code = `<!-- GiveReady donate button -->\n<div id="giveready-donate"\n     data-slug="${slug}"></div>\n<script src="https://giveready.org/widget/donate.js"><\/script>`;
+
+    navigator.clipboard.writeText(code).then(() => {
+      const btn = document.getElementById('copy-btn');
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+</script>
+
+</body>
+</html>
