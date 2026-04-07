@@ -733,6 +733,12 @@ export default {
         return handleGetNonprofit(env.DB, nonprofitMatch[1]);
       }
 
+      // No API route matched — try serving a static asset
+      if (env.ASSETS) {
+        const assetResponse = await env.ASSETS.fetch(request);
+        if (assetResponse.status !== 404) return assetResponse;
+      }
+
       return error('Not found', 404);
     } catch (err) {
       console.error(err);

@@ -6,6 +6,7 @@ compatibility_date = "2024-12-01"
 # Static assets are served first; unmatched paths fall through to the Worker
 [assets]
 directory = "./public"
+binding = "ASSETS"
 
 [vars]
 ENVIRONMENT = "production"
