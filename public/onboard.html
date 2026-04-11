@@ -4,23 +4,49 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Get Listed — GiveReady</title>
-  <meta name="description" content="Get your youth nonprofit listed on GiveReady in under 45 minutes. AI agents find you. Donors pay you directly. No intermediary. No fees." />
+  <meta name="description" content="Register your youth nonprofit on GiveReady in 3 steps. Free donation page, multi-sig custody, AI discovery. Live in minutes." />
   <link rel="canonical" href="https://giveready.org/onboard" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --text: #111;
-      --muted: #666;
-      --light: #999;
+      --bg: #ffffff;
+      --surface: #f9fafb;
+      --surface-hover: #f3f4f6;
+      --card: #ffffff;
       --border: #e5e5e5;
-      --bg: #fff;
-      --code-bg: #fafafa;
+      --border-light: #d4d4d4;
+      --text: #111111;
+      --muted: #666666;
+      --light: #999999;
+      --accent: #059669;
+      --accent-dim: rgba(5,150,105,0.08);
+      --accent-border: rgba(5,150,105,0.2);
+      --nav-bg: rgba(255,255,255,0.92);
+      --cta-bg: #111111;
+      --cta-text: #ffffff;
       --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
       --mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+    }
+
+    html.dark {
+      --bg: #0a0a0a;
+      --surface: #151515;
+      --surface-hover: #1c1c1c;
+      --card: #181818;
+      --border: #2a2a2a;
+      --border-light: #333;
+      --text: #f5f5f5;
+      --muted: #a0a0a0;
+      --light: #666;
+      --accent: #34d399;
+      --accent-dim: rgba(52,211,153,0.12);
+      --accent-border: rgba(52,211,153,0.25);
+      --nav-bg: rgba(10,10,10,0.85);
     }
 
     html { scroll-behavior: smooth; }
@@ -33,199 +59,196 @@
     /* NAV */
     nav {
       position: sticky; top: 0; z-index: 100;
-      background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+      background: var(--nav-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
-      height: 48px; padding: 0 24px;
+      height: 52px; padding: 0 24px;
       display: flex; align-items: center; justify-content: space-between;
     }
-    .nav-left { display: flex; align-items: center; gap: 8px; }
-    .nav-name {
-      font-weight: 700; font-size: 14px; color: var(--text);
-      text-decoration: none; letter-spacing: -0.01em;
-    }
-    .nav-tag {
-      font-size: 10px; font-weight: 600; color: var(--light);
-      border: 1px solid var(--border); padding: 2px 6px; border-radius: 3px;
-      letter-spacing: 0.02em;
-    }
-    .nav-right { display: flex; align-items: center; gap: 20px; }
-    .nav-link { font-size: 13px; color: var(--muted); text-decoration: none; }
+    .nav-left { display: flex; align-items: center; gap: 10px; }
+    .nav-name { font-weight: 700; font-size: 15px; color: var(--text); text-decoration: none; letter-spacing: -0.02em; }
+    .nav-tag { font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); padding: 2px 8px; border-radius: 20px; letter-spacing: 0.03em; text-transform: uppercase; }
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+    .nav-link { font-size: 13px; color: var(--muted); text-decoration: none; font-weight: 500; }
     .nav-link:hover { color: var(--text); }
 
     /* LAYOUT */
-    .wrap { max-width: 640px; margin: 0 auto; padding: 0 24px; }
-    .section { padding: 48px 0; border-bottom: 1px solid var(--border); }
-    .section:last-of-type { border-bottom: none; }
+    .wrap { max-width: 680px; margin: 0 auto; padding: 0 24px; }
 
-    /* HEADER */
-    .page-header {
-      padding: 64px 24px 48px; text-align: center;
-      border-bottom: 1px solid var(--border);
-    }
-    .page-header h1 {
-      font-size: clamp(26px, 5vw, 38px); font-weight: 800;
-      line-height: 1.1; letter-spacing: -0.03em;
-      margin-bottom: 12px;
-    }
-    .page-header p {
-      font-size: 15px; color: var(--muted); line-height: 1.7;
-      max-width: 480px; margin: 0 auto;
-    }
+    /* PAGE HEADER */
+    .page-header { padding: 64px 24px 48px; text-align: center; border-bottom: 1px solid var(--border); }
+    .page-header h1 { font-size: clamp(26px, 5vw, 38px); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 12px; }
+    .page-header p { font-size: 15px; color: var(--muted); line-height: 1.7; max-width: 480px; margin: 0 auto; }
 
-    /* TAG */
-    .tag {
-      display: inline-block; font-size: 11px; font-weight: 600;
-      color: var(--light); letter-spacing: 0.05em; text-transform: uppercase;
-      margin-bottom: 12px;
-    }
+    /* PROGRESS BAR */
+    .progress-container { padding: 32px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .progress-inner { max-width: 680px; margin: 0 auto; padding: 0 24px; }
+    .progress-bar { display: flex; gap: 12px; margin-bottom: 16px; }
+    .progress-step { flex: 1; height: 4px; background: var(--border); border-radius: 2px; transition: background 0.3s; }
+    .progress-step.active { background: var(--accent); }
+    .progress-step.done { background: var(--accent); }
+    .progress-label { display: flex; gap: 4px; font-size: 13px; color: var(--muted); }
+    .progress-label .step-marker { font-weight: 600; color: var(--text); }
+    .progress-label .step-title { font-weight: 500; }
 
-    /* SECTION HEADINGS */
-    .section h2 {
-      font-size: clamp(20px, 4vw, 26px); font-weight: 700;
-      letter-spacing: -0.02em; line-height: 1.2;
-      margin-bottom: 8px;
-    }
-    .section .lead {
-      font-size: 15px; color: var(--muted); line-height: 1.7;
-      margin-bottom: 8px;
+    /* FORM CONTAINER */
+    .form-container { padding: 48px 24px 64px; }
+    .form-wrap { max-width: 600px; margin: 0 auto; }
+
+    .form-step { display: none; }
+    .form-step.active { display: block; animation: fadeIn 0.3s; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
-    /* STEPS */
-    .steps { margin-top: 20px; }
-    .step {
-      display: flex; gap: 16px; padding: 20px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .step:last-child { border-bottom: none; }
-    .step-num {
-      font-size: 12px; font-weight: 700; color: var(--light);
-      min-width: 24px; padding-top: 2px;
-    }
-    .step-content { flex: 1; }
-    .step-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
-    .step-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
-    .step-time {
-      display: inline-block; font-size: 11px; font-weight: 600;
-      color: var(--light); background: var(--code-bg);
-      border: 1px solid var(--border); padding: 2px 8px;
-      border-radius: 3px; margin-top: 6px;
-    }
-    .step-link {
-      color: var(--text); font-weight: 500;
-      text-decoration: underline; text-underline-offset: 2px;
-    }
+    .form-step h2 { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 12px; }
+    .form-step > p { font-size: 15px; color: var(--muted); margin-bottom: 32px; line-height: 1.7; }
 
-    /* WHAT YOU GET */
-    .outcome {
-      display: flex; gap: 12px; align-items: flex-start;
-      padding: 10px 0;
-    }
-    .outcome-icon {
-      font-size: 13px; font-weight: 700; flex-shrink: 0;
-      width: 20px; text-align: center; padding-top: 2px;
-      color: var(--text);
-    }
-    .outcome-text { font-size: 14px; color: #444; line-height: 1.6; }
-    .outcome-text strong { color: var(--text); font-weight: 600; }
-
-    /* FORM */
-    .form-section {
-      padding: 48px 0 64px;
-    }
-    .form-intro {
-      font-size: 14px; color: var(--muted); line-height: 1.7;
-      margin-bottom: 24px;
-    }
-    .form-grid {
-      display: grid; grid-template-columns: 1fr; gap: 16px;
-    }
-    @media (min-width: 520px) {
-      .form-grid { grid-template-columns: 1fr 1fr; }
-      .form-full { grid-column: 1 / -1; }
-    }
-    .field label {
-      display: block; font-size: 12px; font-weight: 600;
-      color: var(--text); margin-bottom: 4px;
-      letter-spacing: 0.01em;
-    }
-    .field .hint {
-      font-size: 11px; color: var(--light); font-weight: 400;
-      margin-left: 4px;
-    }
-    .field input,
-    .field textarea,
-    .field select {
-      width: 100%; font-family: var(--sans); font-size: 14px;
-      color: var(--text); background: var(--bg);
-      border: 1px solid var(--border); border-radius: 6px;
-      padding: 10px 12px; outline: none;
+    /* FORM FIELDS */
+    .form-group { margin-bottom: 24px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; letter-spacing: 0.01em; }
+    .form-group .hint { font-size: 12px; color: var(--light); font-weight: 400; margin-left: 2px; }
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      width: 100%; font-family: var(--sans); font-size: 15px;
+      color: var(--text); background: var(--card);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px 14px; outline: none;
       transition: border-color 0.15s;
     }
-    .field input:focus,
-    .field textarea:focus,
-    .field select:focus {
-      border-color: var(--text);
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      border-color: var(--accent);
     }
-    .field textarea { resize: vertical; min-height: 80px; }
-    .field input::placeholder,
-    .field textarea::placeholder {
+    .form-group textarea { resize: vertical; min-height: 100px; }
+    .form-group input::placeholder,
+    .form-group textarea::placeholder {
       color: var(--light);
     }
 
-    .checkbox-group {
-      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px;
+    .form-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+    @media (min-width: 520px) {
+      .form-grid { grid-template-columns: 1fr 1fr; }
+      .form-grid.full-width { grid-column: 1 / -1; }
     }
+    .form-grid .form-group.full-width { grid-column: 1 / -1; }
+
+    /* CHECKBOXES */
+    .checkbox-group { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
     .checkbox-group label {
-      display: flex; align-items: center; gap: 6px;
-      font-size: 13px; font-weight: 400; color: var(--muted);
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 500; color: var(--muted);
       cursor: pointer;
-      padding: 4px 10px; border: 1px solid var(--border);
-      border-radius: 4px; transition: all 0.15s;
+      padding: 8px 12px; border: 1px solid var(--border);
+      border-radius: 6px; transition: all 0.15s;
     }
     .checkbox-group label:hover { border-color: var(--text); }
-    .checkbox-group input:checked + span {
-      color: var(--text); font-weight: 500;
-    }
-    .checkbox-group input { width: auto; margin: 0; }
+    .checkbox-group input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+    .checkbox-group input[type="checkbox"]:checked + span { color: var(--text); font-weight: 600; }
+    .checkbox-group input { margin: 0; }
 
-    .submit-row {
-      display: flex; align-items: center; gap: 16px;
-      margin-top: 24px; flex-wrap: wrap;
-    }
-    .btn-submit {
-      font-family: var(--sans); font-size: 14px; font-weight: 700;
-      color: #fff; background: var(--text);
-      border: none; padding: 12px 28px; border-radius: 6px;
-      cursor: pointer; transition: opacity 0.15s;
-    }
-    .btn-submit:hover { opacity: 0.8; }
-    .submit-note { font-size: 12px; color: var(--light); }
-    .email-alt {
-      margin-top: 16px; font-size: 13px; color: var(--light);
-    }
-    .email-alt a { color: var(--muted); }
+    /* VERIFICATION SECTION */
+    .verification-box { padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-top: 8px; }
+    .verification-status { font-size: 13px; display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+    .verification-status.success { color: #16a34a; }
+    .verification-status.error { color: #dc2626; }
+    .verification-status.pending { color: var(--muted); }
 
-    /* CODE BLOCKS */
-    .code-block {
-      background: #111; color: #ccc; padding: 14px 16px;
-      border-radius: 6px; font-family: var(--mono);
-      font-size: 12px; line-height: 1.6; overflow-x: auto;
-      margin-top: 12px;
+    /* RADIO CARDS */
+    .radio-group { margin-top: 12px; }
+    .radio-card {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 16px; border: 1px solid var(--border); border-radius: 8px;
+      cursor: pointer; transition: all 0.15s; margin-bottom: 12px;
     }
-    .code-block .cm { color: #555; }
-    .code-block .tg { color: #7ec8e3; }
-    .code-block .at { color: #c4b5fd; }
-    .code-block .st { color: #86efac; }
+    .radio-card:hover { border-color: var(--text); }
+    .radio-card input[type="radio"] {
+      width: 18px; height: 18px; flex-shrink: 0; margin-top: 3px; cursor: pointer;
+    }
+    .radio-card.selected { border-color: var(--accent); background: var(--accent-dim); }
+    .radio-card-content { flex: 1; }
+    .radio-card-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .radio-card-desc { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 8px; }
+    .radio-card-links { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+    .radio-card-links a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    .radio-card-links a:hover { text-decoration: underline; }
+
+    .wallet-input-group { margin-top: 12px; padding: 12px; background: var(--surface); border-radius: 6px; display: none; }
+    .radio-card.selected ~ .wallet-input-group { display: block; }
+    .wallet-input-group label { font-size: 12px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 4px; }
+    .wallet-input-group input { width: 100%; }
+
+    /* BUTTONS */
+    .button-row { display: flex; gap: 12px; margin-top: 32px; flex-wrap: wrap; }
+    .btn { font-family: var(--sans); font-size: 15px; font-weight: 700;
+      padding: 12px 28px; border-radius: 8px; cursor: pointer;
+      border: none; transition: all 0.15s; text-decoration: none;
+      display: inline-block; text-align: center;
+    }
+    .btn-primary { background: var(--text); color: var(--bg); }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-secondary:hover { border-color: var(--text); }
+    .btn-link { background: none; color: var(--muted); font-size: 13px; padding: 0; text-decoration: underline; }
+    .btn-link:hover { color: var(--text); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* VERIFY WALLET BUTTON */
+    .verify-btn { display: inline-block; margin-top: 12px; }
+
+    /* LOADING STATE */
+    .loading { opacity: 0.6; pointer-events: none; }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* PREVIEW CARD */
+    .preview-card { padding: 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); margin-bottom: 24px; }
+    .preview-header { font-size: 13px; font-weight: 600; color: var(--light); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 16px; }
+    .preview-org-name { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+    .preview-mission { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+    .preview-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+    .preview-meta strong { color: var(--text); }
+    .preview-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .preview-badge { display: inline-block; font-size: 11px; padding: 4px 10px; background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: 20px; color: var(--accent); font-weight: 500; }
+
+    /* SUMMARY SECTION */
+    .summary-section { padding: 20px; background: var(--surface); border-radius: 8px; margin: 24px 0; }
+    .summary-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+    .summary-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .summary-item:last-child { border-bottom: none; }
+    .summary-label { color: var(--muted); }
+    .summary-value { color: var(--text); font-weight: 500; }
+
+    /* SUCCESS MESSAGE */
+    .success-message { text-align: center; padding: 64px 24px; }
+    .success-message h2 { font-size: 32px; font-weight: 800; margin-bottom: 12px; color: var(--accent); }
+    .success-message p { font-size: 15px; color: var(--muted); line-height: 1.7; margin-bottom: 24px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .success-links { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+    .success-links a { font-size: 14px; color: var(--accent); text-decoration: none; font-weight: 600; }
+    .success-links a:hover { text-decoration: underline; }
+
+    /* ERROR MESSAGE */
+    .error-box { padding: 16px; background: #fee; border: 1px solid #fcc; border-radius: 8px; color: #c33; font-size: 13px; margin-bottom: 16px; }
 
     /* FOOTER */
-    footer {
-      padding: 24px; text-align: center;
-      font-size: 12px; color: var(--light);
-      border-top: 1px solid var(--border);
-    }
+    footer { padding: 28px 24px; text-align: center; font-size: 12px; color: var(--light); border-top: 1px solid var(--border); }
     footer a { color: var(--muted); text-decoration: none; }
     footer a:hover { color: var(--text); }
-    .footer-links { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+    .footer-links { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+
+    /* RESPONSIVE */
+    @media (max-width: 480px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .progress-label .step-title { display: none; }
+      nav { height: auto; padding: 12px 16px; }
+      .page-header { padding: 48px 16px 32px; }
+      .form-container { padding: 32px 16px 48px; }
+      .button-row { flex-direction: column; }
+      .btn { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -233,156 +256,300 @@
 <nav>
   <div class="nav-left">
     <a href="/" class="nav-name">GiveReady</a>
-    <span class="nav-tag">open source</span>
+    <span class="nav-tag">free</span>
   </div>
   <div class="nav-right">
     <a href="/" class="nav-link">Home</a>
-    <a href="https://github.com/gswardman/giveready" class="nav-link" target="_blank">GitHub</a>
-    <a href="/widget/demo" class="nav-link">Widget Demo</a>
   </div>
 </nav>
 
 <div class="page-header">
-  <h1>Get your nonprofit listed on GiveReady</h1>
-  <p>Under 45 minutes. AI agents start finding you immediately. No fees, no intermediary, you keep 100% of every donation.</p>
+  <h1>Register your nonprofit</h1>
+  <p>Get a free donation page, multi-sig custody, AI discovery. 3 steps. Takes 10 minutes.</p>
 </div>
 
-<div class="section" id="steps">
-  <div class="wrap">
-    <span class="tag">The process</span>
-    <h2>Four steps. One afternoon.</h2>
-    <p class="lead">You don't need a developer. You don't need crypto experience. Each step has a link to exactly what you need.</p>
-
-    <div class="steps">
-      <div class="step">
-        <span class="step-num">01</span>
-        <div class="step-content">
-          <div class="step-name">Set up a USDC wallet</div>
-          <div class="step-desc">
-            Download <a href="https://phantom.app" class="step-link" target="_blank">Phantom</a> (mobile or browser extension) or <a href="https://www.coinbase.com/wallet" class="step-link" target="_blank">Coinbase Wallet</a>. Create a wallet. Copy your Solana USDC address. No KYC required to receive funds. Works in any country.
-          </div>
-          <span class="step-time">~3 minutes</span>
-        </div>
-      </div>
-
-      <div class="step">
-        <span class="step-num">02</span>
-        <div class="step-content">
-          <div class="step-name">Register on GiveReady</div>
-          <div class="step-desc">
-            Fill out the form below with your organisation name, mission, programmes, impact data, and wallet address. We verify your details and publish your profile. AI agents worldwide find you through our MCP server, API, llms.txt, and agents.md.
-          </div>
-          <span class="step-time">~10 minutes</span>
-        </div>
-      </div>
-
-      <div class="step">
-        <span class="step-num">03</span>
-        <div class="step-content">
-          <div class="step-name">Embed the donate button <span style="font-weight:400; color: var(--light);">(optional)</span></div>
-          <div class="step-desc">
-            Use the <a href="/widget/generator" class="step-link">widget generator</a> to build your donate button. Enter your slug, see a live preview, copy the code, paste it into your website. Works on WordPress, Squarespace, Ghost, or any static site. See the <a href="/widget/demo" class="step-link">live demo</a>.
-          </div>
-          <span class="step-time">~2 minutes</span>
-        </div>
-      </div>
-
-      <div class="step">
-        <span class="step-num">04</span>
-        <div class="step-content">
-          <div class="step-name">Set up a fiat off-ramp <span style="font-weight:400; color: var(--light);">(optional)</span></div>
-          <div class="step-desc">
-            If your nonprofit wants to auto-convert USDC to local currency: create an account on <a href="https://www.coinbase.com" class="step-link" target="_blank">Coinbase</a> (US, UK, EU), <a href="https://www.luno.com" class="step-link" target="_blank">Luno</a> (South Africa), or another local exchange. Link your bank account. USDC converts to fiat on arrival. This is the only step that requires KYC, and it's the exchange's KYC — not ours.
-          </div>
-          <span class="step-time">~30 minutes</span>
-        </div>
-      </div>
+<div class="progress-container">
+  <div class="progress-inner">
+    <div class="progress-bar">
+      <div class="progress-step active" id="progress-1"></div>
+      <div class="progress-step" id="progress-2"></div>
+      <div class="progress-step" id="progress-3"></div>
+    </div>
+    <div class="progress-label">
+      <span class="step-marker" id="current-step">1</span>
+      <span class="step-title" id="current-title">About your charity</span>
     </div>
   </div>
 </div>
 
-<div class="section" id="after">
-  <div class="wrap">
-    <span class="tag">What happens next</span>
-    <h2>Once you're listed</h2>
-    <div style="margin-top: 16px;">
-      <div class="outcome">
-        <span class="outcome-icon">✓</span>
-        <span class="outcome-text"><strong>AI agents find you.</strong> When someone asks Claude, ChatGPT, or any MCP-connected assistant to find a youth charity, your nonprofit appears in the results with your mission, programmes, and impact data.</span>
-      </div>
-      <div class="outcome">
-        <span class="outcome-icon">✓</span>
-        <span class="outcome-text"><strong>Donors pay you directly.</strong> USDC goes straight to your wallet via x402 protocol. No intermediary touches the funds. No platform fees. You control the money from the moment it arrives.</span>
-      </div>
-      <div class="outcome">
-        <span class="outcome-icon">✓</span>
-        <span class="outcome-text"><strong>Your profile stays updated.</strong> Email us any time to update your programmes, impact metrics, or wallet address. We keep your data current so AI agents always have the latest.</span>
-      </div>
-      <div class="outcome">
-        <span class="outcome-icon">✓</span>
-        <span class="outcome-text"><strong>It stays free.</strong> No monthly fees. No transaction fees. No contract. GiveReady is open source and MIT licensed. If you ever want to leave, your wallet is yours — nothing to migrate.</span>
-      </div>
-    </div>
-  </div>
-</div>
+<div class="form-container">
+  <div class="form-wrap">
 
-<div class="form-section" id="form">
-  <div class="wrap">
-    <span class="tag">Register</span>
-    <h2>Tell us about your nonprofit</h2>
-    <p class="form-intro">We'll verify your details and publish your GiveReady profile within 48 hours. All fields marked with * are required.</p>
-
-    <form action="https://formspree.io/f/meepnkdg" method="POST">
-      <input type="hidden" name="_subject" value="GiveReady — New nonprofit registration" />
-      <input type="hidden" name="_next" value="https://giveready.org/onboard#thanks" />
+    <!-- STEP 1: ABOUT YOUR CHARITY -->
+    <div class="form-step active" id="step-1">
+      <h2>About your charity</h2>
+      <p>Tell us the basics. Helps donors understand your mission and helps AI agents discover you.</p>
 
       <div class="form-grid">
-        <div class="field">
-          <label>Organisation name *</label>
-          <input type="text" name="org_name" placeholder="e.g. Bridges for Music" required />
+        <div class="form-group full-width">
+          <label>Organisation name <span style="color: var(--accent);">*</span></label>
+          <input type="text" id="org-name" placeholder="e.g. Bridges for Music" required />
         </div>
 
-        <div class="field">
-          <label>Contact email *</label>
-          <input type="email" name="email" placeholder="you@nonprofit.org" required />
+        <div class="form-group">
+          <label>Contact email <span style="color: var(--accent);">*</span></label>
+          <input type="email" id="contact-email" placeholder="you@nonprofit.org" required />
         </div>
 
-        <div class="field">
-          <label>Country *</label>
-          <input type="text" name="country" placeholder="e.g. South Africa" required />
+        <div class="form-group">
+          <label>Country <span style="color: var(--accent);">*</span></label>
+          <select id="country" required>
+            <option value="">Select a country</option>
+            <option value="United Kingdom">United Kingdom</option>
+            <option value="United States">United States</option>
+            <option value="South Africa">South Africa</option>
+            <option value="Bermuda">Bermuda</option>
+            <optgroup label="Other">
+              <option value="Afghanistan">Afghanistan</option>
+              <option value="Albania">Albania</option>
+              <option value="Algeria">Algeria</option>
+              <option value="Andorra">Andorra</option>
+              <option value="Angola">Angola</option>
+              <option value="Antigua and Barbuda">Antigua and Barbuda</option>
+              <option value="Argentina">Argentina</option>
+              <option value="Armenia">Armenia</option>
+              <option value="Australia">Australia</option>
+              <option value="Austria">Austria</option>
+              <option value="Azerbaijan">Azerbaijan</option>
+              <option value="Bahamas">Bahamas</option>
+              <option value="Bahrain">Bahrain</option>
+              <option value="Bangladesh">Bangladesh</option>
+              <option value="Barbados">Barbados</option>
+              <option value="Belarus">Belarus</option>
+              <option value="Belgium">Belgium</option>
+              <option value="Belize">Belize</option>
+              <option value="Benin">Benin</option>
+              <option value="Bhutan">Bhutan</option>
+              <option value="Bolivia">Bolivia</option>
+              <option value="Bosnia and Herzegovina">Bosnia and Herzegovina</option>
+              <option value="Botswana">Botswana</option>
+              <option value="Brazil">Brazil</option>
+              <option value="Brunei">Brunei</option>
+              <option value="Bulgaria">Bulgaria</option>
+              <option value="Burkina Faso">Burkina Faso</option>
+              <option value="Burundi">Burundi</option>
+              <option value="Cambodia">Cambodia</option>
+              <option value="Cameroon">Cameroon</option>
+              <option value="Canada">Canada</option>
+              <option value="Cape Verde">Cape Verde</option>
+              <option value="Central African Republic">Central African Republic</option>
+              <option value="Chad">Chad</option>
+              <option value="Chile">Chile</option>
+              <option value="China">China</option>
+              <option value="Colombia">Colombia</option>
+              <option value="Comoros">Comoros</option>
+              <option value="Congo">Congo</option>
+              <option value="Costa Rica">Costa Rica</option>
+              <option value="Croatia">Croatia</option>
+              <option value="Cyprus">Cyprus</option>
+              <option value="Czech Republic">Czech Republic</option>
+              <option value="Denmark">Denmark</option>
+              <option value="Djibouti">Djibouti</option>
+              <option value="Dominica">Dominica</option>
+              <option value="Dominican Republic">Dominican Republic</option>
+              <option value="East Timor">East Timor</option>
+              <option value="Ecuador">Ecuador</option>
+              <option value="Egypt">Egypt</option>
+              <option value="El Salvador">El Salvador</option>
+              <option value="Equatorial Guinea">Equatorial Guinea</option>
+              <option value="Eritrea">Eritrea</option>
+              <option value="Estonia">Estonia</option>
+              <option value="Ethiopia">Ethiopia</option>
+              <option value="Fiji">Fiji</option>
+              <option value="Finland">Finland</option>
+              <option value="France">France</option>
+              <option value="French Guiana">French Guiana</option>
+              <option value="Gabon">Gabon</option>
+              <option value="Gambia">Gambia</option>
+              <option value="Georgia">Georgia</option>
+              <option value="Germany">Germany</option>
+              <option value="Ghana">Ghana</option>
+              <option value="Gibraltar">Gibraltar</option>
+              <option value="Greece">Greece</option>
+              <option value="Grenada">Grenada</option>
+              <option value="Guadeloupe">Guadeloupe</option>
+              <option value="Guam">Guam</option>
+              <option value="Guatemala">Guatemala</option>
+              <option value="Guinea">Guinea</option>
+              <option value="Guinea-Bissau">Guinea-Bissau</option>
+              <option value="Guyana">Guyana</option>
+              <option value="Haiti">Haiti</option>
+              <option value="Honduras">Honduras</option>
+              <option value="Hong Kong">Hong Kong</option>
+              <option value="Hungary">Hungary</option>
+              <option value="Iceland">Iceland</option>
+              <option value="India">India</option>
+              <option value="Indonesia">Indonesia</option>
+              <option value="Iran">Iran</option>
+              <option value="Iraq">Iraq</option>
+              <option value="Ireland">Ireland</option>
+              <option value="Israel">Israel</option>
+              <option value="Italy">Italy</option>
+              <option value="Jamaica">Jamaica</option>
+              <option value="Japan">Japan</option>
+              <option value="Jordan">Jordan</option>
+              <option value="Kazakhstan">Kazakhstan</option>
+              <option value="Kenya">Kenya</option>
+              <option value="Kiribati">Kiribati</option>
+              <option value="Kosovo">Kosovo</option>
+              <option value="Kuwait">Kuwait</option>
+              <option value="Kyrgyzstan">Kyrgyzstan</option>
+              <option value="Laos">Laos</option>
+              <option value="Latvia">Latvia</option>
+              <option value="Lebanon">Lebanon</option>
+              <option value="Lesotho">Lesotho</option>
+              <option value="Liberia">Liberia</option>
+              <option value="Libya">Libya</option>
+              <option value="Liechtenstein">Liechtenstein</option>
+              <option value="Lithuania">Lithuania</option>
+              <option value="Luxembourg">Luxembourg</option>
+              <option value="Macao">Macao</option>
+              <option value="Macedonia">Macedonia</option>
+              <option value="Madagascar">Madagascar</option>
+              <option value="Malawi">Malawi</option>
+              <option value="Malaysia">Malaysia</option>
+              <option value="Maldives">Maldives</option>
+              <option value="Mali">Mali</option>
+              <option value="Malta">Malta</option>
+              <option value="Marshall Islands">Marshall Islands</option>
+              <option value="Martinique">Martinique</option>
+              <option value="Mauritania">Mauritania</option>
+              <option value="Mauritius">Mauritius</option>
+              <option value="Mayotte">Mayotte</option>
+              <option value="Mexico">Mexico</option>
+              <option value="Micronesia">Micronesia</option>
+              <option value="Moldova">Moldova</option>
+              <option value="Monaco">Monaco</option>
+              <option value="Mongolia">Mongolia</option>
+              <option value="Montenegro">Montenegro</option>
+              <option value="Morocco">Morocco</option>
+              <option value="Mozambique">Mozambique</option>
+              <option value="Myanmar">Myanmar</option>
+              <option value="Namibia">Namibia</option>
+              <option value="Nauru">Nauru</option>
+              <option value="Nepal">Nepal</option>
+              <option value="Netherlands">Netherlands</option>
+              <option value="New Zealand">New Zealand</option>
+              <option value="Nicaragua">Nicaragua</option>
+              <option value="Niger">Niger</option>
+              <option value="Nigeria">Nigeria</option>
+              <option value="North Korea">North Korea</option>
+              <option value="North Macedonia">North Macedonia</option>
+              <option value="Norway">Norway</option>
+              <option value="Oman">Oman</option>
+              <option value="Pakistan">Pakistan</option>
+              <option value="Palau">Palau</option>
+              <option value="Palestine">Palestine</option>
+              <option value="Panama">Panama</option>
+              <option value="Papua New Guinea">Papua New Guinea</option>
+              <option value="Paraguay">Paraguay</option>
+              <option value="Peru">Peru</option>
+              <option value="Philippines">Philippines</option>
+              <option value="Poland">Poland</option>
+              <option value="Portugal">Portugal</option>
+              <option value="Puerto Rico">Puerto Rico</option>
+              <option value="Qatar">Qatar</option>
+              <option value="Reunion">Reunion</option>
+              <option value="Romania">Romania</option>
+              <option value="Russia">Russia</option>
+              <option value="Rwanda">Rwanda</option>
+              <option value="Saint Kitts and Nevis">Saint Kitts and Nevis</option>
+              <option value="Saint Lucia">Saint Lucia</option>
+              <option value="Saint Vincent and the Grenadines">Saint Vincent and the Grenadines</option>
+              <option value="Samoa">Samoa</option>
+              <option value="San Marino">San Marino</option>
+              <option value="Sao Tome and Principe">Sao Tome and Principe</option>
+              <option value="Saudi Arabia">Saudi Arabia</option>
+              <option value="Senegal">Senegal</option>
+              <option value="Serbia">Serbia</option>
+              <option value="Seychelles">Seychelles</option>
+              <option value="Sierra Leone">Sierra Leone</option>
+              <option value="Singapore">Singapore</option>
+              <option value="Slovakia">Slovakia</option>
+              <option value="Slovenia">Slovenia</option>
+              <option value="Solomon Islands">Solomon Islands</option>
+              <option value="Somalia">Somalia</option>
+              <option value="South Korea">South Korea</option>
+              <option value="South Sudan">South Sudan</option>
+              <option value="Spain">Spain</option>
+              <option value="Sri Lanka">Sri Lanka</option>
+              <option value="Sudan">Sudan</option>
+              <option value="Suriname">Suriname</option>
+              <option value="Sweden">Sweden</option>
+              <option value="Switzerland">Switzerland</option>
+              <option value="Syria">Syria</option>
+              <option value="Taiwan">Taiwan</option>
+              <option value="Tajikistan">Tajikistan</option>
+              <option value="Tanzania">Tanzania</option>
+              <option value="Thailand">Thailand</option>
+              <option value="Togo">Togo</option>
+              <option value="Tonga">Tonga</option>
+              <option value="Trinidad and Tobago">Trinidad and Tobago</option>
+              <option value="Tunisia">Tunisia</option>
+              <option value="Turkey">Turkey</option>
+              <option value="Turkmenistan">Turkmenistan</option>
+              <option value="Tuvalu">Tuvalu</option>
+              <option value="Uganda">Uganda</option>
+              <option value="Ukraine">Ukraine</option>
+              <option value="United Arab Emirates">United Arab Emirates</option>
+              <option value="Uruguay">Uruguay</option>
+              <option value="Uzbekistan">Uzbekistan</option>
+              <option value="Vanuatu">Vanuatu</option>
+              <option value="Vatican City">Vatican City</option>
+              <option value="Venezuela">Venezuela</option>
+              <option value="Vietnam">Vietnam</option>
+              <option value="Virgin Islands (British)">Virgin Islands (British)</option>
+              <option value="Virgin Islands (US)">Virgin Islands (US)</option>
+              <option value="Wallis and Futuna">Wallis and Futuna</option>
+              <option value="Western Sahara">Western Sahara</option>
+              <option value="Yemen">Yemen</option>
+              <option value="Zambia">Zambia</option>
+              <option value="Zimbabwe">Zimbabwe</option>
+            </optgroup>
+          </select>
         </div>
 
-        <div class="field">
+        <div class="form-group">
           <label>City</label>
-          <input type="text" name="city" placeholder="e.g. Cape Town" />
+          <input type="text" id="city" placeholder="e.g. Cape Town" />
         </div>
 
-        <div class="field">
+        <div class="form-group">
           <label>Website</label>
-          <input type="url" name="website" placeholder="https://yoursite.org" />
+          <input type="url" id="website" placeholder="https://yoursite.org" />
         </div>
 
-        <div class="field">
+        <div class="form-group">
           <label>Founded year</label>
-          <input type="number" name="founded_year" placeholder="e.g. 2012" min="1900" max="2026" />
+          <input type="number" id="founded-year" placeholder="e.g. 2012" min="1900" max="2026" />
         </div>
 
-        <div class="field form-full">
-          <label>Mission *</label>
-          <textarea name="mission" placeholder="What does your organisation do? Who do you serve? One or two sentences." required></textarea>
+        <div class="form-group full-width">
+          <label>Mission <span style="color: var(--accent);">*</span></label>
+          <textarea id="mission" placeholder="What does your organisation do? Who do you serve?" required></textarea>
         </div>
 
-        <div class="field form-full">
+        <div class="form-group full-width">
           <label>Programmes</label>
-          <textarea name="programmes" placeholder="List your main programmes with a short description of each. Include beneficiary numbers if you have them."></textarea>
+          <textarea id="programmes" placeholder="Your main programmes with brief descriptions. Include beneficiary numbers if you have them."></textarea>
         </div>
 
-        <div class="field form-full">
+        <div class="form-group">
           <label>Young people served per year</label>
-          <input type="number" name="beneficiaries_per_year" placeholder="e.g. 500" />
+          <input type="number" id="beneficiaries" placeholder="e.g. 500" />
         </div>
 
-        <div class="field form-full">
+        <div class="form-group full-width">
           <label>Cause areas <span class="hint">(select all that apply)</span></label>
           <div class="checkbox-group">
             <label><input type="checkbox" name="causes" value="youth-empowerment" /><span>Youth Empowerment</span></label>
@@ -398,36 +565,143 @@
           </div>
         </div>
 
-        <div class="field form-full">
-          <label>USDC wallet address <span class="hint">(Solana — from Phantom or Coinbase Wallet)</span></label>
-          <input type="text" name="usdc_wallet" placeholder="e.g. J4F3RwWiCnAvyeMqnrxMb7RC8CVg2kk8VyPFfzbfn3CH" />
-        </div>
-
-        <div class="field form-full">
-          <label>Registration number <span class="hint">(e.g. 501(c)(3) EIN, UK Charity number)</span></label>
-          <input type="text" name="registration" placeholder="e.g. 501(c)(3) 12-3456789" />
-        </div>
-
-        <div class="field form-full">
-          <label>Anything else?</label>
-          <textarea name="notes" placeholder="Impact metrics, existing donation page URL, questions — anything that helps us build your profile."></textarea>
+        <div class="form-group full-width">
+          <label>Registration number <span class="hint">(optional — helps us verify you faster)</span></label>
+          <div style="display: flex; gap: 12px; margin-bottom: 8px;">
+            <select id="reg-country" style="flex: 0 0 140px;">
+              <option value="">Country</option>
+              <option value="UK">UK Charity Commission</option>
+              <option value="US">US 501(c)(3)</option>
+              <option value="SA">South African NPC</option>
+              <option value="Other">Other</option>
+            </select>
+            <input type="text" id="reg-number" placeholder="e.g. 1234567" style="flex: 1;" />
+          </div>
+          <div id="verification-result"></div>
+          <button type="button" class="btn btn-link verify-btn" id="verify-btn" style="display: none;">Verify</button>
         </div>
       </div>
 
-      <div class="submit-row">
-        <button type="submit" class="btn-submit">Submit Registration</button>
-        <span class="submit-note">We'll confirm within 48 hours.</span>
+      <div class="button-row">
+        <button type="button" class="btn btn-primary" onclick="goToStep(2)">Continue</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: WALLET SETUP -->
+    <div class="form-step" id="step-2">
+      <h2>Set up your wallet</h2>
+      <p>Choose how you want to receive donations. You can add a wallet now or skip and add it later.</p>
+
+      <div class="radio-group" id="wallet-options">
+        <label class="radio-card" onclick="selectWalletOption(this)">
+          <input type="radio" name="wallet-type" value="squads" />
+          <div class="radio-card-content">
+            <div class="radio-card-title">Multi-sig vault (recommended for registered charities)</div>
+            <div class="radio-card-desc">A Squads vault requires 2 or more trustees to approve every withdrawal. This is the governance standard regulators expect. Perfect for registered charities.</div>
+            <div class="radio-card-links">
+              <a href="https://v4.squads.so" target="_blank">Go to v4.squads.so to create your vault</a>
+            </div>
+          </div>
+        </label>
+        <div class="wallet-input-group">
+          <label>Paste your Squads vault address</label>
+          <input type="text" id="wallet-address" placeholder="Solana address starting with a letter or number, 32-44 characters" />
+          <div style="font-size: 12px; color: var(--light); margin-top: 4px;">Your vault address looks like: 9B5X4q7G8k9L2m3N4o5P6q7R8s9T0u1V2w</div>
+        </div>
+
+        <label class="radio-card" onclick="selectWalletOption(this)">
+          <input type="radio" name="wallet-type" value="personal" />
+          <div class="radio-card-content">
+            <div class="radio-card-title">Personal wallet (for testing or individual funds)</div>
+            <div class="radio-card-desc">A personal wallet like Phantom or Coinbase Wallet. Simpler to set up, but one person controls the funds. Not recommended for registered charities.</div>
+            <div class="radio-card-links">
+              <a href="https://phantom.app" target="_blank">Download Phantom</a>
+              <a href="https://www.coinbase.com/wallet" target="_blank">Download Coinbase Wallet</a>
+            </div>
+          </div>
+        </label>
+        <div class="wallet-input-group">
+          <label>Paste your wallet address</label>
+          <input type="text" id="wallet-address" placeholder="Your Solana wallet address" />
+          <div style="font-size: 12px; color: var(--light); margin-top: 4px;">Your wallet address looks like: 9B5X4q7G8k9L2m3N4o5P6q7R8s9T0u1V2w</div>
+        </div>
       </div>
 
-      <p class="email-alt">Prefer email? Send the same info to <a href="mailto:geordie@testventures.net?subject=GiveReady%20—%20List%20our%20nonprofit">geordie@testventures.net</a></p>
-    </form>
-  </div>
-</div>
+      <div id="wallet-verification" style="display: none; margin-top: 24px;">
+        <button type="button" class="btn btn-primary" id="verify-wallet-btn" onclick="verifyWalletOwnership()">Verify ownership</button>
+        <div id="wallet-verify-status" style="margin-top: 12px;"></div>
+        <p style="font-size: 12px; color: var(--muted); margin-top: 8px;">Can't connect wallet? That's OK — we'll verify your wallet during review.</p>
+      </div>
 
-<div id="thanks" style="display:none; padding: 64px 24px; text-align: center;">
-  <div style="max-width: 480px; margin: 0 auto;">
-    <h2 style="font-size: 28px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 12px;">Registration received.</h2>
-    <p style="font-size: 15px; color: var(--muted); line-height: 1.7;">We'll verify your details and publish your GiveReady profile within 48 hours. You'll get an email when your nonprofit is live and discoverable by AI agents.</p>
+      <div class="button-row" style="margin-top: 32px;">
+        <button type="button" class="btn btn-secondary" onclick="goToStep(1)">Back</button>
+        <button type="button" class="btn btn-primary" onclick="goToStep(3)">Continue</button>
+        <button type="button" class="btn btn-link" onclick="goToStep(3)" style="flex-grow: 1; text-align: right;">Skip for now →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: PREVIEW & SUBMIT -->
+    <div class="form-step" id="step-3">
+      <h2>Review & submit</h2>
+      <p>Preview your donation page and submit when you're ready. We'll review and publish within 48 hours.</p>
+
+      <div class="preview-card">
+        <div class="preview-header">This is what donors will see</div>
+        <div class="preview-org-name" id="preview-name"></div>
+        <div class="preview-mission" id="preview-mission"></div>
+        <div class="preview-meta">
+          <div><strong>Location:</strong> <span id="preview-location"></span></div>
+          <div id="preview-founded" style="display: none;"><strong>Founded:</strong> <span id="preview-founded-year"></span></div>
+        </div>
+        <div id="preview-causes"></div>
+        <div id="preview-wallet-display" style="display: none; margin-top: 12px;">
+          <div style="font-size: 12px; color: var(--light);">Wallet: <code style="background: var(--surface); padding: 2px 6px; border-radius: 3px;" id="preview-wallet"></code></div>
+        </div>
+      </div>
+
+      <div class="summary-section">
+        <h3>Registration details</h3>
+        <div class="summary-item">
+          <span class="summary-label">Organisation</span>
+          <span class="summary-value" id="summary-name"></span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Email</span>
+          <span class="summary-value" id="summary-email"></span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Country</span>
+          <span class="summary-value" id="summary-country"></span>
+        </div>
+        <div class="summary-item" id="summary-reg-item" style="display: none;">
+          <span class="summary-label">Registration #</span>
+          <span class="summary-value" id="summary-reg"></span>
+        </div>
+        <div class="summary-item" id="summary-wallet-item" style="display: none;">
+          <span class="summary-label">Wallet</span>
+          <span class="summary-value" style="word-break: break-all; font-family: var(--mono); font-size: 12px;" id="summary-wallet"></span>
+        </div>
+      </div>
+
+      <div id="error-display"></div>
+
+      <div class="button-row">
+        <button type="button" class="btn btn-secondary" onclick="goToStep(2)">Back</button>
+        <button type="button" class="btn btn-primary" id="submit-btn" onclick="submitRegistration()">Submit Registration</button>
+      </div>
+    </div>
+
+    <!-- SUCCESS STATE -->
+    <div id="success-screen" style="display: none;">
+      <div class="success-message">
+        <h2>✓ Registration received</h2>
+        <p>We'll verify your details and publish your GiveReady profile within 48 hours. You'll receive an email at <strong id="success-email"></strong> when your charity is live and discoverable by AI agents.</p>
+        <div class="success-links">
+          <a href="/">Back to homepage</a>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -435,19 +709,399 @@
   <div class="footer-links">
     <a href="/">Home</a>
     <a href="https://github.com/gswardman/giveready" target="_blank">GitHub</a>
-    <a href="/widget/demo">Widget Demo</a>
+    <a href="/agents.md">agents.md</a>
     <a href="/llms.txt">llms.txt</a>
     <a href="https://testventures.net" target="_blank">TestVentures.net</a>
   </div>
-  <p>Open-source infrastructure for AI-assisted charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. Revenue supports the <a href="https://finnwardman.com">Finn Wardman World Explorer Fund</a>.</p>
+  <p>Open-source infrastructure for charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. Revenue supports the <a href="https://finnwardman.com">Finn Wardman World Explorer Fund</a>.</p>
 </footer>
 
 <script>
-  // Show thanks message if redirected back from Formspree
-  if (window.location.hash === '#thanks') {
-    document.getElementById('thanks').style.display = 'block';
-    document.getElementById('form').style.display = 'none';
-    window.scrollTo({ top: document.getElementById('thanks').offsetTop - 100, behavior: 'smooth' });
+  // Form state
+  const formState = {
+    // Step 1
+    orgName: '',
+    contactEmail: '',
+    country: '',
+    city: '',
+    website: '',
+    foundedYear: '',
+    mission: '',
+    programmes: '',
+    beneficiaries: '',
+    causes: [],
+    registrationCountry: '',
+    registrationNumber: '',
+    registrationVerified: false,
+    // Step 2
+    walletType: '',
+    walletAddress: '',
+    walletSignature: '',
+    walletVerified: false,
+    // Step 3
+    currentStep: 1,
+  };
+
+  // Country list for header
+  const countryList = ['UK', 'US', 'SA'];
+
+  // Initialize
+  document.addEventListener('DOMContentLoaded', function() {
+    loadFormState();
+    attachEventListeners();
+  });
+
+  function attachEventListeners() {
+    // Step 1 fields
+    document.getElementById('org-name').addEventListener('change', e => {
+      formState.orgName = e.target.value;
+      saveFormState();
+    });
+    document.getElementById('contact-email').addEventListener('change', e => {
+      formState.contactEmail = e.target.value;
+      saveFormState();
+    });
+    document.getElementById('country').addEventListener('change', e => {
+      formState.country = e.target.value;
+      updateVerifyButton();
+      saveFormState();
+    });
+    document.getElementById('city').addEventListener('change', e => {
+      formState.city = e.target.value;
+      saveFormState();
+    });
+    document.getElementById('website').addEventListener('change', e => {
+      formState.website = e.target.value;
+      saveFormState();
+    });
+    document.getElementById('founded-year').addEventListener('change', e => {
+      formState.foundedYear = e.target.value;
+      saveFormState();
+    });
+    document.getElementById('mission').addEventListener('change', e => {
+      formState.mission = e.target.value;
+      saveFormState();
+    });
+    document.getElementById('programmes').addEventListener('change', e => {
+      formState.programmes = e.target.value;
+      saveFormState();
+    });
+    document.getElementById('beneficiaries').addEventListener('change', e => {
+      formState.beneficiaries = e.target.value;
+      saveFormState();
+    });
+
+    // Cause checkboxes
+    document.querySelectorAll('input[name="causes"]').forEach(cb => {
+      cb.addEventListener('change', e => {
+        const selected = Array.from(document.querySelectorAll('input[name="causes"]:checked')).map(el => el.value);
+        formState.causes = selected;
+        saveFormState();
+      });
+    });
+
+    // Registration
+    document.getElementById('reg-country').addEventListener('change', e => {
+      formState.registrationCountry = e.target.value;
+      updateVerifyButton();
+      saveFormState();
+    });
+    document.getElementById('reg-number').addEventListener('change', e => {
+      formState.registrationNumber = e.target.value;
+      updateVerifyButton();
+      saveFormState();
+    });
+  }
+
+  function updateVerifyButton() {
+    const btn = document.getElementById('verify-btn');
+    const country = document.getElementById('reg-country').value;
+    const number = document.getElementById('reg-number').value;
+    if (country === 'UK' && number) {
+      btn.style.display = 'inline-block';
+    } else {
+      btn.style.display = 'none';
+    }
+  }
+
+  function saveFormState() {
+    try {
+      localStorage.setItem('gr-onboard-state', JSON.stringify(formState));
+    } catch(e) {}
+  }
+
+  function loadFormState() {
+    try {
+      const saved = localStorage.getItem('gr-onboard-state');
+      if (saved) {
+        const state = JSON.parse(saved);
+        Object.assign(formState, state);
+        populateForm();
+      }
+    } catch(e) {}
+  }
+
+  function populateForm() {
+    if (formState.orgName) document.getElementById('org-name').value = formState.orgName;
+    if (formState.contactEmail) document.getElementById('contact-email').value = formState.contactEmail;
+    if (formState.country) document.getElementById('country').value = formState.country;
+    if (formState.city) document.getElementById('city').value = formState.city;
+    if (formState.website) document.getElementById('website').value = formState.website;
+    if (formState.foundedYear) document.getElementById('founded-year').value = formState.foundedYear;
+    if (formState.mission) document.getElementById('mission').value = formState.mission;
+    if (formState.programmes) document.getElementById('programmes').value = formState.programmes;
+    if (formState.beneficiaries) document.getElementById('beneficiaries').value = formState.beneficiaries;
+
+    // Restore checkboxes
+    document.querySelectorAll('input[name="causes"]').forEach(cb => {
+      cb.checked = formState.causes.includes(cb.value);
+    });
+
+    if (formState.registrationCountry) document.getElementById('reg-country').value = formState.registrationCountry;
+    if (formState.registrationNumber) document.getElementById('reg-number').value = formState.registrationNumber;
+
+    updateVerifyButton();
+  }
+
+  function goToStep(step) {
+    // Validate current step before moving
+    if (formState.currentStep === 1) {
+      if (!document.getElementById('org-name').value || !document.getElementById('contact-email').value || !document.getElementById('country').value || !document.getElementById('mission').value) {
+        alert('Please fill in all required fields');
+        return;
+      }
+    }
+
+    // Update form state
+    formState.orgName = document.getElementById('org-name').value;
+    formState.contactEmail = document.getElementById('contact-email').value;
+    formState.country = document.getElementById('country').value;
+    formState.city = document.getElementById('city').value;
+    formState.website = document.getElementById('website').value;
+    formState.foundedYear = document.getElementById('founded-year').value;
+    formState.mission = document.getElementById('mission').value;
+    formState.programmes = document.getElementById('programmes').value;
+    formState.beneficiaries = document.getElementById('beneficiaries').value;
+    formState.registrationCountry = document.getElementById('reg-country').value;
+    formState.registrationNumber = document.getElementById('reg-number').value;
+
+    formState.currentStep = step;
+    saveFormState();
+
+    // Hide all steps
+    document.querySelectorAll('.form-step').forEach(s => s.classList.remove('active'));
+    // Show target step
+    document.getElementById('step-' + step).classList.add('active');
+
+    // Update progress bar
+    updateProgress(step);
+
+    // If step 3, populate preview
+    if (step === 3) {
+      populatePreview();
+    }
+
+    // Scroll to top
+    document.querySelector('.form-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function updateProgress(step) {
+    document.querySelectorAll('.progress-step').forEach((el, i) => {
+      el.classList.remove('active', 'done');
+      if (i + 1 === step) el.classList.add('active');
+      else if (i + 1 < step) el.classList.add('done');
+    });
+
+    const titles = ['About your charity', 'Set up your wallet', 'Review & submit'];
+    document.getElementById('current-step').textContent = step;
+    document.getElementById('current-title').textContent = titles[step - 1];
+  }
+
+  function selectWalletOption(label) {
+    document.querySelectorAll('.radio-card').forEach(el => el.classList.remove('selected'));
+    label.classList.add('selected');
+
+    const radio = label.querySelector('input[type="radio"]');
+    formState.walletType = radio.value;
+
+    // Show appropriate wallet input
+    const inputs = label.parentElement.querySelectorAll('.wallet-input-group');
+    label.parentElement.querySelectorAll('.wallet-input-group').forEach(el => el.style.display = 'none');
+    if (radio.checked) {
+      const nextInput = label.nextElementSibling;
+      if (nextInput && nextInput.classList.contains('wallet-input-group')) {
+        nextInput.style.display = 'block';
+      }
+    }
+
+    // Show verify button when address is filled
+    const input = label.parentElement.querySelector('.wallet-input-group input[type="text"]');
+    if (input && input.value.trim().length > 20) {
+      document.getElementById('wallet-verification').style.display = 'block';
+    }
+
+    saveFormState();
+  }
+
+  function populatePreview() {
+    document.getElementById('preview-name').textContent = formState.orgName;
+    document.getElementById('preview-mission').textContent = formState.mission;
+
+    let location = formState.country;
+    if (formState.city) location = formState.city + ', ' + formState.country;
+    document.getElementById('preview-location').textContent = location;
+
+    if (formState.foundedYear) {
+      document.getElementById('preview-founded').style.display = 'block';
+      document.getElementById('preview-founded-year').textContent = formState.foundedYear;
+    }
+
+    // Display cause badges
+    const causeLabels = {
+      'youth-empowerment': 'Youth Empowerment',
+      'music-education': 'Music Education',
+      'mental-health': 'Mental Health',
+      'education': 'Education',
+      'adventure-travel': 'Adventure & Travel',
+      'surf-therapy': 'Surf Therapy',
+      'entrepreneurship': 'Entrepreneurship',
+      'creative-arts': 'Creative Arts',
+      'community-development': 'Community Development',
+      'poverty-reduction': 'Poverty Reduction',
+    };
+
+    const badges = formState.causes.map(c => `<span class="preview-badge">${causeLabels[c]}</span>`).join('');
+    document.getElementById('preview-causes').innerHTML = badges;
+
+    // Display wallet
+    if (formState.walletAddress) {
+      document.getElementById('preview-wallet-display').style.display = 'block';
+      document.getElementById('preview-wallet').textContent = formState.walletAddress.substring(0, 16) + '...';
+      document.getElementById('summary-wallet-item').style.display = 'flex';
+      document.getElementById('summary-wallet').textContent = formState.walletAddress;
+    }
+
+    // Summary
+    document.getElementById('summary-name').textContent = formState.orgName;
+    document.getElementById('summary-email').textContent = formState.contactEmail;
+    document.getElementById('summary-country').textContent = formState.country;
+
+    if (formState.registrationNumber) {
+      document.getElementById('summary-reg-item').style.display = 'flex';
+      document.getElementById('summary-reg').textContent = `${formState.registrationCountry} - ${formState.registrationNumber}`;
+    }
+  }
+
+  async function verifyWalletOwnership() {
+    const btn = document.getElementById('verify-wallet-btn');
+    const statusDiv = document.getElementById('wallet-verify-status');
+
+    if (!formState.walletAddress) {
+      statusDiv.innerHTML = '<div class="verification-status error">Please enter a wallet address</div>';
+      return;
+    }
+
+    btn.classList.add('loading');
+    btn.innerHTML = '<span class="spinner"></span>Verifying...';
+
+    try {
+      // Check if Phantom is available
+      if (!window.solana) {
+        statusDiv.innerHTML = '<div class="verification-status error">Install Phantom to verify. <a href="https://phantom.app" target="_blank">Download here</a></div>';
+        btn.classList.remove('loading');
+        btn.innerHTML = 'Verify ownership';
+        return;
+      }
+
+      // Request connection
+      await window.solana.connect();
+
+      // Create message to sign
+      const message = `I am registering ${formState.orgName} on GiveReady. Wallet: ${formState.walletAddress}`;
+      const encodedMessage = new TextEncoder().encode(message);
+
+      // Sign message
+      const signedMessage = await window.solana.signMessage(encodedMessage, 'utf8');
+
+      formState.walletVerified = true;
+      formState.walletSignature = btoa(String.fromCharCode.apply(null, new Uint8Array(signedMessage.signature)));
+
+      statusDiv.innerHTML = '<div class="verification-status success">✓ Wallet verified</div>';
+      btn.classList.remove('loading');
+      btn.innerHTML = 'Verified ✓';
+      btn.disabled = true;
+
+      saveFormState();
+    } catch (error) {
+      statusDiv.innerHTML = '<div class="verification-status error">Could not verify wallet. That\'s OK — we\'ll verify during review.</div>';
+      btn.classList.remove('loading');
+      btn.innerHTML = 'Verify ownership';
+    }
+  }
+
+  async function submitRegistration() {
+    // Final validation
+    if (!formState.orgName || !formState.contactEmail || !formState.country || !formState.mission) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    const submitBtn = document.getElementById('submit-btn');
+    const errorDiv = document.getElementById('error-display');
+
+    submitBtn.classList.add('loading');
+    submitBtn.innerHTML = '<span class="spinner"></span>Submitting...';
+    errorDiv.innerHTML = '';
+
+    // Prepare payload
+    const payload = {
+      orgName: formState.orgName,
+      contactEmail: formState.contactEmail,
+      country: formState.country,
+      city: formState.city || null,
+      website: formState.website || null,
+      foundedYear: formState.foundedYear ? parseInt(formState.foundedYear) : null,
+      mission: formState.mission,
+      programmes: formState.programmes || null,
+      beneficiaries: formState.beneficiaries ? parseInt(formState.beneficiaries) : null,
+      causes: formState.causes,
+      registrationCountry: formState.registrationCountry || null,
+      registrationNumber: formState.registrationNumber || null,
+      walletType: formState.walletType || null,
+      walletAddress: formState.walletAddress || null,
+      walletSignature: formState.walletSignature || null,
+      walletVerified: formState.walletVerified,
+    };
+
+    try {
+      const response = await fetch('/api/onboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        // Clear saved state
+        try { localStorage.removeItem('gr-onboard-state'); } catch(e) {}
+
+        // Show success
+        document.querySelector('.form-wrap').innerHTML = '';
+        document.getElementById('success-screen').style.display = 'block';
+        document.getElementById('success-email').textContent = formState.contactEmail;
+
+        // Scroll to success
+        document.querySelector('.form-container').scrollIntoView({ behavior: 'smooth' });
+      } else {
+        const error = await response.text();
+        errorDiv.innerHTML = `<div class="error-box">Error: ${error || 'Something went wrong. Please try again.'}</div>`;
+        submitBtn.classList.remove('loading');
+        submitBtn.innerHTML = 'Submit Registration';
+      }
+    } catch (error) {
+      errorDiv.innerHTML = `<div class="error-box">Network error. Please check your connection and try again.</div>`;
+      submitBtn.classList.remove('loading');
+      submitBtn.innerHTML = 'Submit Registration';
+    }
   }
 </script>
 

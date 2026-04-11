@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GiveReady — AI agents can find your nonprofit and pay it directly</title>
+  <title>GiveReady — A free donation page for your charity</title>
+  <meta name="description" content="One link. Every payment method. Zero platform fees. Get a free donation page for your charity in minutes." />
+  <meta property="og:title" content="GiveReady — A free donation page for your charity" />
+  <meta property="og:description" content="One link. Every payment method. Zero platform fees. Like Linktree, but for donations." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://giveready.org" />
+  <meta name="twitter:card" content="summary" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -11,14 +17,44 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --text: #111;
-      --muted: #666;
-      --light: #999;
+      --bg: #ffffff;
+      --surface: #f9fafb;
+      --surface-hover: #f3f4f6;
+      --card: #ffffff;
       --border: #e5e5e5;
-      --bg: #fff;
-      --code-bg: #fafafa;
+      --border-light: #d4d4d4;
+      --text: #111111;
+      --muted: #666666;
+      --light: #999999;
+      --accent: #059669;
+      --accent-dim: rgba(5,150,105,0.08);
+      --accent-border: rgba(5,150,105,0.2);
+      --nav-bg: rgba(255,255,255,0.92);
+      --cta-bg: #111111;
+      --cta-text: #ffffff;
+      --cta-muted: rgba(255,255,255,0.5);
       --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
       --mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    html.dark {
+      --bg: #0a0a0a;
+      --surface: #151515;
+      --surface-hover: #1c1c1c;
+      --card: #181818;
+      --border: #2a2a2a;
+      --border-light: #333;
+      --text: #f5f5f5;
+      --muted: #a0a0a0;
+      --light: #666;
+      --accent: #34d399;
+      --accent-dim: rgba(52,211,153,0.12);
+      --accent-border: rgba(52,211,153,0.25);
+      --nav-bg: rgba(10,10,10,0.85);
+      --cta-bg: #ffffff;
+      --cta-text: #0a0a0a;
+      --cta-muted: rgba(0,0,0,0.4);
     }
 
     html { scroll-behavior: smooth; }
@@ -31,253 +67,142 @@
     /* NAV */
     nav {
       position: sticky; top: 0; z-index: 100;
-      background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+      background: var(--nav-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
-      height: 48px; padding: 0 24px;
+      height: 52px; padding: 0 24px;
       display: flex; align-items: center; justify-content: space-between;
-      max-width: 100%;
     }
-    .nav-left { display: flex; align-items: center; gap: 8px; }
-    .nav-name {
-      font-weight: 700; font-size: 14px; color: var(--text);
-      text-decoration: none; letter-spacing: -0.01em;
-    }
-    .nav-tag {
-      font-size: 10px; font-weight: 600; color: var(--light);
-      border: 1px solid var(--border); padding: 2px 6px; border-radius: 3px;
-      letter-spacing: 0.02em;
-    }
-    .nav-right { display: flex; align-items: center; gap: 20px; }
-    .nav-link { font-size: 13px; color: var(--muted); text-decoration: none; }
+    .nav-left { display: flex; align-items: center; gap: 10px; }
+    .nav-name { font-weight: 700; font-size: 15px; color: var(--text); text-decoration: none; letter-spacing: -0.02em; }
+    .nav-tag { font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); padding: 2px 8px; border-radius: 20px; letter-spacing: 0.03em; text-transform: uppercase; }
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+    .nav-link { font-size: 13px; color: var(--muted); text-decoration: none; font-weight: 500; }
     .nav-link:hover { color: var(--text); }
-    .nav-cta {
-      font-size: 13px; font-weight: 600; color: #fff;
-      background: var(--text); text-decoration: none;
-      padding: 5px 12px; border-radius: 5px;
-    }
-    .nav-cta:hover { opacity: 0.8; }
+    .nav-cta { font-size: 13px; font-weight: 700; color: var(--bg); background: var(--text); text-decoration: none; padding: 7px 16px; border-radius: 20px; transition: opacity 0.15s; }
+    .nav-cta:hover { opacity: 0.85; }
+    .theme-toggle { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; cursor: pointer; transition: all 0.15s; color: var(--muted); padding: 0; }
+    .theme-toggle:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-light); }
+    .theme-toggle svg { width: 16px; height: 16px; }
+    .theme-toggle .icon-sun { display: block; }
+    .theme-toggle .icon-moon { display: none; }
+    html.dark .theme-toggle .icon-sun { display: none; }
+    html.dark .theme-toggle .icon-moon { display: block; }
 
     /* LAYOUT */
-    .wrap { max-width: 640px; margin: 0 auto; padding: 0 24px; }
-    .wrap-wide { max-width: 800px; margin: 0 auto; padding: 0 24px; }
-    .section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+    .wrap { max-width: 680px; margin: 0 auto; padding: 0 24px; }
+    .section { padding: 72px 0; border-bottom: 1px solid var(--border); }
     .section:last-of-type { border-bottom: none; }
 
     /* HERO */
-    .hero { padding: 80px 24px 64px; text-align: center; border-bottom: 1px solid var(--border); }
-    .hero-inner { max-width: 620px; margin: 0 auto; }
-    .hero h1 {
-      font-size: clamp(28px, 6vw, 44px); font-weight: 800;
-      line-height: 1.1; letter-spacing: -0.03em;
-      margin-bottom: 16px;
-    }
-    .hero h2 {
-      font-size: clamp(18px, 3.5vw, 24px); font-weight: 600;
-      line-height: 1.3; letter-spacing: -0.02em;
-      color: var(--text);
-      margin-bottom: 32px;
-    }
-    .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
-    .btn {
-      display: inline-block; font-size: 14px; font-weight: 600;
-      text-decoration: none; padding: 10px 20px; border-radius: 6px;
-      transition: all 0.15s;
-    }
-    .btn-dark { background: var(--text); color: #fff; }
-    .btn-dark:hover { opacity: 0.8; }
-    .btn-ghost { background: none; color: var(--text); border: 1px solid var(--border); }
+    .hero { padding: 80px 24px 72px; text-align: center; border-bottom: 1px solid var(--border); }
+    .hero-inner { max-width: 640px; margin: 0 auto; }
+    .hero h1 { font-size: clamp(28px, 6vw, 46px); font-weight: 800; line-height: 1.08; letter-spacing: -0.035em; margin-bottom: 16px; }
+    .hero-sub { font-size: clamp(16px, 3vw, 19px); color: var(--muted); line-height: 1.5; margin-bottom: 32px; max-width: 520px; margin-left: auto; margin-right: auto; }
+    .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 28px; }
+    .btn { display: inline-block; font-size: 15px; font-weight: 700; text-decoration: none; padding: 12px 28px; border-radius: 24px; transition: all 0.15s; }
+    .btn-primary { background: var(--text); color: var(--bg); }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-ghost { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
     .btn-ghost:hover { border-color: var(--text); }
-    .hero-meta {
-      display: flex; gap: 0; justify-content: center;
-      margin-top: 0;
-    }
-    .hero-meta-item {
-      display: flex; flex-direction: column; align-items: center;
-      padding: 0 28px;
-      border-right: 1px solid var(--border);
-    }
+    .hero-meta { display: flex; gap: 0; justify-content: center; }
+    .hero-meta-item { display: flex; flex-direction: column; align-items: center; padding: 0 28px; border-right: 1px solid var(--border); }
     .hero-meta-item:last-child { border-right: none; }
-    .hero-meta-num {
-      font-size: 22px; font-weight: 800; color: var(--text);
-      letter-spacing: -0.03em; line-height: 1.2;
-    }
-    .hero-meta-label {
-      font-size: 11px; color: var(--light); font-weight: 500;
-      letter-spacing: 0.02em;
-    }
-    .hero-meta-label a {
-      color: var(--light); text-decoration: none;
-    }
-    .hero-meta-label a:hover { color: var(--text); }
+    .hero-meta-num { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.03em; line-height: 1.2; }
+    .hero-meta-label { font-size: 11px; color: var(--light); font-weight: 500; letter-spacing: 0.02em; }
 
-    /* TEXT SECTIONS */
-    .section h2 {
-      font-size: clamp(22px, 4vw, 28px); font-weight: 700;
-      letter-spacing: -0.02em; line-height: 1.2;
-      margin-bottom: 12px;
+    /* PHONE MOCKUP */
+    .phone-section { padding: 72px 0; text-align: center; border-bottom: 1px solid var(--border); }
+    .phone-section .tag { margin-bottom: 8px; }
+    .phone-section h2 { font-size: clamp(22px, 4vw, 28px); font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+    .phone-section p { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+    .phone-frame {
+      max-width: 375px; margin: 0 auto;
+      border: 2px solid var(--border); border-radius: 24px;
+      overflow: hidden; background: var(--surface);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.08);
     }
-    .section h2 em { font-style: normal; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 4px; }
-    .section .lead {
-      font-size: 15px; color: var(--muted); line-height: 1.7;
-      margin-bottom: 8px;
+    html.dark .phone-frame { box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+    .phone-frame iframe {
+      width: 100%; height: 600px; border: none; display: block;
     }
-    .tag {
-      display: inline-block; font-size: 11px; font-weight: 600;
-      color: var(--light); letter-spacing: 0.05em; text-transform: uppercase;
-      margin-bottom: 12px;
-    }
+    .phone-link { display: inline-block; margin-top: 16px; font-size: 13px; color: var(--muted); text-decoration: none; }
+    .phone-link:hover { color: var(--text); }
+
+    /* SECTION TEXT */
+    .tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 12px; }
+    .section h2 { font-size: clamp(22px, 4vw, 28px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; margin-bottom: 12px; }
+    .section .lead { font-size: 15px; color: var(--muted); line-height: 1.7; }
+
+    /* CARDS */
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 28px; }
+    .card { padding: 24px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); transition: border-color 0.15s; }
+    .card:hover { border-color: var(--border-light); }
+    .card-icon { font-size: 24px; margin-bottom: 12px; }
+    .card h3 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px; }
+    .card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+    /* ZERO FEES */
+    .fees-section { text-align: center; }
+    .fees-section h2 { font-size: clamp(24px, 4.5vw, 32px); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 12px; }
+    .fees-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 28px; max-width: 520px; margin-left: auto; margin-right: auto; }
+    .fees-card { padding: 24px; border-radius: var(--radius); text-align: center; }
+    .fees-card.others { background: var(--surface); border: 1px solid var(--border); }
+    .fees-card.ours { background: var(--accent-dim); border: 1px solid var(--accent-border); }
+    .fees-card-label { font-size: 12px; font-weight: 600; color: var(--light); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+    .fees-card.ours .fees-card-label { color: var(--accent); }
+    .fees-card-num { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; }
+    .fees-card.others .fees-card-num { color: var(--light); text-decoration: line-through; }
+    .fees-card.ours .fees-card-num { color: var(--accent); }
+    .fees-card-note { font-size: 12px; color: var(--light); margin-top: 4px; }
+    .fees-card.ours .fees-card-note { color: var(--muted); }
 
     /* STEPS */
     .steps { margin-top: 24px; }
-    .step {
-      display: flex; gap: 16px; padding: 16px 0;
-      border-bottom: 1px solid var(--border);
-    }
+    .step { display: flex; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--border); }
     .step:last-child { border-bottom: none; }
-    .step-num {
-      font-size: 12px; font-weight: 700; color: var(--light);
-      min-width: 24px; padding-top: 2px;
-    }
-    .step-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+    .step-num { font-size: 12px; font-weight: 700; color: var(--accent); background: var(--accent-dim); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+    .step-name { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
     .step-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
-    .steps-cta {
-      margin-top: 28px; text-align: center;
-    }
 
-    /* WIDGET DEMO */
-    .demo-layout {
-      display: grid; grid-template-columns: 1fr; gap: 24px;
-      margin-top: 24px;
-    }
-    .demo-box {
-      border: 1px solid var(--border); border-radius: 8px;
-      padding: 24px; background: var(--bg);
-    }
-    .demo-box h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
-    .demo-box > p { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
-    .demo-widget-area {
-      padding: 20px; background: var(--code-bg);
-      border: 1px solid var(--border); border-radius: 6px;
-      text-align: center; min-height: 60px;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .code-note {
-      margin-top: 10px; font-size: 12px; color: var(--light);
-    }
+    /* CONSORTIUM */
+    .proof-section { text-align: center; }
+    .proof-stats { display: flex; justify-content: center; gap: 48px; margin: 24px 0 28px; }
+    .proof-stat-num { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; color: var(--text); }
+    .proof-stat-label { font-size: 12px; color: var(--light); margin-top: 2px; }
+    .proof-logos { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+    .proof-chip { font-size: 12px; font-weight: 500; color: var(--muted); padding: 8px 14px; border: 1px solid var(--border); border-radius: 20px; }
 
-    /* VALUE TABLE */
-    .value-table {
-      width: 100%; border-collapse: collapse; margin-top: 24px;
-      font-size: 14px;
-    }
-    .value-table th {
-      text-align: left; font-size: 11px; font-weight: 600;
-      color: var(--light); letter-spacing: 0.04em; text-transform: uppercase;
-      padding: 0 0 8px; border-bottom: 1px solid var(--border);
-    }
-    .value-table th:last-child { text-align: right; }
-    .value-table td {
-      padding: 12px 0; border-bottom: 1px solid var(--border);
-      vertical-align: top;
-    }
-    .value-table tr:last-child td { border-bottom: none; }
-    .val-name { font-weight: 600; color: var(--text); }
-    .val-detail { font-size: 12px; color: var(--light); margin-top: 1px; }
-    .val-elsewhere {
-      text-align: right; font-size: 12px; color: var(--light);
-      text-decoration: line-through;
-    }
-    .val-price {
-      text-align: right; font-weight: 700; color: var(--text);
-      font-size: 15px;
-    }
-    .val-total-row td { padding-top: 16px; border-bottom: none; }
-    .val-total {
-      text-align: right; font-size: 32px; font-weight: 800;
-      letter-spacing: -0.03em;
-    }
-    .val-total-note {
-      text-align: right; font-size: 12px; color: var(--light);
-      margin-top: 2px;
-    }
+    /* STORY */
+    .story-section p { font-size: 14px; color: var(--muted); line-height: 1.8; max-width: 560px; }
 
-    /* STATS */
-    .stats {
-      display: flex; justify-content: center; gap: 48px;
-      text-align: center; margin: 24px 0 32px;
-    }
-    .stat-num {
-      font-size: 28px; font-weight: 800; letter-spacing: -0.03em;
-      color: var(--text);
-    }
-    .stat-label { font-size: 12px; color: var(--light); margin-top: 2px; }
-    .logos {
-      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
-    }
-    .logo-chip {
-      font-size: 12px; font-weight: 500; color: var(--muted);
-      padding: 6px 12px; border: 1px solid var(--border);
-      border-radius: 4px;
-    }
-
-    /* QUALIFIER */
-    .qual-row {
-      display: flex; gap: 10px; align-items: flex-start;
-      padding: 8px 0;
-    }
-    .qual-icon {
-      font-size: 13px; font-weight: 700; flex-shrink: 0;
-      width: 20px; text-align: center; padding-top: 2px;
-    }
-    .qual-yes { color: var(--text); }
-    .qual-no { color: var(--light); }
-    .qual-text { font-size: 14px; color: #444; line-height: 1.6; }
-    .qual-text strong { color: var(--text); font-weight: 600; }
-
-    /* CTA */
-    .final-cta {
-      text-align: center; padding: 80px 24px;
-      background: var(--text); color: #fff;
-    }
-    .final-cta h2 {
-      font-size: clamp(24px, 5vw, 36px); font-weight: 800;
-      letter-spacing: -0.03em; line-height: 1.1;
-      margin-bottom: 12px; color: #fff;
-    }
-    .final-cta p {
-      font-size: 15px; color: rgba(255,255,255,0.5);
-      margin-bottom: 28px; max-width: 400px;
-      margin-left: auto; margin-right: auto; line-height: 1.6;
-    }
-    .btn-white {
-      display: inline-block; background: #fff; color: var(--text);
-      font-size: 14px; font-weight: 700; text-decoration: none;
-      padding: 12px 28px; border-radius: 6px; transition: opacity 0.15s;
-    }
-    .btn-white:hover { opacity: 0.9; }
-    .cta-note { font-size: 12px; color: rgba(255,255,255,0.3); margin-top: 12px; }
+    /* FINAL CTA */
+    .final-cta { text-align: center; padding: 80px 24px; background: var(--cta-bg); color: var(--cta-text); }
+    .final-cta h2 { font-size: clamp(26px, 5.5vw, 40px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.08; margin-bottom: 12px; color: var(--cta-text); }
+    .final-cta p { font-size: 15px; color: var(--cta-muted); margin-bottom: 28px; max-width: 420px; margin-left: auto; margin-right: auto; line-height: 1.6; }
+    .btn-cta { display: inline-block; background: var(--cta-text); color: var(--cta-bg); font-size: 15px; font-weight: 700; text-decoration: none; padding: 14px 32px; border-radius: 24px; transition: opacity 0.15s; }
+    .btn-cta:hover { opacity: 0.9; }
+    .cta-sub { display: block; margin-top: 16px; font-size: 13px; color: var(--cta-muted); text-decoration: none; }
+    .cta-sub:hover { opacity: 0.8; }
 
     /* FOOTER */
-    footer {
-      padding: 24px; text-align: center;
-      font-size: 12px; color: var(--light);
-      border-top: 1px solid var(--border);
-    }
+    footer { padding: 28px 24px; text-align: center; font-size: 12px; color: var(--light); border-top: 1px solid var(--border); }
     footer a { color: var(--muted); text-decoration: none; }
     footer a:hover { color: var(--text); }
-    .footer-links { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+    .footer-links { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
 
     /* RESPONSIVE */
-    @media (min-width: 640px) {
-      .demo-layout { grid-template-columns: 1fr 1fr; }
-    }
+    @media (max-width: 680px) { .cards { grid-template-columns: 1fr !important; } }
     @media (max-width: 480px) {
-      .stats { gap: 24px; }
-      .hero-cta { flex-direction: column; align-items: stretch; }
-      .hero-cta .btn { text-align: center; }
+      .hero { padding: 56px 24px 48px; }
       .hero-meta-item { padding: 0 16px; }
       .hero-meta-num { font-size: 18px; }
-      .value-table { font-size: 13px; }
+      .hero-cta { flex-direction: column; align-items: stretch; }
+      .hero-cta .btn { text-align: center; }
+      .proof-stats { gap: 24px; }
+      .fees-compare { grid-template-columns: 1fr; max-width: 280px; }
+      .nav-link { display: none; }
+      .phone-frame { max-width: 320px; }
+      .phone-frame iframe { height: 500px; }
     }
   </style>
 </head>
@@ -286,255 +211,256 @@
 <nav>
   <div class="nav-left">
     <a href="/" class="nav-name">GiveReady</a>
-    <span class="nav-tag">open source</span>
+    <span class="nav-tag">free</span>
   </div>
   <div class="nav-right">
     <a href="#how" class="nav-link">How It Works</a>
-    <a href="#widget" class="nav-link">Widget</a>
+    <a href="#proof" class="nav-link">Who Uses It</a>
     <a href="https://github.com/gswardman/giveready" class="nav-link" target="_blank">GitHub</a>
-    <a href="/onboard" class="nav-cta">Get Listed</a>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <a href="/onboard" class="nav-cta">Get your page</a>
   </div>
 </nav>
 
-<!-- ========== HERO ========== -->
+<!-- ===== HERO ===== -->
 <div class="hero">
   <div class="hero-inner">
-    <h1>Donors are asking AI where to give.</h1>
-    <h2>Small nonprofits get found. Donors give directly. No platform in between.</h2>
+    <h1>A free donation page for your charity.</h1>
+    <p class="hero-sub">One link. Every payment method. Zero fees. AI agents recommend your charity to donors worldwide. Live in minutes.</p>
     <div class="hero-cta">
-      <a href="/onboard" class="btn btn-dark">Get Listed — Free Forever</a>
-      <a href="#widget" class="btn btn-ghost">See the Widget</a>
+      <a href="/onboard" class="btn btn-primary">Get your free page</a>
+      <a href="/donate/finn-wardman-world-explorer-fund" class="btn btn-ghost">See it live</a>
     </div>
     <div class="hero-meta">
       <div class="hero-meta-item">
-        <span class="hero-meta-num">30</span>
-        <span class="hero-meta-label">pilot nonprofits</span>
+        <span class="hero-meta-num">162</span>
+        <span class="hero-meta-label">nonprofits</span>
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-num">$0</span>
-        <span class="hero-meta-label">fees — ever</span>
+        <span class="hero-meta-label">fees &mdash; ever</span>
       </div>
       <div class="hero-meta-item">
-        <span class="hero-meta-num">MIT</span>
-        <span class="hero-meta-label"><a href="/license">open source</a></span>
+        <span class="hero-meta-num">$1</span>
+        <span class="hero-meta-label">minimum donation</span>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ========== PROBLEM ========== -->
-<div class="section" id="problem">
+<!-- ===== SEE IT IN ACTION ===== -->
+<div class="phone-section">
+  <span class="tag">See it in action</span>
+  <h2>This is what donors see</h2>
+  <p>A real donation page. The Finn Wardman World Explorer Fund.</p>
+  <div class="phone-frame">
+    <iframe src="/donate/finn-wardman-world-explorer-fund" title="Donate page preview"></iframe>
+  </div>
+  <a href="/donate/finn-wardman-world-explorer-fund" class="phone-link" target="_blank">Open full page &rarr;</a>
+</div>
+
+<!-- ===== WHAT YOU GET ===== -->
+<div class="section" id="features">
   <div class="wrap">
-    <span class="tag">The problem</span>
-    <h2>Every donation platform is <em>a middleman</em></h2>
-    <p class="lead">Every.org, The Giving Block, Endaoment — they hold your donations, convert them, and take a cut. None of them make your nonprofit visible to AI agents.</p>
-    <p class="lead">Donors are asking AI assistants to find causes, compare impact, and send money. If your nonprofit isn't in the answer, you're invisible to the fastest-growing donor channel on the planet.</p>
-  </div>
-</div>
-
-<!-- ========== LIVE WIDGET (moved up, right after problem) ========== -->
-<div class="section" id="widget">
-  <div class="wrap-wide">
-    <span class="tag">Live widget</span>
-    <h2>This is what your donors see</h2>
-    <p class="lead" style="margin-bottom:0;">Live donate button. Pulls from the GiveReady API. Generates Solana Pay QR codes. Zero dependencies, 15KB.</p>
-    <div class="demo-layout">
-      <div class="demo-box">
-        <h3>Finn Wardman World Explorer Fund</h3>
-        <p>Youth adventure grants. Click the button, pick an amount, scan with your wallet.</p>
-        <div class="demo-widget-area">
-          <div id="giveready-donate" data-slug="finn-wardman-world-explorer-fund"></div>
-        </div>
+    <span class="tag">What you get</span>
+    <h2>Everything a charity needs to take donations online.</h2>
+    <p class="lead">No developer. No monthly fees. No payment processor taking a cut. Multi-sig governance built in.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="card-icon">&#128279;</div>
+        <h3>One link for everything</h3>
+        <p>Your page at giveready.org/donate/your-charity. Share it anywhere &mdash; Instagram bio, email footer, event posters, WhatsApp groups. Donors see your mission and give instantly.</p>
       </div>
-      <div class="demo-box">
-        <h3>Embed on your site</h3>
-        <p>Enter your slug, see a live preview, copy the code.</p>
-        <div style="text-align:center; padding: 24px 0;">
-          <a href="/widget/generator" style="display:inline-block; font-size:14px; font-weight:700; color:#fff; background:#111; text-decoration:none; padding:12px 28px; border-radius:6px; transition:opacity 0.15s;">Generate Your Widget</a>
-        </div>
-        <p class="code-note">Works on WordPress, Squarespace, Ghost, or any static site. 15KB, zero dependencies.</p>
+      <div class="card">
+        <div class="card-icon">&#128179;</div>
+        <h3>Every payment method</h3>
+        <p>Credit card via MoonPay. Banking apps like Revolut and Coinbase. Crypto wallets like Phantom. Your donors choose how to give. You receive directly &mdash; no intermediary.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#128274;</div>
+        <h3>Trustees stay in control</h3>
+        <p>Multi-sig custody via Squads Protocol. Multiple trustees must approve withdrawals. Full on-chain audit trail. The governance your regulator expects, built into the infrastructure.</p>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ========== HOW IT WORKS ========== -->
+<!-- ===== AI DISCOVERY ===== -->
+<div class="section" id="ai">
+  <div class="wrap" style="text-align: center;">
+    <span class="tag">AI-powered discovery</span>
+    <h2>AI agents recommend your charity to donors.</h2>
+    <p class="lead" style="max-width: 540px; margin: 0 auto 28px;">When someone asks Claude, ChatGPT, or any AI assistant "where can I donate to help young people?" &mdash; your charity shows up. GiveReady is the only donation platform that makes nonprofits discoverable by AI agents. Your page is indexed via MCP server, llms.txt, and agents.md &mdash; the new standards for AI-readable content.</p>
+    <div class="cards" style="grid-template-columns: 1fr 1fr 1fr;">
+      <div class="card" style="text-align: center;">
+        <div class="card-icon">&#129302;</div>
+        <h3>AI finds you</h3>
+        <p>Indexed for Claude, ChatGPT, Copilot, and every AI assistant that follows MCP or llms.txt standards.</p>
+      </div>
+      <div class="card" style="text-align: center;">
+        <div class="card-icon">&#127758;</div>
+        <h3>Always discoverable</h3>
+        <p>Your charity is searchable by cause, country, and keyword. AI agents surface you to donors who would never have found you otherwise.</p>
+      </div>
+      <div class="card" style="text-align: center;">
+        <div class="card-icon">&#9889;</div>
+        <h3>Donate via AI</h3>
+        <p>GiveReady supports x402 &mdash; the payment protocol that lets AI agents donate directly to your wallet on behalf of a donor. One prompt, one tap.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ZERO FEES ===== -->
+<div class="section" id="fees">
+  <div class="wrap fees-section">
+    <span class="tag">Zero platform fees</span>
+    <h2>We don't take a cut. Ever.</h2>
+    <p class="lead">Other platforms charge 3&ndash;8% on every donation. We charge nothing. Banking app and wallet donations are completely free. Card donations have standard MoonPay processing (~4.5%).</p>
+    <div class="fees-compare">
+      <div class="fees-card others">
+        <div class="fees-card-label">Other platforms</div>
+        <div class="fees-card-num">3&ndash;8%</div>
+        <div class="fees-card-note">+ monthly fees</div>
+      </div>
+      <div class="fees-card ours">
+        <div class="fees-card-label">GiveReady</div>
+        <div class="fees-card-num">0%</div>
+        <div class="fees-card-note">100% to the charity</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== GOVERNANCE ===== -->
+<div class="section" id="governance">
+  <div class="wrap">
+    <span class="tag">Charity governance</span>
+    <h2>Trustees stay in control. Donors don't notice.</h2>
+    <p class="lead">The number one concern we hear from charity trustees: "Who controls the wallet?" GiveReady solves this with multi-signature custody powered by Squads Protocol on Solana.</p>
+    <div class="cards" style="grid-template-columns: 1fr 1fr; margin-top: 24px;">
+      <div class="card">
+        <div class="card-icon">&#128274;</div>
+        <h3>Multi-sig custody</h3>
+        <p>Charity funds are held in a Squads vault that requires multiple trustees to approve any withdrawal. No single person can move money. Same controls your Charity Commission expects, built into the wallet itself.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#128203;</div>
+        <h3>Full audit trail</h3>
+        <p>Every donation and every withdrawal is recorded on-chain. Trustees, auditors, and regulators can verify fund movements independently. No spreadsheets. No trust-me accounting.</p>
+      </div>
+    </div>
+    <div style="margin-top: 24px;">
+      <p class="lead">Donors experience a simple, one-tap donation. Behind the scenes, the charity maintains proper financial controls &mdash; threshold approvals, trustee oversight, and transparent fund management. The governance layer is invisible to donors but critical for compliance.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== HOW IT WORKS ===== -->
 <div class="section" id="how">
   <div class="wrap">
     <span class="tag">How it works</span>
-    <h2>Three steps. Under 45 minutes.</h2>
+    <h2>Live in minutes. Free forever.</h2>
     <div class="steps">
       <div class="step">
-        <span class="step-num">01</span>
+        <span class="step-num">1</span>
         <div>
-          <div class="step-name">Set up a USDC wallet</div>
-          <div class="step-desc">Download Phantom or Coinbase Wallet. Create a wallet. Copy your USDC address. Three minutes, no KYC. Works in any country.</div>
+          <div class="step-name">Register your charity</div>
+          <div class="step-desc">Name, mission, wallet address. Five minutes. We verify your details against your national charity registry.</div>
         </div>
       </div>
       <div class="step">
-        <span class="step-num">02</span>
+        <span class="step-num">2</span>
         <div>
-          <div class="step-name">Register on GiveReady</div>
-          <div class="step-desc">Name, mission, programmes, impact data, wallet address. Ten minutes. AI agents worldwide find you through our MCP server, llms.txt, and API.</div>
+          <div class="step-name">Your page goes live</div>
+          <div class="step-desc">You get giveready.org/donate/your-charity. Share it anywhere &mdash; Instagram bio, email signature, WhatsApp groups. Donors give from $1.</div>
         </div>
       </div>
       <div class="step">
-        <span class="step-num">03</span>
+        <span class="step-num">3</span>
         <div>
-          <div class="step-name">Embed the donate button</div>
-          <div class="step-desc">One script tag. Paste into your website. Generates Solana Pay QR codes, links to Phantom and Coinbase Wallet, sends USDC straight to your wallet.</div>
+          <div class="step-name">AI agents find you</div>
+          <div class="step-desc">Your charity becomes discoverable by Claude, ChatGPT, and every AI assistant. When donors ask "where should I give?" &mdash; your charity shows up.</div>
         </div>
       </div>
-    </div>
-    <div class="steps-cta">
-      <a href="/onboard" class="btn btn-dark" style="padding:14px 32px; font-size:15px;">Take donations now for $0</a>
     </div>
   </div>
 </div>
 
-<!-- ========== THE OFFER ========== -->
-<div class="section" id="value">
-  <div class="wrap">
-    <span class="tag">What you get</span>
-    <h2>The offer</h2>
-    <table class="value-table">
-      <thead>
-        <tr>
-          <th>Included</th>
-          <th style="text-align:right">Elsewhere</th>
-          <th style="text-align:right">GiveReady</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>
-            <div class="val-name">AI Agent Discovery</div>
-            <div class="val-detail">MCP server, llms.txt, agents.md, API</div>
-          </td>
-          <td class="val-elsewhere">Doesn't exist</td>
-          <td class="val-price">$0</td>
-        </tr>
-        <tr>
-          <td>
-            <div class="val-name">Direct USDC Donations via x402</div>
-            <div class="val-detail">AI agents pay your wallet directly. x402 protocol, Solana settlement.</div>
-          </td>
-          <td class="val-elsewhere">3–8% fees</td>
-          <td class="val-price">$0</td>
-        </tr>
-        <tr>
-          <td>
-            <div class="val-name">Open-Source Donate Widget</div>
-            <div class="val-detail">One script tag. QR codes. Mobile wallet links.</div>
-          </td>
-          <td class="val-elsewhere">$29–99/mo</td>
-          <td class="val-price">$0</td>
-        </tr>
-        <tr>
-          <td>
-            <div class="val-name">Full Nonprofit Profile</div>
-            <div class="val-detail">Impact data, programmes — structured for AI</div>
-          </td>
-          <td class="val-elsewhere">$0–500/yr</td>
-          <td class="val-price">$0</td>
-        </tr>
-        <tr>
-          <td>
-            <div class="val-name">Zero Platform Fees</div>
-            <div class="val-detail">No transaction fees. No monthly fees. Ever.</div>
-          </td>
-          <td class="val-elsewhere">1–3%</td>
-          <td class="val-price">$0</td>
-        </tr>
-        <tr class="val-total-row">
-          <td></td>
-          <td></td>
-          <td>
-            <div class="val-total">$0</div>
-            <div class="val-total-note">Free forever. <a href="/license" style="color:var(--light);">MIT licensed.</a></div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- ========== CONSORTIUM ========== -->
+<!-- ===== SOCIAL PROOF ===== -->
 <div class="section" id="proof">
-  <div class="wrap" style="text-align:center;">
-    <span class="tag">Consortium</span>
+  <div class="wrap proof-section">
+    <span class="tag">Who uses GiveReady</span>
     <h2>Built with real nonprofits</h2>
-    <div class="stats">
+    <div class="proof-stats">
       <div>
-        <div class="stat-num">30</div>
-        <div class="stat-label">Pilot nonprofits</div>
+        <div class="proof-stat-num">162</div>
+        <div class="proof-stat-label">Nonprofits listed</div>
       </div>
       <div>
-        <div class="stat-num">0%</div>
-        <div class="stat-label">Fees</div>
+        <div class="proof-stat-num">0%</div>
+        <div class="proof-stat-label">Platform fees</div>
       </div>
       <div>
-        <div class="stat-num">100%</div>
-        <div class="stat-label">To the nonprofit</div>
+        <div class="proof-stat-num">100%</div>
+        <div class="proof-stat-label">To the charity</div>
       </div>
     </div>
-    <div class="logos">
-      <span class="logo-chip">Bridges for Music</span>
-      <span class="logo-chip">The Wave Project</span>
-      <span class="logo-chip">Finn Wardman WEF</span>
-      <span class="logo-chip">TestVentures.net</span>
-    </div>
-  </div>
-</div>
-
-<!-- ========== WHO THIS IS FOR ========== -->
-<div class="section" id="who">
-  <div class="wrap">
-    <span class="tag">Who this is for</span>
-    <h2>Youth nonprofits. Any size. Any country.</h2>
-    <div style="margin-top:16px;">
-      <div class="qual-row">
-        <span class="qual-icon qual-yes">✓</span>
-        <span class="qual-text"><strong>Youth nonprofits</strong> that want AI agents to find them and donors to pay them directly.</span>
-      </div>
-      <div class="qual-row">
-        <span class="qual-icon qual-yes">✓</span>
-        <span class="qual-text"><strong>Any size.</strong> 50 young people a year or 50,000. If you work with youth, you qualify.</span>
-      </div>
-      <div class="qual-row">
-        <span class="qual-icon qual-yes">✓</span>
-        <span class="qual-text"><strong>Any country.</strong> USDC works globally. No bank account needed to receive. Optional fiat off-ramp.</span>
-      </div>
-      <div class="qual-row">
-        <span class="qual-icon qual-no">✗</span>
-        <span class="qual-text"><strong>Not for enterprise nonprofits</strong> with seven-figure fundraising teams. They have distribution. This is for the ones that don't.</span>
-      </div>
+    <div class="proof-logos">
+      <span class="proof-chip">Bridges for Music</span>
+      <span class="proof-chip">City Kids Surfing</span>
+      <span class="proof-chip">Finn Wardman WEF</span>
+      <span class="proof-chip">The Wave Project</span>
+      <span class="proof-chip">Waves for Change</span>
+      <span class="proof-chip">Surfers Not Street Children</span>
     </div>
   </div>
 </div>
 
-<!-- ========== FINAL CTA ========== -->
+<!-- ===== STORY ===== -->
+<div class="section">
+  <div class="wrap story-section">
+    <span class="tag">Why it's free</span>
+    <h2>Built in memory of Finn</h2>
+    <p>GiveReady was built by Geordie Wardman after his son Finn died in 2023 at age 20. Finn was a freeride skier, a surfer, and the kind of person who said yes before he'd figured out the logistics. The Finn Wardman World Explorer Fund was created in his memory. GiveReady exists to make sure small charities like Finn's fund can be found by anyone, anywhere &mdash; including AI agents. It's free because charging fees on charitable donations defeats the purpose.</p>
+  </div>
+</div>
+
+<!-- ===== FINAL CTA ===== -->
 <div class="final-cta" id="cta">
-  <h2>Get found. Get funded.<br>Keep 100%.</h2>
-  <p>Free forever. Under 45 minutes. AI agents start finding you immediately.</p>
-  <a href="/onboard" class="btn-white">Get Listed</a>
-  <div class="cta-note">geordie@testventures.net</div>
+  <h2>Get your free donation page.</h2>
+  <p>One link. Every payment method. Zero fees. Multi-sig custody. Live in minutes.</p>
+  <a href="/onboard" class="btn-cta">Get your free page &rarr;</a>
+  <a href="/donate/finn-wardman-world-explorer-fund" class="cta-sub">See it in action &rarr;</a>
 </div>
 
 <footer>
   <div class="footer-links">
-    <a href="/onboard">Get Listed</a>
+    <a href="/onboard">Get Started</a>
     <a href="https://github.com/gswardman/giveready" target="_blank">GitHub</a>
-    <a href="/widget/demo">Widget Demo</a>
-    <a href="/AGENTS.md">agents.md</a>
+    <a href="/agents.md">agents.md</a>
     <a href="/llms.txt">llms.txt</a>
-    <a href="/license">License</a>
+    <a href="/license">Licence</a>
     <a href="https://testventures.net" target="_blank">TestVentures.net</a>
   </div>
-  <p>Open-source infrastructure for AI-assisted charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. Revenue supports the <a href="https://finnwardman.com">Finn Wardman World Explorer Fund</a>.</p>
+  <p>Open-source infrastructure for charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. Revenue supports the <a href="https://finnwardman.com">Finn Wardman World Explorer Fund</a>.</p>
 </footer>
 
-<script src="/widget/donate.js"></script>
+<script>
+  // Theme toggle
+  var saved;
+  try { saved = localStorage.getItem('gr-theme'); } catch(e) {}
+  if (saved === 'dark') document.documentElement.classList.add('dark');
+
+  document.getElementById('theme-toggle').addEventListener('click', function() {
+    document.documentElement.classList.toggle('dark');
+    var isDark = document.documentElement.classList.contains('dark');
+    try { localStorage.setItem('gr-theme', isDark ? 'dark' : 'light'); } catch(e) {}
+  });
+</script>
 
 </body>
 </html>

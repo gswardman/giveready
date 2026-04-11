@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — GiveReady</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #ffffff; --surface: #f9fafb; --card: #ffffff;
+      --border: #e5e5e5; --text: #111111; --muted: #666666; --light: #999;
+      --accent: #059669; --accent-dim: rgba(5,150,105,0.08);
+      --red: #dc2626; --red-dim: rgba(220,38,38,0.08);
+      --sans: 'Inter', -apple-system, system-ui, sans-serif;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.6; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 48px 24px; }
+    h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; }
+    .subtitle { font-size: 15px; color: var(--muted); margin-bottom: 32px; }
+
+    /* LOGIN */
+    #login { max-width: 360px; margin: 80px auto; text-align: center; }
+    #login h1 { margin-bottom: 24px; }
+    #login input {
+      width: 100%; font-family: var(--sans); font-size: 15px;
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px 14px; outline: none; margin-bottom: 12px;
+    }
+    #login input:focus { border-color: var(--accent); }
+    .btn {
+      display: inline-block; font-family: var(--sans); font-size: 14px; font-weight: 700;
+      border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn-primary { background: var(--text); color: var(--bg); }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-approve { background: var(--accent); color: white; font-size: 13px; padding: 8px 16px; }
+    .btn-approve:hover { opacity: 0.85; }
+    .btn-reject { background: var(--red); color: white; font-size: 13px; padding: 8px 16px; }
+    .btn-reject:hover { opacity: 0.85; }
+    .btn-sm { font-size: 12px; padding: 6px 12px; border-radius: 6px; }
+
+    /* DASHBOARD */
+    #dashboard { display: none; }
+    .count-badge { display: inline-block; font-size: 13px; font-weight: 600; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 12px; margin-bottom: 24px; }
+    .empty { text-align: center; padding: 48px 0; color: var(--muted); font-size: 15px; }
+
+    /* CARDS */
+    .draft-card {
+      border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+      margin-bottom: 16px; background: var(--card);
+    }
+    .draft-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+    .draft-name { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+    .draft-meta { font-size: 13px; color: var(--muted); }
+    .draft-meta span { margin-right: 16px; }
+    .draft-mission { font-size: 14px; color: var(--muted); line-height: 1.6; margin: 8px 0 16px; }
+    .draft-details { font-size: 13px; color: var(--light); margin-bottom: 16px; }
+    .draft-details a { color: var(--accent); text-decoration: none; }
+    .draft-actions { display: flex; gap: 8px; align-items: center; }
+    .draft-actions .preview-link { font-size: 13px; color: var(--muted); text-decoration: none; margin-left: auto; }
+    .draft-actions .preview-link:hover { color: var(--text); }
+
+    .status-msg { font-size: 13px; padding: 8px 12px; border-radius: 6px; margin-top: 8px; }
+    .status-msg.success { background: var(--accent-dim); color: var(--accent); }
+    .status-msg.error { background: var(--red-dim); color: var(--red); }
+  </style>
+</head>
+<body>
+
+<div id="login">
+  <h1>GiveReady Admin</h1>
+  <input type="password" id="token-input" placeholder="Admin token" onkeydown="if(event.key==='Enter')login()" />
+  <button class="btn btn-primary" onclick="login()" style="width:100%">Sign in</button>
+  <div id="login-error" style="color:#dc2626; font-size:13px; margin-top:8px;"></div>
+</div>
+
+<div id="dashboard" class="wrap">
+  <h1>Pending Registrations</h1>
+  <p class="subtitle">Review and approve new nonprofit profiles.</p>
+  <div id="count-badge" class="count-badge"></div>
+  <div id="drafts-list"></div>
+  <button class="btn btn-primary" onclick="loadDrafts()" style="margin-top:16px">Refresh</button>
+</div>
+
+<script>
+  let TOKEN = '';
+
+  function login() {
+    TOKEN = document.getElementById('token-input').value.trim();
+    if (!TOKEN) return;
+    document.getElementById('login-error').textContent = '';
+    loadDrafts().then(ok => {
+      if (ok) {
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        try { sessionStorage.setItem('gr-admin', TOKEN); } catch(e) {}
+      } else {
+        document.getElementById('login-error').textContent = 'Invalid token';
+      }
+    });
+  }
+
+  // Auto-login from session
+  try {
+    const saved = sessionStorage.getItem('gr-admin');
+    if (saved) { TOKEN = saved; login(); }
+  } catch(e) {}
+
+  async function loadDrafts() {
+    try {
+      const res = await fetch('/api/admin/drafts', {
+        headers: { 'Authorization': 'Bearer ' + TOKEN }
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      renderDrafts(data.drafts);
+      document.getElementById('count-badge').textContent = data.count + ' pending';
+      return true;
+    } catch(e) {
+      return false;
+    }
+  }
+
+  function renderDrafts(drafts) {
+    const list = document.getElementById('drafts-list');
+    if (!drafts || drafts.length === 0) {
+      list.innerHTML = '<div class="empty">No pending registrations. All clear.</div>';
+      return;
+    }
+    list.innerHTML = drafts.map(d => `
+      <div class="draft-card" id="card-${d.slug}">
+        <div class="draft-header">
+          <div>
+            <div class="draft-name">${esc(d.name)}</div>
+            <div class="draft-meta">
+              <span>${esc(d.country)}${d.city ? ', ' + esc(d.city) : ''}</span>
+              <span>${esc(d.contact_email)}</span>
+              <span>${new Date(d.created_at).toLocaleDateString()}</span>
+            </div>
+          </div>
+        </div>
+        <div class="draft-mission">${esc(d.mission)}</div>
+        <div class="draft-details">
+          ${d.website ? '<a href="' + esc(d.website) + '" target="_blank">' + esc(d.website) + '</a> · ' : ''}
+          ${d.usdc_wallet ? 'Wallet: ' + esc(d.usdc_wallet.slice(0,8)) + '...' + esc(d.usdc_wallet.slice(-4)) : 'No wallet yet'}
+        </div>
+        <div class="draft-actions">
+          <button class="btn btn-approve btn-sm" onclick="approve('${esc(d.slug)}')">Approve</button>
+          <button class="btn btn-reject btn-sm" onclick="reject('${esc(d.slug)}')">Reject</button>
+          <a href="/donate/${esc(d.slug)}?preview=1" target="_blank" class="preview-link">Preview page →</a>
+        </div>
+        <div id="status-${d.slug}"></div>
+      </div>
+    `).join('');
+  }
+
+  async function approve(slug) {
+    if (!confirm('Approve ' + slug + '? Their page will go live immediately.')) return;
+    const statusDiv = document.getElementById('status-' + slug);
+    try {
+      const res = await fetch('/api/admin/approve/' + slug, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + TOKEN }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        statusDiv.innerHTML = '<div class="status-msg success">Approved. Live at <a href="' + data.donate_url + '">' + data.donate_url + '</a></div>';
+      } else {
+        statusDiv.innerHTML = '<div class="status-msg error">' + (data.error || 'Failed') + '</div>';
+      }
+    } catch(e) {
+      statusDiv.innerHTML = '<div class="status-msg error">Network error</div>';
+    }
+  }
+
+  async function reject(slug) {
+    if (!confirm('Reject and delete ' + slug + '? This cannot be undone.')) return;
+    const statusDiv = document.getElementById('status-' + slug);
+    try {
+      const res = await fetch('/api/admin/reject/' + slug, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + TOKEN }
+      });
+      if (res.ok) {
+        document.getElementById('card-' + slug).style.opacity = '0.4';
+        statusDiv.innerHTML = '<div class="status-msg error">Rejected and deleted</div>';
+      }
+    } catch(e) {
+      statusDiv.innerHTML = '<div class="status-msg error">Network error</div>';
+    }
+  }
+
+  function esc(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+
+</body>
+</html>

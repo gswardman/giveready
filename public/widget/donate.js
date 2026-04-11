@@ -622,17 +622,20 @@
       if (this.selectedAmount || this.customAmount) {
         const amount = this.customAmount || this.selectedAmount;
         const solanaPayUrl = buildSolanaPayUrl(usdc_wallet, amount, name, this.currency);
-        const qrCodeUrl = generateQRCodeUrl(solanaPayUrl);
         const amountLabel = this.currency === 'USDC' ? `$${amount}` : `◎${amount} SOL`;
+
+        // QR code encodes the universal donate page URL (works for all users)
+        const donatePageUrl = `https://giveready.org/donate/${this.slug}?amount=${amount}`;
+        const qrCodeUrl = generateQRCodeUrl(donatePageUrl);
 
         modalHTML += `
           <div class="giveready-qr-section">
             <div class="giveready-qr-label">Scan to Donate ${amountLabel}</div>
             <div class="giveready-qr-code">
-              <img src="${qrCodeUrl}" alt="Solana Pay QR Code" width="200" height="200" />
+              <img src="${qrCodeUrl}" alt="Donate QR Code" width="200" height="200" />
             </div>
             <div class="giveready-qr-instructions">
-              Scan with Phantom or Coinbase Wallet
+              Scan with any camera app to open the donation page
             </div>
           </div>
 

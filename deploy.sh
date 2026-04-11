@@ -155,20 +155,29 @@ echo "[6/8] Pushing to GitHub..."
 git push origin main
 git push origin "$DEPLOY_TAG"
 
-# 8. Deploy to Cloudflare
-echo "[7/8] Deploying to Cloudflare..."
+# 8. Run any pending migrations
+echo "[7/8] Running migrations..."
+for migration in migrations/*.sql; do
+  [ -f "$migration" ] && {
+    echo "  Running $migration..."
+    wrangler d1 execute giveready-db --file="$migration" --remote 2>/dev/null || echo "  (already applied or skipped)"
+  }
+done
+
+# 9. Deploy to Cloudflare
+echo "[8/9] Deploying to Cloudflare..."
 wrangler deploy
 
-# 9. MCP registry
+# 10. MCP registry
 if [ "$SKIP_MCP" = false ]; then
-  echo "[8/8] Publishing MCP server..."
+  echo "[9/9] Publishing MCP server..."
   if [ -d "mcp-server" ] && command -v mcp-publisher >/dev/null 2>&1; then
     (cd mcp-server && mcp-publisher publish 2>/dev/null) || echo "  MCP publish skipped (not logged in or error)"
   else
     echo "  Skipped (mcp-publisher not found or no mcp-server dir)"
   fi
 else
-  echo "[8/8] Skipping MCP publish (--skip-mcp)"
+  echo "[9/9] Skipping MCP publish (--skip-mcp)"
 fi
 
 # 10. Verify
