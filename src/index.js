@@ -787,6 +787,28 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     .growth-cta p { font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
     .growth-cta-btn { display: inline-block; padding: 10px 24px; background: var(--accent); color: #0a0a0a; font-size: 13px; font-weight: 700; border-radius: 20px; text-decoration: none; transition: opacity 0.15s; }
     .growth-cta-btn:hover { opacity: 0.9; }
+    .donation-note-wrap { margin-top: 16px; }
+    .donation-note-toggle { display: inline-flex; align-items: center; gap: 5px; background: none; border: none; color: var(--muted); font-size: 12px; font-family: var(--sans); cursor: pointer; padding: 0; transition: color 0.15s; }
+    .donation-note-toggle:hover { color: var(--text); }
+    .donation-note-toggle svg { width: 14px; height: 14px; }
+    .donation-note-field { display: none; margin-top: 8px; }
+    .donation-note-field.visible { display: block; }
+    .donation-note-field textarea { width: 100%; min-height: 56px; max-height: 120px; padding: 10px 12px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: 13px; font-family: var(--sans); resize: vertical; outline: none; transition: border-color 0.15s; box-sizing: border-box; }
+    .donation-note-field textarea:focus { border-color: var(--accent); }
+    .donation-note-field textarea::placeholder { color: var(--light); }
+    .donation-note-count { text-align: right; font-size: 10px; color: var(--light); margin-top: 4px; }
+    .thank-you-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+    .thank-you-overlay.visible { display: flex; }
+    .thank-you-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 24px; max-width: 380px; width: 100%; text-align: center; }
+    .thank-you-icon { width: 56px; height: 56px; background: var(--accent-dim); border: 2px solid var(--accent-border); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+    .thank-you-icon svg { width: 28px; height: 28px; color: var(--accent); }
+    .thank-you-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.02em; }
+    .thank-you-card p { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 20px; }
+    .thank-you-share { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+    .thank-you-close { background: none; border: none; color: var(--light); font-size: 13px; cursor: pointer; padding: 8px; font-family: var(--sans); }
+    .thank-you-close:hover { color: var(--text); }
+    @keyframes heartbeat { 0% { transform: scale(1); } 14% { transform: scale(1.15); } 28% { transform: scale(1); } 42% { transform: scale(1.15); } 70% { transform: scale(1); } }
+    .beating-heart { display: inline-block; animation: heartbeat 1.5s ease-in-out infinite; }
     .share-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 24px; }
     .share-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all 0.15s; text-decoration: none; font-family: var(--sans); }
     .share-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-light); }
@@ -845,7 +867,7 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
       <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
     </button>
-    <button class="nav-share-btn" id="share-nav-btn">
+    <button class="nav-share-btn" id="share-nav-btn" aria-label="Share this page">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
       Share
     </button>
@@ -863,9 +885,24 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
   </div>
 </div>
 
+<!-- Thank you overlay -->
+<div class="thank-you-overlay" id="thank-you">
+  <div class="thank-you-card">
+    <div class="thank-you-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+    <h2>Thank you</h2>
+    <p id="ty-message">Your donation makes a real difference. Thank you for your generosity.</p>
+    <div class="thank-you-share">
+      <a class="share-btn" id="ty-whatsapp" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.627.616l4.584-1.258A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22a9.94 9.94 0 01-5.39-1.59l-.386-.24-2.724.748.698-2.63-.263-.416A9.935 9.935 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg> Share on WhatsApp</a>
+      <button class="share-btn" id="ty-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy link</button>
+    </div>
+    <button class="thank-you-close" id="ty-close">Close</button>
+  </div>
+</div>
+
 <footer>
   <div class="footer-fees">100% of your donation reaches the nonprofit. Zero platform fees.</div>
-  <div class="footer-powered">Powered by <a href="https://giveready.org">GiveReady</a> &middot; Made with &#10084;&#65039; <a href="https://www.finnwardman.com">in memory of Finn</a></div>
+  <div class="footer-powered">Powered by <a href="https://giveready.org">GiveReady</a></div>
+  <div style="margin-top:8px;font-size:10px;text-transform:uppercase;letter-spacing:0.14em;color:var(--light);">MADE WITH <span class="beating-heart" style="font-size:12px;">&#10084;&#65039;</span> <a href="https://www.finnwardman.com" style="color:var(--light);text-decoration:none;">IN MEMORY OF FINN</a></div>
 </footer>
 
 <script>
@@ -874,7 +911,7 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
 
   var USDC_SPL = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
   var QR_API = 'https://api.qrserver.com/v1/create-qr-code';
-  var AMOUNTS = [1, 5, 10, 25];
+  var AMOUNTS = [25, 50, 100, 250];
   var MOONPAY_MIN = 20;
 
   var pathParts = window.location.pathname.split('/').filter(Boolean);
@@ -888,7 +925,7 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
 
   var nonprofit = null;
   var selectedAmount = null;
-  var activeTab = 'bank';
+  var activeTab = 'card';
 
   // Check URL params for pre-selected amount
   var urlParams = new URLSearchParams(window.location.search);
@@ -911,7 +948,7 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
       app.innerHTML = '<div style="text-align:center;padding:4rem 1rem;"><p style="font-size:1.2rem;opacity:0.7;">Nonprofit not found.</p><a href="/" style="color:var(--accent);text-decoration:underline;">Browse nonprofits</a></div>';
     });
 
-  function esc(t) { var d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
+  function esc(t) { var d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\\\`/g, '&#96;'); }
   function initials(name) { if (!name) return '?'; var parts = name.split(/\s+/); if (parts.length === 1) return parts[0].charAt(0).toUpperCase(); return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase(); }
   function solUrl(w, a, n) { var p = new URLSearchParams({ amount: a.toString(), label: n, message: 'Donation via GiveReady', 'spl-token': USDC_SPL }); return 'solana:' + w + '?' + p.toString(); }
   function qrUrl(d) { return QR_API + '/?size=200x200&data=' + encodeURIComponent(d); }
@@ -953,6 +990,12 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     h += '<div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Direct to charity</div>';
     h += '</div>';
 
+    // Preserve note across re-renders
+    var noteEl = document.getElementById('donation-note');
+    var savedNote = noteEl ? noteEl.value : '';
+    var noteOpen = document.getElementById('note-field');
+    var noteWasOpen = noteOpen ? noteOpen.classList.contains('visible') : false;
+
     // Amount
     h += '<div class="amount-section"><label class="section-label">Choose amount (USD)</label><div class="amount-pills">';
     AMOUNTS.forEach(function(a) { h += '<button class="amount-btn' + (selectedAmount === a ? ' active' : '') + '" data-amount="' + a + '">$' + a + '</button>'; });
@@ -960,16 +1003,32 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     var showCustom = (selectedAmount && AMOUNTS.indexOf(selectedAmount) === -1) ? ' visible' : '';
     h += '<div class="custom-row' + showCustom + '" id="custom-row"><input type="number" class="custom-input" id="custom-input" placeholder="Enter amount" min="0.01" step="0.01" /><button class="custom-set-btn" id="custom-set">Set</button></div></div>';
 
+    // Donation note
+    h += '<div class="donation-note-wrap">';
+    h += '<button class="donation-note-toggle" id="note-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Add a note (optional)</button>';
+    h += '<div class="donation-note-field" id="note-field"><textarea id="donation-note" maxlength="200" placeholder="Add a personal message (optional)"></textarea>';
+    h += '<div class="donation-note-count"><span id="note-chars">0</span>/200</div></div></div>';
+
     // Payment
     h += '<div class="pay-section">';
     if (!selectedAmount) {
       h += '<div class="select-amount-prompt">Select an amount to see payment options</div>';
     } else {
       h += '<div class="pay-tabs">';
-      h += '<button class="pay-tab' + (activeTab === 'bank' ? ' active' : '') + '" data-tab="bank"><span class="pay-tab-label">Banking App</span><span class="pay-tab-sub">Zero fees</span></button>';
       h += '<button class="pay-tab' + (activeTab === 'card' ? ' active' : '') + '" data-tab="card"><span class="pay-tab-label">Card</span><span class="pay-tab-sub">~4.5% fee</span></button>';
+      h += '<button class="pay-tab' + (activeTab === 'bank' ? ' active' : '') + '" data-tab="bank"><span class="pay-tab-label">Banking App</span><span class="pay-tab-sub">Zero fees</span></button>';
       h += '<button class="pay-tab' + (activeTab === 'wallet' ? ' active' : '') + '" data-tab="wallet"><span class="pay-tab-label">Wallet</span><span class="pay-tab-sub">Solana Pay</span></button>';
       h += '</div>';
+
+      // Card (first)
+      h += '<div class="pay-panel' + (activeTab === 'card' ? ' active' : '') + '" data-panel="card">';
+      if (selectedAmount < MOONPAY_MIN) {
+        h += '<div class="moonpay-min-warning">\u26A0 Card payments have a $' + MOONPAY_MIN + ' minimum via MoonPay. For donations under $' + MOONPAY_MIN + ', use the Banking App tab \u2014 it\u2019s free and works with Revolut, Coinbase, or Kraken.</div>';
+        h += '<button class="moonpay-btn" style="opacity:0.4;cursor:not-allowed;" disabled>Card minimum is $' + MOONPAY_MIN + '</button>';
+      } else {
+        h += '<a href="#" class="moonpay-btn" id="moonpay-pay">Pay $' + selectedAmount + ' with Card \u2192</a>';
+      }
+      h += '<div class="moonpay-note">Opens MoonPay. Card details handled securely by MoonPay. ~4.5% processing fee.</div></div>';
 
       // Bank
       h += '<div class="pay-panel' + (activeTab === 'bank' ? ' active' : '') + '" data-panel="bank">';
@@ -977,16 +1036,6 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
       h += '<div class="wallet-box"><div class="wallet-box-label">USDC Wallet Address (Solana)</div><div class="wallet-box-row"><span class="wallet-box-addr">' + esc(w) + '</span><button class="copy-btn" id="copy-bank-btn">Copy</button></div></div>';
       h += '<div class="network-note">\u26A0 Select <strong>Solana</strong> network, not Ethereum</div>';
       h += '<div class="zero-fee-note">\u2713 Zero fees \u2014 100% reaches the charity</div></div>';
-
-      // Card
-      h += '<div class="pay-panel' + (activeTab === 'card' ? ' active' : '') + '" data-panel="card">';
-      if (selectedAmount < MOONPAY_MIN) {
-        h += '<div class="moonpay-min-warning">\u26A0 Card payments have a $' + MOONPAY_MIN + ' minimum via MoonPay. For donations under $' + MOONPAY_MIN + ', use the Banking App tab \u2014 it\u2019s free and works with Revolut, Coinbase, or Kraken.</div>';
-        h += '<button class="moonpay-btn" style="opacity:0.4;cursor:not-allowed;" disabled>Card minimum is $' + MOONPAY_MIN + '</button>';
-      } else {
-        h += '<a href="#" class="moonpay-btn">Pay $' + selectedAmount + ' with Card \u2192</a>';
-      }
-      h += '<div class="moonpay-note">Opens MoonPay. Card details handled securely by MoonPay. ~4.5% processing fee.</div></div>';
 
       // Wallet
       var su = solUrl(w, selectedAmount, nonprofit.name);
@@ -997,10 +1046,17 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     }
     h += '</div>';
 
+    // Confirmation button for off-page payments
+    if (selectedAmount) {
+      h += '<div style="text-align:center;margin-top:16px;">';
+      h += '<button class="share-btn" id="confirm-sent-btn" style="color:var(--accent);border-color:var(--accent-border);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> I\\u2019ve sent my donation</button></div>';
+    }
+
     // Share row
     h += '<div class="share-row">';
     h += '<button class="share-btn" id="share-copy-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy link</button>';
     h += '<a class="share-btn" href="https://wa.me/?text=' + encodeURIComponent('Donate to ' + nonprofit.name + ' \u2014 100% reaches the charity, zero fees: ' + pageUrl()) + '" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.627.616l4.584-1.258A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22a9.94 9.94 0 01-5.39-1.59l-.386-.24-2.724.748.698-2.63-.263-.416A9.935 9.935 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg> WhatsApp</a>';
+    h += '<button class="share-btn" id="share-native-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg> Instagram</button>';
     h += '<button class="share-btn" id="share-more-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg> More</button>';
     h += '</div>';
 
@@ -1009,6 +1065,15 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
 
     app.innerHTML = h;
     bindUI();
+    // Restore note state
+    if (savedNote) {
+      var nEl = document.getElementById('donation-note');
+      var nField = document.getElementById('note-field');
+      var nChars = document.getElementById('note-chars');
+      if (nEl) nEl.value = savedNote;
+      if (nField && noteWasOpen) nField.classList.add('visible');
+      if (nChars) nChars.textContent = savedNote.length;
+    }
   }
 
   function bindUI() {
@@ -1016,11 +1081,11 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
       b.addEventListener('click', function() {
         var v = b.dataset.amount;
         if (v === 'custom') { var cr = document.getElementById('custom-row'); cr.classList.toggle('visible'); if (cr.classList.contains('visible')) document.getElementById('custom-input').focus(); return; }
-        selectedAmount = parseFloat(v); activeTab = 'bank'; render();
+        selectedAmount = parseFloat(v); activeTab = 'card'; render();
       });
     });
     var cs = document.getElementById('custom-set'), ci = document.getElementById('custom-input');
-    if (cs && ci) { cs.addEventListener('click', function() { var v = parseFloat(ci.value); if (v > 0) { selectedAmount = v; activeTab = 'bank'; render(); } }); ci.addEventListener('keypress', function(e) { if (e.key === 'Enter') cs.click(); }); }
+    if (cs && ci) { cs.addEventListener('click', function() { var v = parseFloat(ci.value); if (v > 0) { selectedAmount = v; activeTab = 'card'; render(); } }); ci.addEventListener('keypress', function(e) { if (e.key === 'Enter') cs.click(); }); }
     document.querySelectorAll('.pay-tab').forEach(function(tab) {
       tab.addEventListener('click', function() {
         activeTab = tab.dataset.tab;
@@ -1040,6 +1105,31 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     document.getElementById('share-nav-btn').addEventListener('click', function() { showSharePopup(); });
     document.getElementById('share-popup-close').addEventListener('click', function() { hideSharePopup(); });
     document.getElementById('share-popup').addEventListener('click', function(e) { if (e.target === document.getElementById('share-popup')) hideSharePopup(); });
+    // Note toggle + counter
+    var noteToggle = document.getElementById('note-toggle');
+    var noteField = document.getElementById('note-field');
+    var noteTextarea = document.getElementById('donation-note');
+    var noteChars = document.getElementById('note-chars');
+    if (noteToggle && noteField) { noteToggle.addEventListener('click', function() { noteField.classList.toggle('visible'); if (noteField.classList.contains('visible') && noteTextarea) noteTextarea.focus(); }); }
+    if (noteTextarea && noteChars) { noteTextarea.addEventListener('input', function() { noteChars.textContent = noteTextarea.value.length; }); }
+    // Instagram / native share
+    var nativeBtn = document.getElementById('share-native-btn');
+    if (nativeBtn) { nativeBtn.addEventListener('click', function() { var shareText = 'Donate to ' + nonprofit.name + ' \\u2014 100% reaches the charity, zero fees'; if (navigator.share) { navigator.share({ title: nonprofit.name, text: shareText, url: pageUrl() }).catch(function(){}); } else { navigator.clipboard.writeText(pageUrl()).then(function() { nativeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="20 6 9 17 4 12"/></svg> Link copied!'; setTimeout(function() { nativeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg> Instagram'; }, 2000); }); } }); }
+    // Confirm sent button
+    var csb = document.getElementById('confirm-sent-btn');
+    if (csb) { csb.addEventListener('click', function() { showThankYou(); }); }
+  }
+
+  function showThankYou() {
+    document.getElementById('thank-you').classList.add('visible');
+    var url = pageUrl();
+    var text = 'I just donated to ' + nonprofit.name + ' \\u2014 100% reaches the charity, zero fees';
+    document.getElementById('ty-whatsapp').href = 'https://wa.me/?text=' + encodeURIComponent(text + ': ' + url);
+    document.getElementById('ty-copy').addEventListener('click', function() {
+      navigator.clipboard.writeText(url).then(function() { document.getElementById('ty-copy').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="20 6 9 17 4 12"/></svg> Copied!'; });
+    });
+    document.getElementById('ty-close').addEventListener('click', function() { document.getElementById('thank-you').classList.remove('visible'); });
+    document.getElementById('thank-you').addEventListener('click', function(e) { if (e.target === document.getElementById('thank-you')) document.getElementById('thank-you').classList.remove('visible'); });
   }
 
   function showSharePopup() {
@@ -1052,7 +1142,33 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     copyBtn.addEventListener('click', function() { navigator.clipboard.writeText(url).then(function() { copyBtn.innerHTML = '\u2713 Copied!'; setTimeout(function() { copyBtn.innerHTML = '\uD83D\uDD17 Copy link'; }, 2000); }); });
     grid.appendChild(copyBtn);
     var waBtn = document.createElement('a'); waBtn.className = 'share-popup-btn'; waBtn.href = 'https://wa.me/?text=' + encodeURIComponent(text + ': ' + url); waBtn.target = '_blank'; waBtn.rel = 'noopener'; waBtn.innerHTML = '\uD83D\uDCAC WhatsApp'; grid.appendChild(waBtn);
+    var igBtn = document.createElement('button');
+    igBtn.className = 'share-popup-btn';
+    igBtn.innerHTML = '\\uD83D\\uDCF7 Instagram';
+    igBtn.addEventListener('click', function() {
+      if (navigator.share) { navigator.share({ title: name, text: text, url: url }).catch(function(){}); }
+      else { navigator.clipboard.writeText(url).then(function() { igBtn.innerHTML = '\\u2713 Link copied!'; setTimeout(function() { igBtn.innerHTML = '\\uD83D\\uDCF7 Instagram'; }, 2000); }); }
+    });
+    grid.appendChild(igBtn);
     var xBtn = document.createElement('a'); xBtn.className = 'share-popup-btn'; xBtn.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(url); xBtn.target = '_blank'; xBtn.rel = 'noopener'; xBtn.innerHTML = '\uD835\uDD4F Post on X'; grid.appendChild(xBtn);
+    var fbBtn = document.createElement('a');
+    fbBtn.className = 'share-popup-btn';
+    fbBtn.href = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url);
+    fbBtn.target = '_blank'; fbBtn.rel = 'noopener';
+    fbBtn.innerHTML = '\\uD83D\\uDC4D Facebook';
+    grid.appendChild(fbBtn);
+    var liBtn = document.createElement('a');
+    liBtn.className = 'share-popup-btn';
+    liBtn.href = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(url);
+    liBtn.target = '_blank'; liBtn.rel = 'noopener';
+    liBtn.innerHTML = '\\uD83D\\uDCBC LinkedIn';
+    grid.appendChild(liBtn);
+    var tgBtn = document.createElement('a');
+    tgBtn.className = 'share-popup-btn';
+    tgBtn.href = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
+    tgBtn.target = '_blank'; tgBtn.rel = 'noopener';
+    tgBtn.innerHTML = '\\u2708\\uFE0F Telegram';
+    grid.appendChild(tgBtn);
     var emBtn = document.createElement('a'); emBtn.className = 'share-popup-btn'; emBtn.href = 'mailto:?subject=' + encodeURIComponent('Donate to ' + name) + '&body=' + encodeURIComponent(text + '\\n\\n' + url); emBtn.innerHTML = '\u2709\uFE0F Email'; grid.appendChild(emBtn);
     document.getElementById('share-popup-sub').textContent = 'Help more people discover ' + name + '.';
     document.getElementById('share-popup').classList.add('visible');

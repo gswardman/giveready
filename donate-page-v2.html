@@ -4,12 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Donate — GiveReady</title>
-  <meta name="description" content="Donate directly to verified nonprofits. 100% reaches the charity. Zero platform fees." />
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content="Donate — GiveReady" />
-  <meta property="og:description" content="100% of your donation reaches the charity. Zero platform fees." />
-  <meta property="og:url" content="https://giveready.org" />
-  <meta name="twitter:card" content="summary" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -28,10 +22,26 @@
       --accent: #34d399;
       --accent-dim: rgba(52,211,153,0.12);
       --accent-border: rgba(52,211,153,0.25);
+      --nav-bg: rgba(10,10,10,0.85);
       --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
       --mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
       --radius: 12px;
       --radius-sm: 8px;
+    }
+    html.light {
+      --bg: #ffffff;
+      --surface: #f9fafb;
+      --surface-hover: #f3f4f6;
+      --card: #f9fafb;
+      --border: #e5e5e5;
+      --border-light: #d4d4d4;
+      --text: #111111;
+      --muted: #666666;
+      --light: #999999;
+      --accent: #059669;
+      --accent-dim: rgba(5,150,105,0.08);
+      --accent-border: rgba(5,150,105,0.2);
+      --nav-bg: rgba(255,255,255,0.92);
     }
     html { scroll-behavior: smooth; }
     body {
@@ -45,10 +55,8 @@
       display: flex;
       flex-direction: column;
     }
-
-    /* NAV */
     nav {
-      background: rgba(10,10,10,0.85);
+      background: var(--nav-bg);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
@@ -62,244 +70,44 @@
       z-index: 100;
     }
     .nav-left { display: flex; align-items: center; gap: 10px; }
-    .nav-name {
-      font-weight: 700;
-      font-size: 15px;
-      color: var(--text);
-      text-decoration: none;
-      letter-spacing: -0.02em;
-    }
-    .nav-badge {
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--accent);
-      background: var(--accent-dim);
-      border: 1px solid var(--accent-border);
-      padding: 2px 8px;
-      border-radius: 20px;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-    }
-    .nav-share-btn {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--muted);
-      cursor: pointer;
-      transition: all 0.15s;
-      font-family: var(--sans);
-    }
+    .nav-name { font-weight: 700; font-size: 15px; color: var(--text); text-decoration: none; letter-spacing: -0.02em; }
+    .nav-badge { font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); padding: 2px 8px; border-radius: 20px; letter-spacing: 0.03em; text-transform: uppercase; }
+    .nav-share-btn { display: flex; align-items: center; gap: 6px; padding: 6px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all 0.15s; font-family: var(--sans); }
     .nav-share-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-light); }
     .nav-share-btn svg { width: 14px; height: 14px; }
-
-    /* MAIN */
-    .wrap {
-      max-width: 480px;
-      margin: 0 auto;
-      padding: 28px 20px 40px;
-      flex: 1;
-      width: 100%;
-    }
-
-    /* LOADING */
-    .loading { text-align: center; padding: 100px 0; color: var(--muted); }
-    .loading-spinner {
-      display: inline-block;
-      width: 28px;
-      height: 28px;
-      border: 2.5px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      margin-bottom: 16px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .error-state { text-align: center; padding: 100px 0; color: #ef4444; }
-
-    /* NONPROFIT HEADER */
+    .wrap { max-width: 480px; margin: 0 auto; padding: 28px 20px 40px; flex: 1; width: 100%; }
     .np-header { text-align: center; margin-bottom: 28px; }
-    .np-avatar {
-      width: 64px;
-      height: 64px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent-dim), var(--surface));
-      border: 2px solid var(--accent-border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 16px;
-      font-size: 22px;
-      font-weight: 800;
-      color: var(--accent);
-      letter-spacing: -0.02em;
-    }
-    .np-name {
-      font-size: clamp(20px, 5vw, 26px);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.15;
-      margin-bottom: 8px;
-    }
-    .np-mission {
-      font-size: 14px;
-      color: var(--muted);
-      line-height: 1.6;
-      margin-bottom: 12px;
-      max-width: 400px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .np-verified {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--accent);
-      background: var(--accent-dim);
-      border: 1px solid var(--accent-border);
-      padding: 5px 12px;
-      border-radius: 20px;
-    }
+    .np-avatar { width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-dim), var(--surface)); border: 2px solid var(--accent-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 22px; font-weight: 800; color: var(--accent); letter-spacing: -0.02em; overflow: hidden; }
+    .np-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    html.light .np-avatar img { filter: none; }
+    html:not(.light) .np-avatar img { filter: invert(1); }
+    .np-name { font-size: clamp(20px, 5vw, 26px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; margin-bottom: 8px; }
+    .np-mission { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; max-width: 400px; margin-left: auto; margin-right: auto; }
+    .np-verified { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); padding: 5px 12px; border-radius: 20px; }
     .np-verified svg { width: 14px; height: 14px; flex-shrink: 0; }
-
-    /* IMPACT STATS */
-    .impact-bar {
-      display: flex;
-      justify-content: center;
-      gap: 24px;
-      padding: 16px 0;
-      margin-bottom: 24px;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
+    .impact-bar { display: flex; justify-content: center; gap: 24px; padding: 16px 0; margin-bottom: 24px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
     .impact-stat { text-align: center; }
     .impact-val { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
     .impact-label { font-size: 11px; color: var(--light); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
-
-    /* TRUST STRIP */
-    .trust-strip {
-      display: flex;
-      justify-content: center;
-      gap: 16px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
-    .trust-item {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--muted);
-    }
+    .trust-strip { display: flex; justify-content: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .trust-item { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; color: var(--muted); }
     .trust-item svg { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
-
-    /* AMOUNT SECTION */
     .amount-section { margin-bottom: 24px; }
-    .section-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--light);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 12px;
-      display: block;
-    }
-    .amount-pills {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .amount-btn {
-      flex: 1;
-      min-width: 64px;
-      padding: 12px 8px;
-      border: 2px solid var(--border);
-      background: var(--surface);
-      border-radius: var(--radius);
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.15s;
-      color: var(--text);
-      font-family: var(--sans);
-      text-align: center;
-    }
+    .section-label { font-size: 12px; font-weight: 600; color: var(--light); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: block; }
+    .amount-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .amount-btn { flex: 1; min-width: 64px; padding: 12px 8px; border: 2px solid var(--border); background: var(--surface); border-radius: var(--radius); font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.15s; color: var(--text); font-family: var(--sans); text-align: center; }
     .amount-btn:hover { border-color: var(--border-light); background: var(--surface-hover); }
-    .amount-btn.active {
-      background: var(--accent);
-      color: #0a0a0a;
-      border-color: var(--accent);
-    }
-    .custom-row {
-      display: none;
-      gap: 8px;
-      margin-top: 10px;
-    }
+    .amount-btn.active { background: var(--accent); color: #0a0a0a; border-color: var(--accent); }
+    .custom-row { display: none; gap: 8px; margin-top: 10px; }
     .custom-row.visible { display: flex; }
-    .custom-input {
-      flex: 1;
-      padding: 12px 14px;
-      border: 2px solid var(--border);
-      background: var(--surface);
-      border-radius: var(--radius);
-      font-size: 15px;
-      color: var(--text);
-      font-family: var(--sans);
-      transition: border-color 0.15s;
-    }
+    .custom-input { flex: 1; padding: 12px 14px; border: 2px solid var(--border); background: var(--surface); border-radius: var(--radius); font-size: 15px; color: var(--text); font-family: var(--sans); transition: border-color 0.15s; }
     .custom-input:focus { outline: none; border-color: var(--accent); }
     .custom-input::placeholder { color: var(--light); }
-    .custom-set-btn {
-      padding: 12px 20px;
-      background: var(--accent);
-      border: none;
-      border-radius: var(--radius);
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      color: #0a0a0a;
-      font-family: var(--sans);
-      transition: opacity 0.15s;
-    }
+    .custom-set-btn { padding: 12px 20px; background: var(--accent); border: none; border-radius: var(--radius); font-size: 14px; font-weight: 700; cursor: pointer; color: #0a0a0a; font-family: var(--sans); transition: opacity 0.15s; }
     .custom-set-btn:hover { opacity: 0.9; }
-
-    /* PAYMENT TABS */
     .pay-section { margin-bottom: 24px; }
-    .pay-tabs {
-      display: flex;
-      background: var(--surface);
-      border-radius: var(--radius);
-      padding: 4px;
-      gap: 4px;
-      margin-bottom: 16px;
-      border: 1px solid var(--border);
-    }
-    .pay-tab {
-      flex: 1;
-      padding: 10px 8px;
-      background: transparent;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      color: var(--muted);
-      font-family: var(--sans);
-      transition: all 0.15s;
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 3px;
-    }
+    .pay-tabs { display: flex; background: var(--surface); border-radius: var(--radius); padding: 4px; gap: 4px; margin-bottom: 16px; border: 1px solid var(--border); }
+    .pay-tab { flex: 1; padding: 10px 8px; background: transparent; border: none; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; color: var(--muted); font-family: var(--sans); transition: all 0.15s; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 3px; }
     .pay-tab:hover { color: var(--text); }
     .pay-tab.active { background: var(--surface-hover); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
     .pay-tab-label { font-size: 12px; font-weight: 600; }
@@ -307,319 +115,101 @@
     .pay-tab.active .pay-tab-sub { color: var(--muted); }
     .pay-panel { display: none; }
     .pay-panel.active { display: block; }
-    .select-amount-prompt {
-      text-align: center;
-      padding: 32px 16px;
-      color: var(--light);
-      font-size: 14px;
-      background: var(--surface);
-      border-radius: var(--radius);
-      border: 1px dashed var(--border);
-    }
-
-    /* CARD PANEL */
-    .moonpay-btn {
-      display: block;
-      width: 100%;
-      padding: 16px;
-      background: var(--text);
-      color: var(--bg);
-      border: none;
-      border-radius: var(--radius);
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: var(--sans);
-      transition: opacity 0.15s;
-      text-align: center;
-      text-decoration: none;
-    }
+    .select-amount-prompt { text-align: center; padding: 32px 16px; color: var(--light); font-size: 14px; background: var(--surface); border-radius: var(--radius); border: 1px dashed var(--border); }
+    .moonpay-btn { display: block; width: 100%; padding: 16px; background: var(--text); color: var(--bg); border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700; cursor: pointer; font-family: var(--sans); transition: opacity 0.15s; text-align: center; text-decoration: none; }
     .moonpay-btn:hover { opacity: 0.92; }
-    .moonpay-note {
-      font-size: 12px;
-      color: var(--light);
-      text-align: center;
-      margin-top: 10px;
-      line-height: 1.5;
-    }
-    .moonpay-min-warning {
-      background: rgba(245,158,11,0.1);
-      border: 1px solid rgba(245,158,11,0.2);
-      color: #f59e0b;
-      font-size: 12px;
-      font-weight: 500;
-      padding: 10px 14px;
-      border-radius: var(--radius-sm);
-      margin-bottom: 12px;
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      line-height: 1.5;
-    }
-
-    /* BANK PANEL */
-    .bank-steps {
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.7;
-      margin-bottom: 16px;
-    }
+    .moonpay-note { font-size: 12px; color: var(--light); text-align: center; margin-top: 10px; line-height: 1.5; }
+    .moonpay-min-warning { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); color: #f59e0b; font-size: 12px; font-weight: 500; padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 12px; display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+    .bank-steps { font-size: 13px; color: var(--muted); line-height: 1.7; margin-bottom: 16px; }
     .bank-steps ol { padding-left: 20px; }
     .bank-steps li { margin-bottom: 6px; }
     .bank-steps strong { color: var(--text); }
-    .wallet-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px;
-      margin-bottom: 10px;
-    }
-    .wallet-box-label {
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--light);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 8px;
-    }
-    .wallet-box-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-    }
-    .wallet-box-addr {
-      flex: 1;
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--text);
-      word-break: break-all;
-      line-height: 1.5;
-    }
-    .copy-btn {
-      flex-shrink: 0;
-      padding: 8px 14px;
-      background: var(--accent);
-      border: none;
-      border-radius: var(--radius-sm);
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      color: #0a0a0a;
-      font-family: var(--sans);
-      transition: all 0.15s;
-    }
+    .wallet-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; }
+    .wallet-box-label { font-size: 10px; font-weight: 700; color: var(--light); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+    .wallet-box-row { display: flex; align-items: flex-start; gap: 10px; }
+    .wallet-box-addr { flex: 1; font-family: var(--mono); font-size: 12px; color: var(--text); word-break: break-all; line-height: 1.5; }
+    .copy-btn { flex-shrink: 0; padding: 8px 14px; background: var(--accent); border: none; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; cursor: pointer; color: #0a0a0a; font-family: var(--sans); transition: all 0.15s; }
     .copy-btn:hover { opacity: 0.9; }
-    .copy-btn.copied { background: var(--accent); }
-    .network-note {
-      font-size: 11px;
-      color: #f59e0b;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .zero-fee-note {
-      text-align: center;
-      font-size: 12px;
-      color: var(--accent);
-      font-weight: 600;
-      margin-top: 12px;
-    }
-
-    /* WALLET PANEL */
+    .network-note { font-size: 11px; color: #f59e0b; font-weight: 500; display: flex; align-items: center; gap: 5px; }
+    .zero-fee-note { text-align: center; font-size: 12px; color: var(--accent); font-weight: 600; margin-top: 12px; }
     .wallet-content { text-align: center; }
-    .wallet-open-btn {
-      display: block;
-      width: 100%;
-      padding: 16px;
-      background: var(--surface);
-      border: 2px solid var(--border);
-      border-radius: var(--radius);
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-      text-decoration: none;
-      text-align: center;
-      font-family: var(--sans);
-      transition: all 0.15s;
-      margin-bottom: 20px;
-    }
+    .wallet-open-btn { display: block; width: 100%; padding: 16px; background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); font-size: 15px; font-weight: 600; color: var(--text); text-decoration: none; text-align: center; font-family: var(--sans); transition: all 0.15s; margin-bottom: 20px; }
     .wallet-open-btn:hover { border-color: var(--accent); background: var(--surface-hover); }
-    .qr-wrap {
-      display: inline-block;
-      padding: 16px;
-      background: #fff;
-      border-radius: var(--radius);
-      margin-bottom: 10px;
-    }
+    .qr-wrap { display: inline-block; padding: 16px; background: #fff; border-radius: var(--radius); margin-bottom: 10px; }
     .qr-wrap img { display: block; border-radius: 4px; image-rendering: pixelated; }
     .qr-label { font-size: 11px; color: var(--light); margin-top: 8px; }
-
-    /* GROWTH CTA */
-    .growth-cta {
-      background: linear-gradient(135deg, var(--accent-dim), rgba(52,211,153,0.04));
-      border: 1px solid var(--accent-border);
-      border-radius: var(--radius);
-      padding: 24px;
-      text-align: center;
-      margin-bottom: 24px;
-    }
-    .growth-cta h3 {
-      font-size: 16px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      margin-bottom: 6px;
-      color: var(--text);
-    }
-    .growth-cta p {
-      font-size: 13px;
-      color: var(--muted);
-      margin-bottom: 14px;
-      line-height: 1.5;
-    }
-    .growth-cta-btn {
-      display: inline-block;
-      padding: 10px 24px;
-      background: var(--accent);
-      color: #0a0a0a;
-      font-size: 13px;
-      font-weight: 700;
-      border-radius: 20px;
-      text-decoration: none;
-      transition: opacity 0.15s;
-    }
+    .growth-cta { background: linear-gradient(135deg, var(--accent-dim), rgba(52,211,153,0.04)); border: 1px solid var(--accent-border); border-radius: var(--radius); padding: 24px; text-align: center; margin-bottom: 24px; }
+    .growth-cta h3 { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 6px; color: var(--text); }
+    .growth-cta p { font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+    .growth-cta-btn { display: inline-block; padding: 10px 24px; background: var(--accent); color: #0a0a0a; font-size: 13px; font-weight: 700; border-radius: 20px; text-decoration: none; transition: opacity 0.15s; }
     .growth-cta-btn:hover { opacity: 0.9; }
-
-    /* SHARE ROW */
-    .share-row {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      margin-bottom: 24px;
-    }
-    .share-btn {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--muted);
-      cursor: pointer;
-      transition: all 0.15s;
-      text-decoration: none;
-      font-family: var(--sans);
-    }
+    .donation-note-wrap { margin-top: 16px; }
+    .donation-note-toggle { display: inline-flex; align-items: center; gap: 5px; background: none; border: none; color: var(--muted); font-size: 12px; font-family: var(--sans); cursor: pointer; padding: 0; transition: color 0.15s; }
+    .donation-note-toggle:hover { color: var(--text); }
+    .donation-note-toggle svg { width: 14px; height: 14px; }
+    .donation-note-field { display: none; margin-top: 8px; }
+    .donation-note-field.visible { display: block; }
+    .donation-note-field textarea { width: 100%; min-height: 56px; max-height: 120px; padding: 10px 12px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: 13px; font-family: var(--sans); resize: vertical; outline: none; transition: border-color 0.15s; box-sizing: border-box; }
+    .donation-note-field textarea:focus { border-color: var(--accent); }
+    .donation-note-field textarea::placeholder { color: var(--light); }
+    .donation-note-count { text-align: right; font-size: 10px; color: var(--light); margin-top: 4px; }
+    .thank-you-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+    .thank-you-overlay.visible { display: flex; }
+    .thank-you-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 24px; max-width: 380px; width: 100%; text-align: center; }
+    .thank-you-icon { width: 56px; height: 56px; background: var(--accent-dim); border: 2px solid var(--accent-border); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+    .thank-you-icon svg { width: 28px; height: 28px; color: var(--accent); }
+    .thank-you-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.02em; }
+    .thank-you-card p { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 20px; }
+    .thank-you-share { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+    .thank-you-close { background: none; border: none; color: var(--light); font-size: 13px; cursor: pointer; padding: 8px; font-family: var(--sans); }
+    .thank-you-close:hover { color: var(--text); }
+    @keyframes heartbeat { 0% { transform: scale(1); } 14% { transform: scale(1.15); } 28% { transform: scale(1); } 42% { transform: scale(1.15); } 70% { transform: scale(1); } }
+    .beating-heart { display: inline-block; animation: heartbeat 1.5s ease-in-out infinite; }
+    .share-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 24px; }
+    .share-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all 0.15s; text-decoration: none; font-family: var(--sans); }
     .share-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-light); }
     .share-btn svg { width: 14px; height: 14px; }
-
-    /* SHARE POPUP */
-    .share-popup {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(8px);
-      z-index: 200;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
+    .share-popup { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
     .share-popup.visible { display: flex; }
-    .share-popup-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px;
-      max-width: 380px;
-      width: 100%;
-    }
-    .share-popup-title {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 4px;
-      letter-spacing: -0.02em;
-    }
-    .share-popup-sub {
-      font-size: 13px;
-      color: var(--muted);
-      margin-bottom: 20px;
-    }
-    .share-popup-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-    .share-popup-btn {
+    .share-popup-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; max-width: 380px; width: 100%; }
+    .share-popup-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; letter-spacing: -0.02em; }
+    .share-popup-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+    .share-popup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+    .share-popup-btn { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; transition: all 0.15s; text-decoration: none; font-family: var(--sans); }
+    .share-popup-btn:hover { background: var(--surface-hover); border-color: var(--border-light); }
+    .share-popup-close { display: block; width: 100%; padding: 10px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; font-family: var(--sans); transition: all 0.15s; }
+    .share-popup-close:hover { color: var(--text); border-color: var(--border-light); }
+    footer { padding: 24px 20px; text-align: center; border-top: 1px solid var(--border); }
+    .footer-fees { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .footer-powered { font-size: 11px; color: var(--light); }
+    .footer-powered a { color: var(--light); text-decoration: none; }
+    .footer-powered a:hover { color: var(--muted); }
+    /* Theme toggle */
+    .nav-right { display: flex; align-items: center; gap: 8px; }
+    .theme-toggle {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 12px 14px;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
+      border-radius: 50%;
       cursor: pointer;
       transition: all 0.15s;
-      text-decoration: none;
-      font-family: var(--sans);
-    }
-    .share-popup-btn:hover { background: var(--surface-hover); border-color: var(--border-light); }
-    .share-popup-close {
-      display: block;
-      width: 100%;
-      padding: 10px;
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      font-size: 13px;
-      font-weight: 600;
       color: var(--muted);
-      cursor: pointer;
-      font-family: var(--sans);
-      transition: all 0.15s;
+      padding: 0;
     }
-    .share-popup-close:hover { color: var(--text); border-color: var(--border-light); }
-
-    /* FOOTER */
-    footer {
-      padding: 24px 20px;
-      text-align: center;
-      border-top: 1px solid var(--border);
-    }
-    .footer-fees {
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 8px;
-    }
-    .footer-powered {
-      font-size: 11px;
-      color: var(--light);
-    }
-    .footer-powered a {
-      color: var(--light);
-      text-decoration: none;
-    }
-    .footer-powered a:hover { color: var(--muted); }
-
-    /* MOBILE */
-    @media (max-width: 480px) {
-      .wrap { padding: 20px 16px 32px; }
-      .amount-pills { flex-wrap: wrap; }
-      .amount-btn { min-width: 56px; }
-      .impact-bar { gap: 16px; }
-      .share-popup-grid { grid-template-columns: 1fr; }
-      .trust-strip { gap: 10px; }
-    }
+    .theme-toggle:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-light); }
+    .theme-toggle svg { width: 16px; height: 16px; }
+    .theme-toggle .icon-sun { display: none; }
+    .theme-toggle .icon-moon { display: block; }
+    html.light .theme-toggle .icon-sun { display: block; }
+    html.light .theme-toggle .icon-moon { display: none; }
+    html.light .qr-wrap { border: 1px solid var(--border); }
+    html.light .moonpay-btn { background: var(--text); color: #fff; }
+    html.light .amount-btn.active { color: #fff; }
+    @media (max-width: 480px) { .wrap { padding: 20px 16px 32px; } .amount-pills { flex-wrap: wrap; } .amount-btn { min-width: 56px; } .impact-bar { gap: 16px; } .share-popup-grid { grid-template-columns: 1fr; } .trust-strip { gap: 10px; } }
   </style>
 </head>
 <body>
@@ -628,20 +218,20 @@
     <a href="https://giveready.org" class="nav-name">GiveReady</a>
     <span class="nav-badge">donate</span>
   </div>
-  <button class="nav-share-btn" id="share-nav-btn">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-    Share
-  </button>
+  <div class="nav-right">
+    <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+    <button class="nav-share-btn" id="share-nav-btn" aria-label="Share this page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      Share
+    </button>
+  </div>
 </nav>
 
-<div class="wrap" id="app">
-  <div class="loading" id="loading-state">
-    <div class="loading-spinner"></div>
-    <div>Loading nonprofit...</div>
-  </div>
-</div>
+<div class="wrap" id="app"></div>
 
-<!-- SHARE POPUP -->
 <div class="share-popup" id="share-popup">
   <div class="share-popup-card">
     <div class="share-popup-title">Share this page</div>
@@ -651,9 +241,24 @@
   </div>
 </div>
 
+<!-- Thank you overlay -->
+<div class="thank-you-overlay" id="thank-you">
+  <div class="thank-you-card">
+    <div class="thank-you-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+    <h2>Thank you</h2>
+    <p id="ty-message">Your donation makes a real difference. Thank you for your generosity.</p>
+    <div class="thank-you-share">
+      <a class="share-btn" id="ty-whatsapp" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.627.616l4.584-1.258A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22a9.94 9.94 0 01-5.39-1.59l-.386-.24-2.724.748.698-2.63-.263-.416A9.935 9.935 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg> Share on WhatsApp</a>
+      <button class="share-btn" id="ty-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy link</button>
+    </div>
+    <button class="thank-you-close" id="ty-close">Close</button>
+  </div>
+</div>
+
 <footer>
-  <div class="footer-fees" id="footer-fees">100% of your donation reaches the nonprofit. Zero platform fees.</div>
-  <div class="footer-powered">Powered by <a href="https://giveready.org">GiveReady</a> &middot; Made with &#10084;&#65039; <a href="https://www.finnwardman.com">in memory of Finn</a></div>
+  <div class="footer-fees">100% of your donation reaches the nonprofit. Zero platform fees.</div>
+  <div class="footer-powered">Powered by <a href="https://giveready.org">GiveReady</a></div>
+  <div style="margin-top:8px;font-size:10px;text-transform:uppercase;letter-spacing:0.14em;color:var(--light);">MADE WITH <span class="beating-heart" style="font-size:12px;">&#10084;&#65039;</span> <a href="https://www.finnwardman.com" style="color:var(--light);text-decoration:none;">IN MEMORY OF FINN</a></div>
 </footer>
 
 <script>
@@ -662,7 +267,7 @@
 
   var USDC_SPL = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
   var QR_API = 'https://api.qrserver.com/v1/create-qr-code';
-  var AMOUNTS = [1, 5, 10, 25];
+  var AMOUNTS = [25, 50, 100, 250];
   var MOONPAY_MIN = 20;
 
   var pathParts = window.location.pathname.split('/').filter(Boolean);
@@ -670,21 +275,19 @@
   var app = document.getElementById('app');
 
   if (!slug) {
-    app.innerHTML = '<div class="error-state"><p>No nonprofit specified.</p><p style="color:var(--muted);margin-top:8px;font-size:13px;">Use /donate/{slug}</p></div>';
+    app.innerHTML = '<div style="text-align:center;padding:4rem 1rem;"><p style="font-size:1.2rem;opacity:0.7;">No nonprofit specified.</p><a href="/" style="color:var(--accent);text-decoration:underline;">Browse nonprofits</a></div>';
     return;
   }
 
   var nonprofit = null;
   var selectedAmount = null;
-  var activeTab = 'bank'; // default to zero-fee option
+  var activeTab = 'card';
 
-  // Check URL param
-  var urlAmt = new URLSearchParams(window.location.search).get('amount');
-  if (urlAmt && !isNaN(parseFloat(urlAmt)) && parseFloat(urlAmt) > 0) {
-    selectedAmount = parseFloat(urlAmt);
-  }
+  // Check URL params for pre-selected amount
+  var urlParams = new URLSearchParams(window.location.search);
+  var urlAmount = urlParams.get('amount');
+  if (urlAmount) { selectedAmount = parseFloat(urlAmount); }
 
-  // Fetch nonprofit data
   fetch('/api/nonprofits/' + encodeURIComponent(slug))
     .then(function(r) {
       if (!r.ok) throw new Error('Nonprofit not found');
@@ -693,222 +296,152 @@
     .then(function(data) {
       nonprofit = data;
       document.title = 'Donate to ' + nonprofit.name + ' — GiveReady';
-
-      // Update OG tags
-      var ogTitle = document.querySelector('meta[property="og:title"]');
-      if (ogTitle) ogTitle.setAttribute('content', 'Donate to ' + nonprofit.name + ' — GiveReady');
-      var ogDesc = document.querySelector('meta[property="og:description"]');
-      if (ogDesc) ogDesc.setAttribute('content', (nonprofit.mission || '100% reaches the charity.') + ' Zero platform fees.');
-
-      // Update footer
-      var ff = document.getElementById('footer-fees');
-      if (ff) ff.textContent = '100% of your donation reaches ' + nonprofit.name + '. Zero platform fees.';
-
+      var feeEl = document.querySelector('.footer-fees');
+      if (feeEl) feeEl.textContent = '100% of your donation reaches ' + nonprofit.name + '. Zero platform fees.';
       render();
     })
     .catch(function(err) {
-      app.innerHTML = '<div class="error-state"><p>' + esc(err.message) + '</p><p style="color:var(--muted);margin-top:8px;font-size:13px;">Check the URL and try again.</p></div>';
+      app.innerHTML = '<div style="text-align:center;padding:4rem 1rem;"><p style="font-size:1.2rem;opacity:0.7;">Nonprofit not found.</p><a href="/" style="color:var(--accent);text-decoration:underline;">Browse nonprofits</a></div>';
     });
 
-  function esc(t) {
-    var d = document.createElement('div');
-    d.textContent = t || '';
-    return d.innerHTML;
-  }
-
-  function initials(name) {
-    if (!name) return '?';
-    var parts = name.split(/\s+/);
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-  }
-
-  function solUrl(w, a, n) {
-    var p = new URLSearchParams({
-      amount: a.toString(),
-      label: n,
-      message: 'Donation via GiveReady',
-      'spl-token': USDC_SPL
-    });
-    return 'solana:' + w + '?' + p.toString();
-  }
-
-  function qrUrl(d) {
-    return QR_API + '/?size=200x200&data=' + encodeURIComponent(d);
-  }
-
-  function pageUrl() {
-    return window.location.origin + '/donate/' + slug;
-  }
+  function esc(t) { var d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\\\`/g, '&#96;'); }
+  function initials(name) { if (!name) return '?'; var parts = name.split(/\s+/); if (parts.length === 1) return parts[0].charAt(0).toUpperCase(); return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase(); }
+  function solUrl(w, a, n) { var p = new URLSearchParams({ amount: a.toString(), label: n, message: 'Donation via GiveReady', 'spl-token': USDC_SPL }); return 'solana:' + w + '?' + p.toString(); }
+  function qrUrl(d) { return QR_API + '/?size=200x200&data=' + encodeURIComponent(d); }
+  function pageUrl() { return 'https://giveready.org/donate/' + slug; }
 
   function render() {
-    if (!nonprofit) return;
     var w = nonprofit.usdc_wallet || '';
     var h = '';
 
-    // --- HEADER ---
     h += '<div class="np-header">';
-    h += '<div class="np-avatar">' + esc(initials(nonprofit.name)) + '</div>';
-    h += '<h1 class="np-name">' + esc(nonprofit.name) + '</h1>';
-    if (nonprofit.mission) {
-      h += '<p class="np-mission">' + esc(nonprofit.mission) + '</p>';
+    if (nonprofit.logo_url) {
+      h += '<div class="np-avatar"><img src="' + esc(nonprofit.logo_url) + '" alt="' + esc(nonprofit.name) + '" /></div>';
+    } else {
+      h += '<div class="np-avatar">' + esc(initials(nonprofit.name)) + '</div>';
     }
-    // Verified badge
+    h += '<h1 class="np-name">' + esc(nonprofit.name) + '</h1>';
+    if (nonprofit.mission) h += '<p class="np-mission">' + esc(nonprofit.mission) + '</p>';
     if (nonprofit.registrations && nonprofit.registrations.length > 0) {
       var r = nonprofit.registrations[0];
       h += '<span class="np-verified"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Verified: ' + esc(r.type) + ' ' + esc(r.registration_number) + '</span>';
-    } else if (nonprofit.verified) {
-      h += '<span class="np-verified"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Verified nonprofit</span>';
     }
     h += '</div>';
 
-    // --- IMPACT STATS ---
+    // Impact stats
     var stats = [];
-    if (nonprofit.impact_metrics && nonprofit.impact_metrics.length > 0) {
-      nonprofit.impact_metrics.slice(0, 3).forEach(function(m) {
-        stats.push({ val: m.value + (m.unit ? ' ' + m.unit : ''), label: m.name });
-      });
-    }
-    if (nonprofit.programs && nonprofit.programs.length > 0 && stats.length < 3) {
-      stats.push({ val: nonprofit.programs.length, label: nonprofit.programs.length === 1 ? 'Programme' : 'Programmes' });
-    }
-    if (nonprofit.beneficiaries_per_year && stats.length < 3) {
-      stats.push({ val: nonprofit.beneficiaries_per_year.toLocaleString(), label: 'People reached / yr' });
-    }
-    if (nonprofit.founded_year && stats.length < 3) {
-      stats.push({ val: nonprofit.founded_year, label: 'Founded' });
-    }
+    if (nonprofit.programs && nonprofit.programs.length > 0) stats.push({ val: nonprofit.programs.length, label: nonprofit.programs.length === 1 ? 'Programme' : 'Programmes' });
+    if (nonprofit.founded_year) stats.push({ val: nonprofit.founded_year, label: 'Founded' });
+    if (nonprofit.causes && nonprofit.causes.length > 0) stats.push({ val: nonprofit.causes.map(function(c){ return c.name; }).join(', '), label: 'Focus' });
     if (stats.length > 0) {
       h += '<div class="impact-bar">';
-      stats.forEach(function(s) {
-        h += '<div class="impact-stat"><div class="impact-val">' + esc(String(s.val)) + '</div><div class="impact-label">' + esc(s.label) + '</div></div>';
-      });
+      stats.forEach(function(s) { h += '<div class="impact-stat"><div class="impact-val">' + esc(String(s.val)) + '</div><div class="impact-label">' + esc(s.label) + '</div></div>'; });
       h += '</div>';
     }
 
-    // --- TRUST STRIP ---
+    // Trust strip
     h += '<div class="trust-strip">';
     h += '<div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Zero fees</div>';
     h += '<div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Verified</div>';
     h += '<div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Direct to charity</div>';
     h += '</div>';
 
-    // --- AMOUNT SELECTION ---
-    h += '<div class="amount-section">';
-    h += '<label class="section-label">Choose amount (USD)</label>';
-    h += '<div class="amount-pills">';
-    AMOUNTS.forEach(function(a) {
-      h += '<button class="amount-btn' + (selectedAmount === a ? ' active' : '') + '" data-amount="' + a + '">$' + a + '</button>';
-    });
-    h += '<button class="amount-btn' + (selectedAmount && AMOUNTS.indexOf(selectedAmount) === -1 ? ' active' : '') + '" data-amount="custom">Other</button>';
-    h += '</div>';
+    // Preserve note across re-renders
+    var noteEl = document.getElementById('donation-note');
+    var savedNote = noteEl ? noteEl.value : '';
+    var noteOpen = document.getElementById('note-field');
+    var noteWasOpen = noteOpen ? noteOpen.classList.contains('visible') : false;
+
+    // Amount
+    h += '<div class="amount-section"><label class="section-label">Choose amount (USD)</label><div class="amount-pills">';
+    AMOUNTS.forEach(function(a) { h += '<button class="amount-btn' + (selectedAmount === a ? ' active' : '') + '" data-amount="' + a + '">$' + a + '</button>'; });
+    h += '<button class="amount-btn' + (selectedAmount && AMOUNTS.indexOf(selectedAmount) === -1 ? ' active' : '') + '" data-amount="custom">Other</button></div>';
     var showCustom = (selectedAmount && AMOUNTS.indexOf(selectedAmount) === -1) ? ' visible' : '';
-    h += '<div class="custom-row' + showCustom + '" id="custom-row"><input type="number" class="custom-input" id="custom-input" placeholder="Enter amount" min="0.01" step="0.01"' + (selectedAmount && AMOUNTS.indexOf(selectedAmount) === -1 ? ' value="' + selectedAmount + '"' : '') + ' /><button class="custom-set-btn" id="custom-set">Set</button></div>';
-    h += '</div>';
+    h += '<div class="custom-row' + showCustom + '" id="custom-row"><input type="number" class="custom-input" id="custom-input" placeholder="Enter amount" min="0.01" step="0.01" /><button class="custom-set-btn" id="custom-set">Set</button></div></div>';
 
-    // --- PAYMENT METHODS ---
+    // Donation note
+    h += '<div class="donation-note-wrap">';
+    h += '<button class="donation-note-toggle" id="note-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Add a note (optional)</button>';
+    h += '<div class="donation-note-field" id="note-field"><textarea id="donation-note" maxlength="200" placeholder="Add a personal message (optional)"></textarea>';
+    h += '<div class="donation-note-count"><span id="note-chars">0</span>/200</div></div></div>';
+
+    // Payment
     h += '<div class="pay-section">';
-
     if (!selectedAmount) {
       h += '<div class="select-amount-prompt">Select an amount to see payment options</div>';
     } else {
-      // Tabs
       h += '<div class="pay-tabs">';
-      h += '<button class="pay-tab' + (activeTab === 'bank' ? ' active' : '') + '" data-tab="bank"><span class="pay-tab-label">Banking App</span><span class="pay-tab-sub">Zero fees</span></button>';
       h += '<button class="pay-tab' + (activeTab === 'card' ? ' active' : '') + '" data-tab="card"><span class="pay-tab-label">Card</span><span class="pay-tab-sub">~4.5% fee</span></button>';
+      h += '<button class="pay-tab' + (activeTab === 'bank' ? ' active' : '') + '" data-tab="bank"><span class="pay-tab-label">Banking App</span><span class="pay-tab-sub">Zero fees</span></button>';
       h += '<button class="pay-tab' + (activeTab === 'wallet' ? ' active' : '') + '" data-tab="wallet"><span class="pay-tab-label">Wallet</span><span class="pay-tab-sub">Solana Pay</span></button>';
       h += '</div>';
 
-      // --- BANK PANEL ---
-      h += '<div class="pay-panel' + (activeTab === 'bank' ? ' active' : '') + '" data-panel="bank">';
-      h += '<div class="bank-steps"><ol>';
-      h += '<li>Copy the wallet address below</li>';
-      h += '<li>Open your banking app (<strong>Revolut, Coinbase, Kraken</strong>)</li>';
-      h += '<li>Go to <strong>Send Crypto \u2192 USDC \u2192 Solana network</strong></li>';
-      h += '<li>Paste the address and send <strong>$' + selectedAmount + ' USDC</strong></li>';
-      h += '</ol></div>';
-      h += '<div class="wallet-box"><div class="wallet-box-label">USDC Wallet Address (Solana)</div><div class="wallet-box-row"><span class="wallet-box-addr">' + esc(w) + '</span><button class="copy-btn" id="copy-bank-btn">Copy</button></div></div>';
-      h += '<div class="network-note">\u26A0 Select <strong>Solana</strong> network, not Ethereum</div>';
-      h += '<div class="zero-fee-note">\u2713 Zero fees \u2014 100% reaches the charity</div>';
-      h += '</div>';
-
-      // --- CARD PANEL ---
+      // Card (first)
       h += '<div class="pay-panel' + (activeTab === 'card' ? ' active' : '') + '" data-panel="card">';
       if (selectedAmount < MOONPAY_MIN) {
         h += '<div class="moonpay-min-warning">\u26A0 Card payments have a $' + MOONPAY_MIN + ' minimum via MoonPay. For donations under $' + MOONPAY_MIN + ', use the Banking App tab \u2014 it\u2019s free and works with Revolut, Coinbase, or Kraken.</div>';
-      }
-      var mpUrl = 'https://buy.moonpay.com?currencyCode=usdc_sol&walletAddress=' + encodeURIComponent(w) + '&baseCurrencyAmount=' + (selectedAmount < MOONPAY_MIN ? MOONPAY_MIN : selectedAmount);
-      var cardDisabled = selectedAmount < MOONPAY_MIN;
-      if (cardDisabled) {
         h += '<button class="moonpay-btn" style="opacity:0.4;cursor:not-allowed;" disabled>Card minimum is $' + MOONPAY_MIN + '</button>';
       } else {
-        h += '<a href="' + esc(mpUrl) + '" target="_blank" rel="noopener" class="moonpay-btn">Pay $' + selectedAmount + ' with Card \u2192</a>';
+        h += '<a href="#" class="moonpay-btn" id="moonpay-pay">Pay $' + selectedAmount + ' with Card \u2192</a>';
       }
-      h += '<div class="moonpay-note">Opens MoonPay. Card details handled securely by MoonPay. ~4.5% processing fee.</div>';
-      h += '</div>';
+      h += '<div class="moonpay-note">Opens MoonPay. Card details handled securely by MoonPay. ~4.5% processing fee.</div></div>';
 
-      // --- WALLET PANEL ---
-      h += '<div class="pay-panel' + (activeTab === 'wallet' ? ' active' : '') + '" data-panel="wallet">';
+      // Bank
+      h += '<div class="pay-panel' + (activeTab === 'bank' ? ' active' : '') + '" data-panel="bank">';
+      h += '<div class="bank-steps"><ol><li>Copy the wallet address below</li><li>Open your banking app (<strong>Revolut, Coinbase, Kraken</strong>)</li><li>Go to <strong>Send Crypto \u2192 USDC \u2192 Solana network</strong></li><li>Paste the address and send <strong>$' + selectedAmount + ' USDC</strong></li></ol></div>';
+      h += '<div class="wallet-box"><div class="wallet-box-label">USDC Wallet Address (Solana)</div><div class="wallet-box-row"><span class="wallet-box-addr">' + esc(w) + '</span><button class="copy-btn" id="copy-bank-btn">Copy</button></div></div>';
+      h += '<div class="network-note">\u26A0 Select <strong>Solana</strong> network, not Ethereum</div>';
+      h += '<div class="zero-fee-note">\u2713 Zero fees \u2014 100% reaches the charity</div></div>';
+
+      // Wallet
       var su = solUrl(w, selectedAmount, nonprofit.name);
-      h += '<div class="wallet-content">';
+      h += '<div class="pay-panel' + (activeTab === 'wallet' ? ' active' : '') + '" data-panel="wallet"><div class="wallet-content">';
       h += '<a href="' + esc(su) + '" class="wallet-open-btn">Open in Phantom / Coinbase Wallet \u2192</a>';
       h += '<div class="qr-wrap"><img src="' + esc(qrUrl(su)) + '" alt="Solana Pay QR" width="180" height="180" /></div>';
-      h += '<div class="qr-label">Scan with any Solana wallet</div>';
-      h += '</div></div>';
+      h += '<div class="qr-label">Scan with any Solana wallet</div></div></div>';
     }
     h += '</div>';
 
-    // --- SHARE ROW ---
+    // Confirmation button for off-page payments
+    if (selectedAmount) {
+      h += '<div style="text-align:center;margin-top:16px;">';
+      h += '<button class="share-btn" id="confirm-sent-btn" style="color:var(--accent);border-color:var(--accent-border);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> I\\u2019ve sent my donation</button></div>';
+    }
+
+    // Share row
     h += '<div class="share-row">';
     h += '<button class="share-btn" id="share-copy-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy link</button>';
-    h += '<a class="share-btn" id="share-wa-btn" href="https://wa.me/?text=' + encodeURIComponent('Donate to ' + nonprofit.name + ' \u2014 100% reaches the charity, zero fees: ' + pageUrl()) + '" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.627.616l4.584-1.258A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22a9.94 9.94 0 01-5.39-1.59l-.386-.24-2.724.748.698-2.63-.263-.416A9.935 9.935 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg> WhatsApp</a>';
+    h += '<a class="share-btn" href="https://wa.me/?text=' + encodeURIComponent('Donate to ' + nonprofit.name + ' \u2014 100% reaches the charity, zero fees: ' + pageUrl()) + '" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.627.616l4.584-1.258A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22a9.94 9.94 0 01-5.39-1.59l-.386-.24-2.724.748.698-2.63-.263-.416A9.935 9.935 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg> WhatsApp</a>';
+    h += '<button class="share-btn" id="share-native-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg> Instagram</button>';
     h += '<button class="share-btn" id="share-more-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg> More</button>';
     h += '</div>';
 
-    // --- GROWTH CTA ---
-    h += '<div class="growth-cta">';
-    h += '<h3>Want a free page like this?</h3>';
-    h += '<p>Get a zero-fee donation page for your charity. One link, every payment method, live in minutes.</p>';
-    h += '<a href="/get-started" class="growth-cta-btn">Get your free page \u2192</a>';
-    h += '</div>';
+    // Growth CTA
+    h += '<div class="growth-cta"><h3>Want a free page like this?</h3><p>Get a zero-fee donation page for your charity. One link, every payment method, live in minutes.</p><a href="/onboard" class="growth-cta-btn">Get your free page \u2192</a></div>';
 
     app.innerHTML = h;
     bindUI();
+    // Restore note state
+    if (savedNote) {
+      var nEl = document.getElementById('donation-note');
+      var nField = document.getElementById('note-field');
+      var nChars = document.getElementById('note-chars');
+      if (nEl) nEl.value = savedNote;
+      if (nField && noteWasOpen) nField.classList.add('visible');
+      if (nChars) nChars.textContent = savedNote.length;
+    }
   }
 
   function bindUI() {
-    // Amount buttons
     document.querySelectorAll('.amount-btn').forEach(function(b) {
       b.addEventListener('click', function() {
         var v = b.dataset.amount;
-        if (v === 'custom') {
-          var cr = document.getElementById('custom-row');
-          cr.classList.toggle('visible');
-          if (cr.classList.contains('visible')) {
-            document.getElementById('custom-input').focus();
-          }
-          return;
-        }
-        selectedAmount = parseFloat(v);
-        activeTab = 'bank';
-        render();
+        if (v === 'custom') { var cr = document.getElementById('custom-row'); cr.classList.toggle('visible'); if (cr.classList.contains('visible')) document.getElementById('custom-input').focus(); return; }
+        selectedAmount = parseFloat(v); activeTab = 'card'; render();
       });
     });
-
-    // Custom amount
-    var cs = document.getElementById('custom-set');
-    var ci = document.getElementById('custom-input');
-    if (cs && ci) {
-      cs.addEventListener('click', function() {
-        var v = parseFloat(ci.value);
-        if (v > 0) { selectedAmount = v; activeTab = 'bank'; render(); }
-      });
-      ci.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') cs.click();
-      });
-    }
-
-    // Payment tabs
+    var cs = document.getElementById('custom-set'), ci = document.getElementById('custom-input');
+    if (cs && ci) { cs.addEventListener('click', function() { var v = parseFloat(ci.value); if (v > 0) { selectedAmount = v; activeTab = 'card'; render(); } }); ci.addEventListener('keypress', function(e) { if (e.key === 'Enter') cs.click(); }); }
     document.querySelectorAll('.pay-tab').forEach(function(tab) {
       tab.addEventListener('click', function() {
         activeTab = tab.dataset.tab;
@@ -919,109 +452,97 @@
         if (panel) panel.classList.add('active');
       });
     });
-
-    // Copy wallet address (bank panel)
     var cb = document.getElementById('copy-bank-btn');
-    if (cb) {
-      cb.addEventListener('click', function() {
-        navigator.clipboard.writeText(nonprofit.usdc_wallet).then(function() {
-          cb.textContent = 'Copied!';
-          setTimeout(function() { cb.textContent = 'Copy'; }, 2000);
-        });
-      });
-    }
-
-    // Share: copy link
+    if (cb) { cb.addEventListener('click', function() { navigator.clipboard.writeText(nonprofit.usdc_wallet).then(function() { cb.textContent = 'Copied!'; setTimeout(function() { cb.textContent = 'Copy'; }, 2000); }); }); }
     var scb = document.getElementById('share-copy-btn');
-    if (scb) {
-      scb.addEventListener('click', function() {
-        navigator.clipboard.writeText(pageUrl()).then(function() {
-          scb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
-          setTimeout(function() {
-            scb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy link';
-          }, 2000);
-        });
-      });
-    }
-
-    // Share: more
+    if (scb) { scb.addEventListener('click', function() { navigator.clipboard.writeText(pageUrl()).then(function() { scb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!'; setTimeout(function() { scb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy link'; }, 2000); }); }); }
     var smb = document.getElementById('share-more-btn');
-    if (smb) {
-      smb.addEventListener('click', function() { showSharePopup(); });
-    }
+    if (smb) { smb.addEventListener('click', function() { showSharePopup(); }); }
+    document.getElementById('share-nav-btn').addEventListener('click', function() { showSharePopup(); });
+    document.getElementById('share-popup-close').addEventListener('click', function() { hideSharePopup(); });
+    document.getElementById('share-popup').addEventListener('click', function(e) { if (e.target === document.getElementById('share-popup')) hideSharePopup(); });
+    // Note toggle + counter
+    var noteToggle = document.getElementById('note-toggle');
+    var noteField = document.getElementById('note-field');
+    var noteTextarea = document.getElementById('donation-note');
+    var noteChars = document.getElementById('note-chars');
+    if (noteToggle && noteField) { noteToggle.addEventListener('click', function() { noteField.classList.toggle('visible'); if (noteField.classList.contains('visible') && noteTextarea) noteTextarea.focus(); }); }
+    if (noteTextarea && noteChars) { noteTextarea.addEventListener('input', function() { noteChars.textContent = noteTextarea.value.length; }); }
+    // Instagram / native share
+    var nativeBtn = document.getElementById('share-native-btn');
+    if (nativeBtn) { nativeBtn.addEventListener('click', function() { var shareText = 'Donate to ' + nonprofit.name + ' \\u2014 100% reaches the charity, zero fees'; if (navigator.share) { navigator.share({ title: nonprofit.name, text: shareText, url: pageUrl() }).catch(function(){}); } else { navigator.clipboard.writeText(pageUrl()).then(function() { nativeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="20 6 9 17 4 12"/></svg> Link copied!'; setTimeout(function() { nativeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg> Instagram'; }, 2000); }); } }); }
+    // Confirm sent button
+    var csb = document.getElementById('confirm-sent-btn');
+    if (csb) { csb.addEventListener('click', function() { showThankYou(); }); }
+  }
 
-    // Nav share button
-    var nsb = document.getElementById('share-nav-btn');
-    if (nsb) {
-      nsb.addEventListener('click', function() { showSharePopup(); });
-    }
-
-    // Share popup close
-    var spc = document.getElementById('share-popup-close');
-    if (spc) {
-      spc.addEventListener('click', function() { hideSharePopup(); });
-    }
-    var spop = document.getElementById('share-popup');
-    if (spop) {
-      spop.addEventListener('click', function(e) {
-        if (e.target === spop) hideSharePopup();
-      });
-    }
+  function showThankYou() {
+    document.getElementById('thank-you').classList.add('visible');
+    var url = pageUrl();
+    var text = 'I just donated to ' + nonprofit.name + ' \\u2014 100% reaches the charity, zero fees';
+    document.getElementById('ty-whatsapp').href = 'https://wa.me/?text=' + encodeURIComponent(text + ': ' + url);
+    document.getElementById('ty-copy').addEventListener('click', function() {
+      navigator.clipboard.writeText(url).then(function() { document.getElementById('ty-copy').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="20 6 9 17 4 12"/></svg> Copied!'; });
+    });
+    document.getElementById('ty-close').addEventListener('click', function() { document.getElementById('thank-you').classList.remove('visible'); });
+    document.getElementById('thank-you').addEventListener('click', function(e) { if (e.target === document.getElementById('thank-you')) document.getElementById('thank-you').classList.remove('visible'); });
   }
 
   function showSharePopup() {
-    var name = nonprofit ? nonprofit.name : 'this nonprofit';
+    var name = nonprofit.name;
     var url = pageUrl();
     var text = 'Donate to ' + name + ' \u2014 100% reaches the charity, zero fees';
     var grid = document.getElementById('share-popup-grid');
     grid.innerHTML = '';
-
-    // Copy link
-    var copyBtn = document.createElement('button');
-    copyBtn.className = 'share-popup-btn';
-    copyBtn.innerHTML = '\uD83D\uDD17 Copy link';
-    copyBtn.addEventListener('click', function() {
-      navigator.clipboard.writeText(url).then(function() {
-        copyBtn.innerHTML = '\u2713 Copied!';
-        setTimeout(function() { copyBtn.innerHTML = '\uD83D\uDD17 Copy link'; }, 2000);
-      });
-    });
+    var copyBtn = document.createElement('button'); copyBtn.className = 'share-popup-btn'; copyBtn.innerHTML = '\uD83D\uDD17 Copy link';
+    copyBtn.addEventListener('click', function() { navigator.clipboard.writeText(url).then(function() { copyBtn.innerHTML = '\u2713 Copied!'; setTimeout(function() { copyBtn.innerHTML = '\uD83D\uDD17 Copy link'; }, 2000); }); });
     grid.appendChild(copyBtn);
-
-    // WhatsApp
-    var waBtn = document.createElement('a');
-    waBtn.className = 'share-popup-btn';
-    waBtn.href = 'https://wa.me/?text=' + encodeURIComponent(text + ': ' + url);
-    waBtn.target = '_blank';
-    waBtn.rel = 'noopener';
-    waBtn.innerHTML = '\uD83D\uDCAC WhatsApp';
-    grid.appendChild(waBtn);
-
-    // X / Twitter
-    var xBtn = document.createElement('a');
-    xBtn.className = 'share-popup-btn';
-    xBtn.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(url);
-    xBtn.target = '_blank';
-    xBtn.rel = 'noopener';
-    xBtn.innerHTML = '\uD835\uDD4F Post on X';
-    grid.appendChild(xBtn);
-
-    // Email
-    var emBtn = document.createElement('a');
-    emBtn.className = 'share-popup-btn';
-    emBtn.href = 'mailto:?subject=' + encodeURIComponent('Donate to ' + name) + '&body=' + encodeURIComponent(text + '\n\n' + url);
-    emBtn.innerHTML = '\u2709\uFE0F Email';
-    grid.appendChild(emBtn);
-
+    var waBtn = document.createElement('a'); waBtn.className = 'share-popup-btn'; waBtn.href = 'https://wa.me/?text=' + encodeURIComponent(text + ': ' + url); waBtn.target = '_blank'; waBtn.rel = 'noopener'; waBtn.innerHTML = '\uD83D\uDCAC WhatsApp'; grid.appendChild(waBtn);
+    var igBtn = document.createElement('button');
+    igBtn.className = 'share-popup-btn';
+    igBtn.innerHTML = '\\uD83D\\uDCF7 Instagram';
+    igBtn.addEventListener('click', function() {
+      if (navigator.share) { navigator.share({ title: name, text: text, url: url }).catch(function(){}); }
+      else { navigator.clipboard.writeText(url).then(function() { igBtn.innerHTML = '\\u2713 Link copied!'; setTimeout(function() { igBtn.innerHTML = '\\uD83D\\uDCF7 Instagram'; }, 2000); }); }
+    });
+    grid.appendChild(igBtn);
+    var xBtn = document.createElement('a'); xBtn.className = 'share-popup-btn'; xBtn.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(url); xBtn.target = '_blank'; xBtn.rel = 'noopener'; xBtn.innerHTML = '\uD835\uDD4F Post on X'; grid.appendChild(xBtn);
+    var fbBtn = document.createElement('a');
+    fbBtn.className = 'share-popup-btn';
+    fbBtn.href = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url);
+    fbBtn.target = '_blank'; fbBtn.rel = 'noopener';
+    fbBtn.innerHTML = '\\uD83D\\uDC4D Facebook';
+    grid.appendChild(fbBtn);
+    var liBtn = document.createElement('a');
+    liBtn.className = 'share-popup-btn';
+    liBtn.href = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(url);
+    liBtn.target = '_blank'; liBtn.rel = 'noopener';
+    liBtn.innerHTML = '\\uD83D\\uDCBC LinkedIn';
+    grid.appendChild(liBtn);
+    var tgBtn = document.createElement('a');
+    tgBtn.className = 'share-popup-btn';
+    tgBtn.href = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
+    tgBtn.target = '_blank'; tgBtn.rel = 'noopener';
+    tgBtn.innerHTML = '\\u2708\\uFE0F Telegram';
+    grid.appendChild(tgBtn);
+    var emBtn = document.createElement('a'); emBtn.className = 'share-popup-btn'; emBtn.href = 'mailto:?subject=' + encodeURIComponent('Donate to ' + name) + '&body=' + encodeURIComponent(text + '\\n\\n' + url); emBtn.innerHTML = '\u2709\uFE0F Email'; grid.appendChild(emBtn);
     document.getElementById('share-popup-sub').textContent = 'Help more people discover ' + name + '.';
     document.getElementById('share-popup').classList.add('visible');
   }
 
-  function hideSharePopup() {
-    document.getElementById('share-popup').classList.remove('visible');
-  }
+  function hideSharePopup() { document.getElementById('share-popup').classList.remove('visible'); }
 
+  // Theme toggle
+  var savedTheme = null;
+  try { savedTheme = localStorage.getItem('gr-theme'); } catch(e) {}
+  if (savedTheme === 'light') document.documentElement.classList.add('light');
+
+  document.getElementById('theme-toggle').addEventListener('click', function() {
+    document.documentElement.classList.toggle('light');
+    var isLight = document.documentElement.classList.contains('light');
+    try { localStorage.setItem('gr-theme', isLight ? 'light' : 'dark'); } catch(e) {}
+  });
 })();
-</script>
+<\/script>
 </body>
 </html>
