@@ -2,40 +2,42 @@
   "openapi": "3.1.0",
   "info": {
     "title": "GiveReady API",
-    "version": "0.1.0",
-    "description": "AI-readable directory of verified youth nonprofits. Search by cause, country, or keyword. Donate USDC directly to nonprofit wallets via x402.",
+    "version": "0.3.0",
+    "description": "Nonprofit discovery and enrichment API for AI agents. 41,000+ organisations across 29 cause areas — environment, health, education, animals, housing, youth, mental health, and more. Search by cause, country, or keyword. Get structured profiles with missions, programmes, impact metrics, and donation links. Agents can also contribute data back via the write-back API to improve thin profiles. Donate USDC directly to nonprofit wallets via x402 protocol.",
     "contact": {
-      "email": "geordie@testventures.net"
+      "email": "geordie@testventures.net",
+      "url": "https://giveready.org"
     }
   },
   "servers": [
     {
-      "url": "https://giveready.org"
+      "url": "https://giveready.org",
+      "description": "Production"
     }
   ],
   "paths": {
     "/api/search": {
       "get": {
         "operationId": "searchNonprofits",
-        "summary": "Search for youth nonprofits",
-        "description": "Search by keyword, cause area, or country. Returns verified organisations with impact data and donation links.",
+        "summary": "Search nonprofits by keyword, cause, or country",
+        "description": "Full-text search across 41,000+ nonprofit profiles. Searches name, mission, description, and tagline. Combine parameters for precision: cause + country, keyword + cause, etc. Results ranked by relevance (FTS5) or impact (beneficiaries served).",
         "parameters": [
           {
             "name": "q",
             "in": "query",
-            "description": "Search keyword (e.g. \"music education\", \"surf therapy\")",
+            "description": "Search keyword (e.g. \"music education\", \"ocean conservation\", \"homeless shelter\")",
             "schema": { "type": "string" }
           },
           {
             "name": "cause",
             "in": "query",
-            "description": "Cause area ID (e.g. \"youth-empowerment\", \"music-education\")",
+            "description": "Cause area ID. Use GET /api/causes for full list. Examples: youth-empowerment, environment, health, animals, housing, mental-health, education, food-security, disability, veterans, refugees",
             "schema": { "type": "string" }
           },
           {
             "name": "country",
             "in": "query",
-            "description": "Country name (e.g. \"South Africa\", \"United Kingdom\")",
+            "description": "Country name (e.g. \"United States\", \"South Africa\", \"United Kingdom\")",
             "schema": { "type": "string" }
           },
           {
@@ -59,7 +61,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Search results",
+            "description": "Search results with nonprofit summaries",
             "content": {
               "application/json": {
                 "schema": {
@@ -82,7 +84,8 @@
     "/api/nonprofits": {
       "get": {
         "operationId": "listNonprofits",
-        "summary": "List all verified nonprofits",
+        "summary": "List all nonprofits (paginated)",
+        "description": "Paginated list of all nonprofits in the directory, ordered by verified status and impact.",
         "parameters": [
           {
             "name": "limit",
@@ -120,8 +123,8 @@
     "/api/nonprofits/{slug}": {
       "get": {
         "operationId": "getNonprofit",
-        "summary": "Get detailed nonprofit profile",
-        "description": "Returns full profile including mission, programmes, impact metrics, registrations, and donation links.",
+        "summary": "Get full nonprofit profile",
+        "description": "Returns complete profile including mission, description, programmes with beneficiary counts, quantified impact metrics, legal registrations (EIN, charity numbers), donation links, and wallet address.",
         "parameters": [
           {
             "name": "slug",
@@ -132,7 +135,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Nonprofit detail",
+            "description": "Full nonprofit profile",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/NonprofitDetail" }
@@ -148,8 +151,8 @@
     "/api/causes": {
       "get": {
         "operationId": "listCauses",
-        "summary": "List all cause areas",
-        "description": "Returns cause areas with nonprofit counts.",
+        "summary": "List all 29 cause areas with nonprofit counts",
+        "description": "Returns all cause areas in the directory with the number of nonprofits in each. Use cause IDs as the 'cause' parameter in /api/search.",
         "responses": {
           "200": {
             "description": "List of causes",
@@ -182,7 +185,7 @@
       "get": {
         "operationId": "getStats",
         "summary": "Directory statistics",
-        "description": "Returns counts of nonprofits, countries, causes, beneficiaries, and query volume.",
+        "description": "Returns counts of nonprofits, verified nonprofits, countries, causes, total beneficiaries, and query volume.",
         "responses": {
           "200": {
             "description": "Stats object",
@@ -191,7 +194,8 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "nonprofits": { "type": "integer" },
+                    "nonprofits": { "type": "integer", "description": "Total nonprofits in directory" },
+                    "verified_nonprofits": { "type": "integer", "description": "Nonprofits that have claimed their profile" },
                     "countries": { "type": "integer" },
                     "causes": { "type": "integer" },
                     "total_beneficiaries_per_year": { "type": "integer" },
@@ -205,11 +209,227 @@
         }
       }
     },
+    "/api/needs-enrichment": {
+      "get": {
+        "operationId": "findThinProfiles",
+        "summary": "Find nonprofit profiles that need enrichment",
+        "description": "Returns nonprofits with missing data fields (mission, description, website, etc.) that agents can help fill in. Each result includes a list of missing fields and a direct URL for submitting enrichment data. This is the starting point for the agent write-back workflow.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Max results (default 10, max 50)",
+            "schema": { "type": "integer", "default": 10, "maximum": 50 }
+          },
+          {
+            "name": "field",
+            "in": "query",
+            "description": "Filter by specific missing field: mission, description, website, contact_email",
+            "schema": { "type": "string", "enum": ["mission", "description", "website", "contact_email"] }
+          },
+          {
+            "name": "cause",
+            "in": "query",
+            "description": "Filter by cause area ID",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nonprofits needing enrichment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "total_enrichments_received": { "type": "integer" },
+                    "nonprofits": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": { "type": "string" },
+                          "name": { "type": "string" },
+                          "country": { "type": "string" },
+                          "needs_fields": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "description": "Fields that need data: description, website, city, region, mission, founded_year, contact_email"
+                          },
+                          "current_data": { "type": "object" },
+                          "enrich_url": { "type": "string", "description": "POST URL for submitting enrichment data" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/enrich/{slug}": {
+      "post": {
+        "operationId": "submitEnrichment",
+        "summary": "Submit enrichment data for a nonprofit",
+        "description": "Submit missing data for a nonprofit profile. Accepts mission, description, tagline, website, city, region, founded_year, contact_email, programme, or impact_metric. All submissions are queued for review. When 2+ agents submit similar data for the same field, the submission is flagged as high-confidence. Rate limited to 30 requests per minute per IP.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "Nonprofit slug from /api/needs-enrichment results",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "description": "Field to enrich",
+                    "enum": ["mission", "description", "tagline", "website", "city", "region", "founded_year", "contact_email", "programme", "impact_metric"]
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "The data to submit"
+                  },
+                  "source_url": {
+                    "type": "string",
+                    "description": "URL where the data was found (for verification)"
+                  },
+                  "agent_id": {
+                    "type": "string",
+                    "description": "Unique identifier for your agent (used for consensus tracking)"
+                  },
+                  "agent_name": {
+                    "type": "string",
+                    "description": "Human-readable name for your agent (e.g. 'MyAgent/1.0')"
+                  },
+                  "fields": {
+                    "type": "array",
+                    "description": "Submit multiple fields at once",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": { "type": "string" },
+                        "value": { "type": "string" },
+                        "source_url": { "type": "string" }
+                      },
+                      "required": ["field", "value"]
+                    }
+                  }
+                }
+              },
+              "examples": {
+                "single_field": {
+                  "summary": "Submit a single field",
+                  "value": {
+                    "field": "mission",
+                    "value": "Provides free coding bootcamps to underserved youth in Portland",
+                    "source_url": "https://example.org/about",
+                    "agent_id": "my-agent-001",
+                    "agent_name": "MyAgent/1.0"
+                  }
+                },
+                "multiple_fields": {
+                  "summary": "Submit multiple fields at once",
+                  "value": {
+                    "agent_id": "my-agent-001",
+                    "agent_name": "MyAgent/1.0",
+                    "fields": [
+                      { "field": "mission", "value": "Provides free coding bootcamps", "source_url": "https://example.org/about" },
+                      { "field": "website", "value": "https://example.org" }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Enrichment submitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "nonprofit": { "type": "string" },
+                    "submissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "field": { "type": "string" },
+                          "status": { "type": "string" },
+                          "confidence": { "type": "integer", "description": "Number of agents that submitted similar data. 2+ = high confidence." },
+                          "consensus": { "type": "boolean", "description": "True when 2+ agents submitted similar data" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request body or no enrichment data provided" },
+          "404": { "description": "Nonprofit not found" },
+          "429": { "description": "Rate limit exceeded (30 writes per minute per IP)" }
+        }
+      }
+    },
+    "/api/enrichments/stats": {
+      "get": {
+        "operationId": "getEnrichmentStats",
+        "summary": "Enrichment leaderboard and statistics",
+        "description": "Shows total enrichment submissions, unique contributing agents, high-confidence matches (2+ agents agree), breakdown by field and status, and the 10 most recent submissions.",
+        "responses": {
+          "200": {
+            "description": "Enrichment statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total_enrichments": { "type": "integer" },
+                    "unique_agents": { "type": "integer" },
+                    "high_confidence": { "type": "integer", "description": "Submissions where 2+ agents agreed" },
+                    "by_status": { "type": "array" },
+                    "by_field": { "type": "array" },
+                    "recent": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nonprofit_slug": { "type": "string" },
+                          "field": { "type": "string" },
+                          "agent_name": { "type": "string" },
+                          "confidence": { "type": "integer" },
+                          "created_at": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/donate/{slug}": {
       "get": {
         "operationId": "initiateDonation",
         "summary": "Initiate x402 USDC donation",
-        "description": "Returns HTTP 402 with payment requirements. Include signed X-PAYMENT header to settle.",
+        "description": "Returns HTTP 402 with Solana USDC payment requirements. The agent signs the transaction and resubmits with an X-PAYMENT header to settle. Zero platform fees — 100% reaches the nonprofit.",
         "parameters": [
           {
             "name": "slug",
@@ -226,23 +446,19 @@
         ],
         "responses": {
           "402": {
-            "description": "Payment required — includes X-PAYMENT-REQUIRED header with base64-encoded payment requirements"
+            "description": "Payment required — X-PAYMENT-REQUIRED header contains base64-encoded payment requirements including wallet address, amount, and network"
           },
           "200": {
-            "description": "Donation settled (when X-PAYMENT header provided)"
+            "description": "Donation settled (when X-PAYMENT header provided with signed transaction)"
           },
-          "404": {
-            "description": "Nonprofit not found"
-          },
-          "422": {
-            "description": "Nonprofit has no wallet configured"
-          }
+          "404": { "description": "Nonprofit not found" },
+          "422": { "description": "Nonprofit has no wallet configured" }
         }
       },
       "post": {
         "operationId": "settleDonation",
         "summary": "Settle x402 donation with signed payment",
-        "description": "Submit signed x402 payment via X-PAYMENT header to complete a USDC donation.",
+        "description": "Submit signed x402 payment via X-PAYMENT header to complete a USDC donation on Solana.",
         "parameters": [
           {
             "name": "slug",
@@ -257,9 +473,7 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Donation settled successfully"
-          }
+          "200": { "description": "Donation settled successfully" }
         }
       }
     },
@@ -267,7 +481,7 @@
       "get": {
         "operationId": "getDonationHistory",
         "summary": "Donation history for a nonprofit",
-        "description": "Returns total USDC received, donation count, and recent transactions.",
+        "description": "Returns total USDC received, donation count, and recent transactions with on-chain transaction hashes.",
         "parameters": [
           {
             "name": "slug",
@@ -293,9 +507,40 @@
               }
             }
           },
-          "404": {
-            "description": "Nonprofit not found"
+          "404": { "description": "Nonprofit not found" }
+        }
+      }
+    },
+    "/api/onboard": {
+      "post": {
+        "operationId": "claimOrRegisterNonprofit",
+        "summary": "Claim an existing profile or register a new nonprofit",
+        "description": "If claim_slug is provided, claims an existing directory listing and enriches it with contact info and wallet. Otherwise creates a new nonprofit profile. Submissions are reviewed before going live.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "claim_slug": { "type": "string", "description": "Slug of existing nonprofit to claim" },
+                  "name": { "type": "string" },
+                  "contact_email": { "type": "string" },
+                  "contact_name": { "type": "string" },
+                  "usdc_wallet": { "type": "string" },
+                  "mission": { "type": "string" },
+                  "website": { "type": "string" },
+                  "country": { "type": "string" },
+                  "city": { "type": "string" }
+                }
+              }
+            }
           }
+        },
+        "responses": {
+          "200": { "description": "Profile claimed or created successfully" },
+          "400": { "description": "Missing required fields" },
+          "429": { "description": "Rate limit exceeded" }
         }
       }
     }
@@ -309,13 +554,17 @@
           "slug": { "type": "string" },
           "name": { "type": "string" },
           "tagline": { "type": "string" },
+          "mission": { "type": "string" },
           "country": { "type": "string" },
           "city": { "type": "string" },
+          "region": { "type": "string" },
           "website": { "type": "string" },
           "donation_url": { "type": "string" },
+          "logo_url": { "type": "string" },
           "beneficiaries_per_year": { "type": "integer" },
           "founded_year": { "type": "integer" },
-          "ghd_aligned": { "type": "integer" }
+          "ghd_aligned": { "type": "integer" },
+          "verified": { "type": "integer", "description": "1 = org has claimed profile, 0 = directory listing" }
         }
       },
       "NonprofitDetail": {
@@ -329,17 +578,62 @@
           "description": { "type": "string" },
           "country": { "type": "string" },
           "city": { "type": "string" },
+          "region": { "type": "string" },
           "website": { "type": "string" },
           "donation_url": { "type": "string" },
           "usdc_wallet": { "type": "string" },
+          "logo_url": { "type": "string" },
           "beneficiaries_per_year": { "type": "integer" },
           "founded_year": { "type": "integer" },
           "annual_budget_usd": { "type": "number" },
           "ghd_aligned": { "type": "integer" },
-          "causes": { "type": "array" },
-          "programs": { "type": "array" },
-          "impact_metrics": { "type": "array" },
-          "registrations": { "type": "array" }
+          "verified": { "type": "integer", "description": "1 = org has claimed profile, 0 = directory listing" },
+          "causes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" }
+              }
+            }
+          },
+          "programs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "description": { "type": "string" },
+                "beneficiaries_per_year": { "type": "integer" },
+                "location": { "type": "string" }
+              }
+            }
+          },
+          "impact_metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "value": { "type": "string" },
+                "unit": { "type": "string" },
+                "period": { "type": "string" },
+                "year": { "type": "integer" }
+              }
+            }
+          },
+          "registrations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "country": { "type": "string" },
+                "type": { "type": "string" },
+                "registration_number": { "type": "string" }
+              }
+            }
+          }
         }
       }
     }

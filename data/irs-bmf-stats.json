@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-04-12T12:27:03.053Z",
+  "states": [
+    "WY"
+  ],
+  "totalParsed": 5931,
+  "total501c3": 4735,
+  "totalInserted": 4735,
+  "totalSkipped": 0,
+  "stateStats": {
+    "WY": {
+      "rows": 5931,
+      "inserts": 4735,
+      "skips": 0
+    }
+  }
+}

@@ -222,22 +222,22 @@
       <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
-    <a href="/onboard" class="nav-cta">Get your page</a>
+    <a href="/onboard" class="nav-cta">Claim your page</a>
   </div>
 </nav>
 
 <!-- ===== HERO ===== -->
 <div class="hero">
   <div class="hero-inner">
-    <h1>A free donation page for your charity.</h1>
-    <p class="hero-sub">One link. Every payment method. Zero fees. AI agents recommend your charity to donors worldwide. Live in minutes.</p>
+    <h1>Your charity is already here. Claim it.</h1>
+    <p class="hero-sub">41,000+ nonprofits. Free donation page. Zero fees. AI agents recommend your charity to donors worldwide. Claim yours in minutes.</p>
     <div class="hero-cta">
-      <a href="/onboard" class="btn btn-primary">Get your free page</a>
+      <a href="/onboard" class="btn btn-primary">Claim your page</a>
       <a href="/donate/finn-wardman-world-explorer-fund" class="btn btn-ghost">See it live</a>
     </div>
     <div class="hero-meta">
       <div class="hero-meta-item">
-        <span class="hero-meta-num">162</span>
+        <span class="hero-meta-num" id="stat-nonprofits">41,000+</span>
         <span class="hero-meta-label">nonprofits</span>
       </div>
       <div class="hero-meta-item">
@@ -245,8 +245,8 @@
         <span class="hero-meta-label">fees &mdash; ever</span>
       </div>
       <div class="hero-meta-item">
-        <span class="hero-meta-num">$1</span>
-        <span class="hero-meta-label">minimum donation</span>
+        <span class="hero-meta-num" id="stat-causes">29</span>
+        <span class="hero-meta-label">cause areas</span>
       </div>
     </div>
   </div>
@@ -369,15 +369,15 @@
       <div class="step">
         <span class="step-num">1</span>
         <div>
-          <div class="step-name">Register your charity</div>
-          <div class="step-desc">Name, mission, wallet address. Five minutes. We verify your details against your national charity registry.</div>
+          <div class="step-name">Find &amp; claim your page</div>
+          <div class="step-desc">Search 41,000+ nonprofits. Your charity is probably already listed. Claim it, check the details, and you're live in two minutes.</div>
         </div>
       </div>
       <div class="step">
         <span class="step-num">2</span>
         <div>
-          <div class="step-name">Your page goes live</div>
-          <div class="step-desc">You get giveready.org/donate/your-charity. Share it anywhere &mdash; Instagram bio, email signature, WhatsApp groups. Donors give from $1.</div>
+          <div class="step-name">Choose how to get paid</div>
+          <div class="step-desc">Crypto, credit card, or bank transfer. Pick what works for you. Your donation page goes live at giveready.org/donate/your-charity.</div>
         </div>
       </div>
       <div class="step">
@@ -398,7 +398,7 @@
     <h2>Built with real nonprofits</h2>
     <div class="proof-stats">
       <div>
-        <div class="proof-stat-num">162</div>
+        <div class="proof-stat-num" id="stat-nonprofits-2">41,000+</div>
         <div class="proof-stat-label">Nonprofits listed</div>
       </div>
       <div>
@@ -432,9 +432,9 @@
 
 <!-- ===== FINAL CTA ===== -->
 <div class="final-cta" id="cta">
-  <h2>Get your free donation page.</h2>
-  <p>One link. Every payment method. Zero fees. Multi-sig custody. Live in minutes.</p>
-  <a href="/onboard" class="btn-cta">Get your free page &rarr;</a>
+  <h2>Your charity is already here.</h2>
+  <p>41,000+ nonprofits listed. Claim your page, verify your info, and start receiving donations. Zero fees.</p>
+  <a href="/onboard" class="btn-cta">Claim your page &rarr;</a>
   <a href="/donate/finn-wardman-world-explorer-fund" class="cta-sub">See it in action &rarr;</a>
 </div>
 
@@ -462,6 +462,18 @@
     var isDark = document.documentElement.classList.contains('dark');
     try { localStorage.setItem('gr-theme', isDark ? 'dark' : 'light'); } catch(e) {}
   });
+
+  // Live stats from API
+  fetch('/api/stats').then(function(r) { return r.json(); }).then(function(d) {
+    var n = d.nonprofits;
+    var fmt = n >= 1000 ? Math.floor(n / 1000).toLocaleString() + ',000+' : String(n);
+    var el1 = document.getElementById('stat-nonprofits');
+    var el2 = document.getElementById('stat-nonprofits-2');
+    var el3 = document.getElementById('stat-causes');
+    if (el1) el1.textContent = fmt;
+    if (el2) el2.textContent = fmt;
+    if (el3 && d.causes) el3.textContent = d.causes;
+  }).catch(function() {});
 </script>
 
 </body>

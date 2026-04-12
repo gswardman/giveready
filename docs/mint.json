@@ -23,7 +23,7 @@
     }
   ],
   "topbarCtaButton": {
-    "name": "Onboard Your Nonprofit",
+    "name": "Claim Your Nonprofit",
     "url": "https://giveready.org/onboard"
   },
   "anchors": [
@@ -73,7 +73,8 @@
         "api/nonprofits",
         "api/causes",
         "api/donations",
-        "api/stats"
+        "api/stats",
+        "api/enrichment"
       ]
     },
     {
