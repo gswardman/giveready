@@ -274,7 +274,7 @@
       "post": {
         "operationId": "submitEnrichment",
         "summary": "Submit enrichment data for a nonprofit",
-        "description": "Submit missing data for a nonprofit profile. Accepts mission, description, tagline, website, city, region, founded_year, contact_email, programme, or impact_metric. All submissions are queued for review. When 2+ agents submit similar data for the same field, the submission is flagged as high-confidence. Rate limited to 30 requests per minute per IP.",
+        "description": "Submit missing data for a nonprofit profile. Consensus is split by field type: STRUCTURED fields (website, city, region, founded_year, contact_email) auto-promote LIVE when 2+ distinct agents submit the same normalised value. PROSE fields (mission, description, tagline) do NOT auto-promote — they queue for a future committee-vote endpoint. Safety: the server never overwrites an existing non-empty value. Response includes field_type, promotion_note, applied flag, and auto_promote map so agents know the rule before retrying. Rate limited to 30 requests per minute per IP.",
         "parameters": [
           {
             "name": "slug",
@@ -363,15 +363,27 @@
                   "properties": {
                     "message": { "type": "string" },
                     "nonprofit": { "type": "string" },
+                    "profile_url": { "type": "string", "description": "Canonical URL of the nonprofit profile to re-check after submission" },
+                    "auto_promote": {
+                      "type": "object",
+                      "description": "Which fields auto-promote vs queue. Read this to know the rule before retrying.",
+                      "properties": {
+                        "structured": { "type": "array", "items": { "type": "string" }, "description": "Fields that auto-promote on 2+ agent consensus" },
+                        "prose_pending": { "type": "array", "items": { "type": "string" }, "description": "Fields that queue for committee vote and never auto-promote" }
+                      }
+                    },
                     "submissions": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
                           "field": { "type": "string" },
-                          "status": { "type": "string" },
-                          "confidence": { "type": "integer", "description": "Number of agents that submitted similar data. 2+ = high confidence." },
-                          "consensus": { "type": "boolean", "description": "True when 2+ agents submitted similar data" }
+                          "field_type": { "type": "string", "enum": ["structured", "prose"], "description": "Which lane this field is in" },
+                          "status": { "type": "string", "enum": ["pending", "applied", "rejected"], "description": "applied = promoted live; pending = awaiting more consensus or committee vote; rejected = lost consensus to another value" },
+                          "applied": { "type": "boolean", "description": "True when this submission is now live on the nonprofit profile" },
+                          "confidence": { "type": "integer", "description": "Number of distinct agents that submitted the same normalised value. 2+ triggers promotion for structured fields." },
+                          "consensus": { "type": "boolean", "description": "True when 2+ distinct agents submitted the same value" },
+                          "promotion_note": { "type": "string", "description": "Human-readable explanation of why the submission was or wasn't promoted" }
                         }
                       }
                     }
