@@ -7,8 +7,10 @@ set -euo pipefail
 
 BASE="${BASE:-https://giveready.org}"
 SLUG="${SLUG:-}"
-FIELD="${FIELD:-tagline}"
-VALUE="${VALUE:-Consensus smoke test $(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+# Structured fields auto-promote on normalised match. Use 'website' by default.
+# Use FIELD=mission to test prose (should stay pending, never apply).
+FIELD="${FIELD:-website}"
+VALUE="${VALUE:-https://example.org/smoke-$(date -u +%Y%m%dT%H%M%SZ)}"
 
 if [ -z "$SLUG" ]; then
   SLUG=$(curl -s "$BASE/api/needs-enrichment?limit=1&field=$FIELD" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['nonprofits'][0]['slug'])")

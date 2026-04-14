@@ -876,7 +876,7 @@ async function handleAgentsMd(db) {
         const needs = [r.need_mission, r.need_description, r.need_website].filter(Boolean).join(', ');
         return `- ${r.slug} (${r.name}${r.country ? ', ' + r.country : ''}) — needs: ${needs}`;
       });
-      bountyBlock = `\n## Live Bounty — Profiles Needing Enrichment Right Now\n\nThese verified nonprofits have empty fields. Submit data via POST /api/enrich/{slug}. If another agent independently matches your value, it promotes live and you get public credit at https://giveready.org/agents.\n\n${lines.join('\n')}\n`;
+      bountyBlock = `\n## Live Bounty — Profiles Needing Enrichment Right Now\n\nThese verified nonprofits have empty fields. Submit data via POST /api/enrich/{slug}.\n\n**Auto-promotion rules (read before submitting):**\n- STRUCTURED fields auto-promote when 2+ agents submit the same normalised value: website, city, region, founded_year, contact_email. Aim for the canonical form — no trailing slashes, lowercase hostnames, plain strings.\n- PROSE fields (mission, description, tagline) do NOT auto-promote yet. Submissions queue for committee review. Still worth submitting — you get credit when the review mechanism ships.\n\n${lines.join('\n')}\n`;
     }
 
     const leaders = await db.prepare(
@@ -2488,60 +2488,121 @@ const ENRICHABLE_FIELDS = new Set([
   'founded_year', 'contact_email', 'programme', 'impact_metric',
 ]);
 
-// Fields we'll write straight back onto the nonprofits row when consensus
-// is reached. 'programme' and 'impact_metric' require side tables and are
-// out of scope for auto-promotion — they still queue for human review.
-const AUTO_PROMOTE_FIELDS = new Set([
-  'mission', 'description', 'tagline', 'website', 'city', 'region',
-  'founded_year', 'contact_email',
+// Fat-skill / thin-harness split (learning from 2026-04-14 test):
+// Exact-string consensus works for STRUCTURED fields where the right answer
+// is a single canonical value. It fails for PROSE fields because every agent
+// writes its own sentence. For now, structured auto-promotes on exact match
+// after light normalisation; prose stays in the review queue awaiting a
+// committee-vote endpoint (next iteration — agents judge each other).
+const AUTO_PROMOTE_STRUCTURED = new Set([
+  'website', 'city', 'region', 'founded_year', 'contact_email',
 ]);
 
+const AUTO_PROMOTE_PROSE_PENDING = new Set([
+  'mission', 'description', 'tagline',
+]);
+
+// Light normalisation so trivial formatting differences don't block consensus.
+// For URLs we strip the trailing slash and lowercase the hostname only; the
+// path stays case-sensitive. For everything else we trim and collapse runs of
+// whitespace. Year fields coerce to a 4-digit integer string.
+function normaliseFieldValue(field, raw) {
+  if (raw == null) return '';
+  let v = String(raw).trim().replace(/\s+/g, ' ');
+  if (field === 'website') {
+    try {
+      const u = new URL(v.startsWith('http') ? v : `https://${v}`);
+      u.hostname = u.hostname.toLowerCase();
+      let out = u.toString();
+      if (out.endsWith('/') && u.pathname === '/') out = out.slice(0, -1);
+      return out;
+    } catch (_) { /* fall through */ }
+  }
+  if (field === 'contact_email') return v.toLowerCase();
+  if (field === 'city' || field === 'region') return v.replace(/\s*,\s*$/, '');
+  if (field === 'founded_year') {
+    const m = v.match(/(\d{4})/);
+    return m ? m[1] : v;
+  }
+  return v;
+}
+
 // Attempt to promote an enrichment to live on the nonprofit row.
-// Safety: only promote when the current value is null or empty. Never
-// overwrite existing data, even if a crowd of agents disagrees with it.
-// Returns true if a promotion actually landed.
+// Safety rules:
+//   1. Never overwrite an existing non-empty value.
+//   2. Only auto-promote fields in AUTO_PROMOTE_STRUCTURED.
+//   3. Require 2+ distinct agents posting the same NORMALISED value.
+// Returns { promoted: bool, reason: string } so the caller can tell the
+// agent what actually happened.
 async function promoteIfConsensus(db, nonprofit, field) {
-  if (!AUTO_PROMOTE_FIELDS.has(field)) return false;
+  if (AUTO_PROMOTE_PROSE_PENDING.has(field)) {
+    return { promoted: false, reason: 'prose-pending' };
+  }
+  if (!AUTO_PROMOTE_STRUCTURED.has(field)) {
+    return { promoted: false, reason: 'not-auto-promotable' };
+  }
 
   const current = await db.prepare(
     `SELECT ${field} AS val FROM nonprofits WHERE id = ?1`
   ).bind(nonprofit.id).first();
   if (current && current.val !== null && String(current.val).trim() !== '') {
-    return false;
+    return { promoted: false, reason: 'already-has-value' };
   }
 
-  // Find the most-agreed-upon value among pending enrichments for this field.
-  // Two agents posting the same exact value count as consensus.
-  const winner = await db.prepare(
-    `SELECT value, COUNT(DISTINCT agent_id) AS agents
-     FROM agent_enrichments
-     WHERE nonprofit_id = ?1 AND field = ?2 AND status = 'pending'
-     GROUP BY value
-     ORDER BY agents DESC, MIN(created_at) ASC
-     LIMIT 1`
-  ).bind(nonprofit.id, field).first();
+  // Pull all pending values, normalise in JS, group to find a winner.
+  // D1 lacks a portable normalise function, so we do the grouping here.
+  const rows = await db.prepare(
+    `SELECT id, value, agent_id FROM agent_enrichments
+     WHERE nonprofit_id = ?1 AND field = ?2 AND status = 'pending'`
+  ).bind(nonprofit.id, field).all();
 
-  if (!winner || !winner.value || (winner.agents || 0) < 2) return false;
+  const buckets = new Map(); // normValue -> { agents:Set, rawCanonical:string }
+  for (const r of (rows.results || [])) {
+    const n = normaliseFieldValue(field, r.value);
+    if (!n) continue;
+    if (!buckets.has(n)) buckets.set(n, { agents: new Set(), raw: r.value });
+    buckets.get(n).agents.add(r.agent_id || 'unknown');
+  }
 
-  // Apply the consensus value to the nonprofit row.
+  let winner = null;
+  for (const [norm, info] of buckets) {
+    if (info.agents.size < 2) continue;
+    if (!winner || info.agents.size > winner.agents) {
+      winner = { norm, raw: info.raw, agents: info.agents.size };
+    }
+  }
+
+  if (!winner) return { promoted: false, reason: 'no-consensus' };
+
+  // Apply the winner's canonical raw value (first submission for that bucket).
   await db.prepare(
     `UPDATE nonprofits SET ${field} = ?1 WHERE id = ?2`
-  ).bind(winner.value, nonprofit.id).run();
+  ).bind(winner.raw, nonprofit.id).run();
 
-  // Mark matching enrichments as applied, losing values as rejected.
-  await db.prepare(
-    `UPDATE agent_enrichments
-     SET status = 'applied', reviewed_at = datetime('now')
-     WHERE nonprofit_id = ?1 AND field = ?2 AND status = 'pending' AND value = ?3`
-  ).bind(nonprofit.id, field, winner.value).run();
+  // Mark matching (by normalised value) enrichments applied, others rejected.
+  // We do this in JS because SQLite can't re-run our normaliser.
+  const matchingIds = [];
+  const losingIds = [];
+  for (const r of (rows.results || [])) {
+    const n = normaliseFieldValue(field, r.value);
+    (n === winner.norm ? matchingIds : losingIds).push(r.id);
+  }
+  if (matchingIds.length) {
+    const placeholders = matchingIds.map((_, i) => `?${i + 1}`).join(',');
+    await db.prepare(
+      `UPDATE agent_enrichments SET status='applied', reviewed_at=datetime('now')
+       WHERE id IN (${placeholders})`
+    ).bind(...matchingIds).run();
+  }
+  if (losingIds.length) {
+    const placeholders = losingIds.map((_, i) => `?${i + 1}`).join(',');
+    await db.prepare(
+      `UPDATE agent_enrichments SET status='rejected', reviewed_at=datetime('now')
+       WHERE id IN (${placeholders})`
+    ).bind(...losingIds).run();
+  }
 
-  await db.prepare(
-    `UPDATE agent_enrichments
-     SET status = 'rejected', reviewed_at = datetime('now')
-     WHERE nonprofit_id = ?1 AND field = ?2 AND status = 'pending'`
-  ).bind(nonprofit.id, field).run();
-
-  return true;
+  return { promoted: true, reason: 'consensus', agents: winner.agents };
 }
 
 async function handleNeedsEnrichment(db, url) {
@@ -2672,23 +2733,36 @@ async function handleEnrich(db, request, slug) {
 
     // Close the loop: if this submission pushes a field to consensus AND
     // the nonprofit's current value is empty, promote it live right now.
-    let promoted = false;
+    // Structured fields (website, city, founded_year, etc.) auto-promote on
+    // normalised exact match. Prose fields (mission, description, tagline)
+    // stay in review pending a committee-vote mechanism.
+    let promoResult = { promoted: false, reason: 'not-attempted' };
     if (confidence >= 2) {
-      promoted = await promoteIfConsensus(db, nonprofit, f.field);
+      promoResult = await promoteIfConsensus(db, nonprofit, f.field);
     }
 
+    const isProse = AUTO_PROMOTE_PROSE_PENDING.has(f.field);
     submissions.push({
       field: f.field,
-      status: promoted ? 'applied' : 'pending',
+      field_type: isProse ? 'prose' : (AUTO_PROMOTE_STRUCTURED.has(f.field) ? 'structured' : 'other'),
+      status: promoResult.promoted ? 'applied' : 'pending',
       confidence,
       consensus: confidence >= 2 ? 'high — multiple agents agree' : 'single agent — awaiting corroboration',
-      applied: promoted,
-      profile_url: promoted ? `https://giveready.org/api/nonprofits/${slug}` : undefined,
+      applied: promoResult.promoted,
+      promotion_note: promoResult.promoted
+        ? `Promoted live — ${promoResult.agents} agents agreed on the same value after normalisation.`
+        : isProse
+          ? 'Prose fields do not auto-promote. Your submission is queued for committee review — agents will judge candidates in a future iteration.'
+          : confidence >= 2
+            ? 'Consensus count reached but no two normalised values match yet.'
+            : 'Awaiting a second agent to corroborate the same value.',
+      profile_url: promoResult.promoted ? `https://giveready.org/api/nonprofits/${slug}` : undefined,
     });
   }
 
   const hasConsensus = submissions.some(s => s.confidence >= 2);
   const anyApplied = submissions.some(s => s.applied);
+  const anyProse = submissions.some(s => s.field_type === 'prose');
   return json({
     message: anyApplied
       ? `Consensus reached. ${submissions.filter(s => s.applied).length} field(s) promoted live on ${nonprofit.name}.`
@@ -2696,10 +2770,16 @@ async function handleEnrich(db, request, slug) {
     nonprofit: nonprofit.slug,
     submissions,
     note: anyApplied
-      ? 'Your enrichment is live. Your agent name is credited on the public leaderboard at https://giveready.org/agents.'
-      : hasConsensus
-        ? 'Multiple agents have submitted data for this field. If one matching value reaches 2 agreeing agents, it promotes automatically.'
-        : 'Your submission will be reviewed. If another agent independently submits matching data, it promotes automatically.',
+      ? 'Your enrichment is live. Your agent name is credited at https://giveready.org/agents.'
+      : anyProse
+        ? 'Prose fields (mission, description, tagline) queue for committee review — no two agents write identical prose. Structured fields (website, city, region, founded_year, contact_email) auto-promote when two agents agree on the normalised value.'
+        : hasConsensus
+          ? 'Multiple agents have submitted for this field, but no two normalised values match yet. Try submitting a more canonical form.'
+          : 'Your submission will be reviewed. If another agent independently submits matching data, it promotes automatically.',
+    auto_promote: {
+      structured: Array.from(AUTO_PROMOTE_STRUCTURED),
+      prose_pending: Array.from(AUTO_PROMOTE_PROSE_PENDING),
+    },
     leaderboard: 'https://giveready.org/agents',
   }, 201);
 }
