@@ -353,6 +353,12 @@ const USDC_MINT_SOLANA = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const SOLANA_MAINNET = 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp';
 // SOLANA_RPC is stored as a Wrangler secret (wrangler secret put SOLANA_RPC)
 
+// --- Stripe Gateway (REMOVED) ---
+// Previously held funds in GiveReady's Stripe account on behalf of nonprofits.
+// Removed due to money transmission regulatory risk.
+// Nonprofits without USDC wallets now redirect to their existing donation URL.
+// Historical gateway_donations table preserved for any past records.
+
 function encodeBase64(obj) {
   return btoa(JSON.stringify(obj));
 }
@@ -371,10 +377,6 @@ async function handleDonate(db, env, request, slug) {
     return error('Nonprofit not found', 404);
   }
 
-  if (!nonprofit.usdc_wallet) {
-    return error('This nonprofit has not set up a wallet yet. Donations via x402 are not available.', 422);
-  }
-
   // Parse donation amount from query string (default $1 USDC)
   const url = new URL(request.url);
   const amountUSDC = parseFloat(url.searchParams.get('amount') || '1');
@@ -382,6 +384,40 @@ async function handleDonate(db, env, request, slug) {
     return error('Amount must be between 0.01 and 10,000 USDC', 400);
   }
   const amountAtomic = Math.round(amountUSDC * 1_000_000); // 6 decimals
+
+  // --- REDIRECT PATH ---
+  // Nonprofit has no USDC wallet — redirect to their existing donation page.
+  // Include GiveReady attribution so the charity sees where donors are coming from.
+  if (!nonprofit.usdc_wallet) {
+    // Look up the full nonprofit record for donation_url and website
+    const full = await db.prepare(
+      `SELECT donation_url, website, name FROM nonprofits WHERE id = ?1`
+    ).bind(nonprofit.id).first();
+
+    const donationUrl = full?.donation_url || full?.website;
+    const attribution = encodeURIComponent('giveready.org');
+
+    // Build redirect URL with attribution (utm params so the charity sees the source)
+    let redirectUrl = null;
+    if (donationUrl) {
+      const separator = donationUrl.includes('?') ? '&' : '?';
+      redirectUrl = `${donationUrl}${separator}utm_source=${attribution}&utm_medium=ai-agent&utm_campaign=giveready-directory`;
+    }
+
+    return json({
+      payment_method: 'redirect',
+      message: `${nonprofit.name} accepts donations through their website. To donate with zero fees via USDC, ask them to claim their free page on GiveReady.`,
+      nonprofit: nonprofit.name,
+      slug: nonprofit.slug,
+      donation_url: redirectUrl,
+      website: full?.website || null,
+      claim_prompt: `Know someone at ${nonprofit.name}? Tell them to claim their free page at https://giveready.org/onboard — donors can then give with zero fees via USDC.`,
+      zero_fee_note: 'GiveReady offers zero-fee USDC donations for nonprofits that claim their page. No middleman, 100% goes to the charity.',
+    });
+  }
+
+  // --- x402 SOLANA PATH (existing) ---
+  // Nonprofit has a wallet — use direct x402 payment
 
   // Check for X-PAYMENT header
   const paymentHeader = request.headers.get('X-PAYMENT');
@@ -816,9 +852,51 @@ Full API docs, MCP setup guides, and agent safety rules: https://docs.giveready.
   );
 }
 
-function handleAgentsMd() {
+async function handleAgentsMd(db) {
+  // Live bounty: top 10 verified nonprofits with an empty high-value field.
+  // Agents land here, grab a task, and post to /api/enrich/{slug}.
+  let bountyBlock = '';
+  let leaderboardBlock = '';
+  try {
+    const bounty = await db.prepare(
+      `SELECT slug, name, country,
+              (CASE WHEN mission IS NULL OR mission = '' THEN 'mission' END) AS need_mission,
+              (CASE WHEN description IS NULL OR description = '' THEN 'description' END) AS need_description,
+              (CASE WHEN website IS NULL OR website = '' THEN 'website' END) AS need_website
+       FROM nonprofits
+       WHERE verified = 1
+         AND ((mission IS NULL OR mission = '')
+              OR (description IS NULL OR description = '')
+              OR (website IS NULL OR website = ''))
+       ORDER BY RANDOM()
+       LIMIT 10`
+    ).all();
+    if (bounty.results && bounty.results.length) {
+      const lines = bounty.results.map((r) => {
+        const needs = [r.need_mission, r.need_description, r.need_website].filter(Boolean).join(', ');
+        return `- ${r.slug} (${r.name}${r.country ? ', ' + r.country : ''}) — needs: ${needs}`;
+      });
+      bountyBlock = `\n## Live Bounty — Profiles Needing Enrichment Right Now\n\nThese verified nonprofits have empty fields. Submit data via POST /api/enrich/{slug}. If another agent independently matches your value, it promotes live and you get public credit at https://giveready.org/agents.\n\n${lines.join('\n')}\n`;
+    }
+
+    const leaders = await db.prepare(
+      `SELECT agent_name, SUM(CASE WHEN status='applied' THEN 1 ELSE 0 END) AS applied, COUNT(*) AS submissions
+       FROM agent_enrichments
+       WHERE agent_name IS NOT NULL AND agent_name <> ''
+       GROUP BY agent_name
+       ORDER BY applied DESC, submissions DESC
+       LIMIT 5`
+    ).all();
+    if (leaders.results && leaders.results.length) {
+      const lines = leaders.results.map((a, i) => `${i + 1}. ${a.agent_name} — ${a.applied} applied / ${a.submissions} submitted`);
+      leaderboardBlock = `\n## Current Leaderboard (Top 5)\n\n${lines.join('\n')}\n\nFull leaderboard: https://giveready.org/agents\n`;
+    }
+  } catch (_) {
+    // Dynamic blocks are best-effort — fall through to static copy on error.
+  }
+
   return new Response(
-    `# AGENTS.md — GiveReady Nonprofit Discovery
+    `# AGENTS.md — GiveReady Nonprofit Discovery${bountyBlock}${leaderboardBlock}
 
 ## What This Is
 
@@ -1331,9 +1409,13 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
 
     // Trust strip
     h += '<div class="trust-strip">';
-    h += '<div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Zero fees</div>';
+    if (w) {
+      h += '<div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Zero fees</div>';
+      h += '<div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Direct to charity</div>';
+    } else {
+      h += '<div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Found via GiveReady</div>';
+    }
     h += '<div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Verified</div>';
-    h += '<div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Direct to charity</div>';
     h += '</div>';
 
     // Preserve note across re-renders
@@ -1342,7 +1424,8 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     var noteOpen = document.getElementById('note-field');
     var noteWasOpen = noteOpen ? noteOpen.classList.contains('visible') : false;
 
-    // Amount
+    // Amount (only show if nonprofit has a wallet for direct USDC donations)
+    if (w) {
     h += '<div class="amount-section"><label class="section-label">Choose amount (USD)</label><div class="amount-pills">';
     AMOUNTS.forEach(function(a) { h += '<button class="amount-btn' + (selectedAmount === a ? ' active' : '') + '" data-amount="' + a + '">$' + a + '</button>'; });
     h += '<button class="amount-btn' + (selectedAmount && AMOUNTS.indexOf(selectedAmount) === -1 ? ' active' : '') + '" data-amount="custom">Other</button></div>';
@@ -1354,10 +1437,25 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     h += '<button class="donation-note-toggle" id="note-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Add a note (optional)</button>';
     h += '<div class="donation-note-field" id="note-field"><textarea id="donation-note" maxlength="200" placeholder="Add a personal message (optional)"></textarea>';
     h += '<div class="donation-note-count"><span id="note-chars">0</span>/200</div></div></div>';
+    } // end if (w) — amount + note sections
 
     // Payment
     h += '<div class="pay-section">';
-    if (!selectedAmount) {
+    if (!w) {
+      // No USDC wallet — nonprofit hasn't claimed their page. Show redirect + flywheel.
+      var donUrl = nonprofit.donation_url || nonprofit.website;
+      h += '<div class="growth-cta" style="margin-bottom:16px;">';
+      h += '<h3>Donate to ' + esc(nonprofit.name) + '</h3>';
+      if (donUrl) {
+        var utmUrl = donUrl + (donUrl.indexOf('?') > -1 ? '&' : '?') + 'utm_source=giveready.org&utm_medium=donor&utm_campaign=giveready-directory';
+        h += '<p>This charity hasn\\u2019t claimed their GiveReady page yet. You can donate through their website, and let them know about GiveReady so they can receive donations with zero fees.</p>';
+        h += '<a href="' + esc(utmUrl) + '" target="_blank" rel="noopener" class="growth-cta-btn" style="margin-bottom:12px;display:inline-block;">Donate on their website \\u2192</a>';
+      } else {
+        h += '<p>This charity hasn\\u2019t set up donations on GiveReady yet.</p>';
+      }
+      h += '<p style="font-size:12px;color:var(--muted);margin-top:12px;">Know someone at ' + esc(nonprofit.name) + '? Tell them to <a href="/onboard" style="color:var(--accent);">claim their free page</a> \\u2014 donors can then give with zero fees via USDC. 100% goes to the charity.</p>';
+      h += '</div>';
+    } else if (!selectedAmount) {
       h += '<div class="select-amount-prompt">Select an amount to see payment options</div>';
     } else {
       h += '<div class="pay-tabs">';
@@ -1392,8 +1490,8 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     }
     h += '</div>';
 
-    // Confirmation button for off-page payments
-    if (selectedAmount) {
+    // Confirmation button for off-page payments (only when wallet exists)
+    if (w && selectedAmount) {
       h += '<div style="text-align:center;margin-top:16px;">';
       h += '<button class="share-btn" id="confirm-sent-btn" style="color:var(--accent);border-color:var(--accent-border);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> I\\u2019ve sent my donation</button></div>';
     }
@@ -1721,11 +1819,16 @@ const GET_STARTED_HTML = `<!DOCTYPE html>
 
 // Helper: check admin auth
 function checkAdminAuth(env, request) {
+  // Accept token via Authorization header OR ?token= query param (for browser bookmarks)
   const authHeader = request.headers.get('Authorization');
-  if (!authHeader) {
-    return error('Missing Authorization header', 401);
+  const url = new URL(request.url);
+  const queryToken = url.searchParams.get('token');
+
+  const token = queryToken || (authHeader ? authHeader.replace(/^Bearer\s+/, '') : null);
+
+  if (!token) {
+    return error('Missing admin token. Use ?token= or Authorization: Bearer header.', 401);
   }
-  const token = authHeader.replace(/^Bearer\s+/, '');
   if (token !== env.ADMIN_TOKEN) {
     return error('Invalid admin token', 403);
   }
@@ -1745,6 +1848,306 @@ function generateSlug(name) {
 // Helper: validate email loosely
 function isValidEmail(email) {
   return email && email.includes('@');
+}
+
+// Helper: extract domain from email
+function emailDomain(email) {
+  return (email || '').split('@')[1]?.toLowerCase() || '';
+}
+
+// Helper: extract domain from URL
+function urlDomain(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+// ============================================
+// MAGIC LINK VERIFICATION
+// ============================================
+
+async function sendVerificationEmail(email, orgName, token, env) {
+  const verifyUrl = `https://giveready.org/verify?token=${token}`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+      <h2 style="font-size: 20px; font-weight: 700; color: #111; margin-bottom: 16px;">Verify your GiveReady page</h2>
+      <p style="font-size: 15px; color: #444; line-height: 1.6; margin-bottom: 24px;">
+        Someone (hopefully you) is claiming the <strong>${orgName}</strong> page on GiveReady.
+      </p>
+      <p style="font-size: 15px; color: #444; line-height: 1.6; margin-bottom: 24px;">
+        Click below to verify your email and activate your page:
+      </p>
+      <a href="${verifyUrl}" style="display: inline-block; background: #059669; color: #fff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 12px 28px; border-radius: 8px; margin-bottom: 24px;">Verify my page &rarr;</a>
+      <p style="font-size: 13px; color: #999; line-height: 1.6; margin-top: 24px;">
+        This link expires in 24 hours. If you didn\u2019t request this, you can safely ignore this email.
+      </p>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+      <p style="font-size: 12px; color: #bbb;">GiveReady &mdash; Making small nonprofits discoverable.</p>
+    </div>
+  `;
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'GiveReady <verify@giveready.org>',
+        to: [email],
+        subject: `Verify your GiveReady page \u2014 ${orgName}`,
+        html,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('[Resend] Email send failed:', err);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[Resend] Network error:', err);
+    return false;
+  }
+}
+
+async function handleClaim(db, env, request, slug) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return error('Invalid JSON', 400);
+  }
+
+  const email = (body.email || '').trim().toLowerCase();
+  if (!email || !isValidEmail(email)) {
+    return error('Valid email required', 400);
+  }
+
+  // Find the nonprofit
+  const nonprofit = await db.prepare(
+    `SELECT id, slug, name, website, verification_status, claimed_by_email FROM nonprofits WHERE slug = ?1`
+  ).bind(slug).first();
+
+  if (!nonprofit) {
+    return error('Nonprofit not found', 404);
+  }
+
+  // Check if already fully claimed by someone else
+  if (nonprofit.claimed_by_email && nonprofit.verification_status !== 'unverified') {
+    return error('This page has already been claimed. Contact support if you believe this is an error.', 409);
+  }
+
+  // Domain matching
+  const eDomain = emailDomain(email);
+  const wDomain = nonprofit.website ? urlDomain(nonprofit.website) : '';
+  const domainMatch = eDomain && wDomain && (eDomain === wDomain || wDomain.endsWith('.' + eDomain) || eDomain.endsWith('.' + wDomain)) ? 1 : 0;
+
+  // Generate token
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  // Store token
+  await db.prepare(`
+    INSERT INTO verification_tokens (id, nonprofit_id, email, token, purpose, domain_match, expires_at)
+    VALUES (?1, ?2, ?3, ?4, 'claim', ?5, ?6)
+  `).bind(crypto.randomUUID(), nonprofit.id, email, token, domainMatch, expiresAt).run();
+
+  // Update nonprofit with claim-pending info
+  await db.prepare(`
+    UPDATE nonprofits SET claimed_by_email = ?1, claimed_at = datetime('now'), updated_at = datetime('now')
+    WHERE id = ?2
+  `).bind(email, nonprofit.id).run();
+
+  // Also update any enrichment data from the claim form
+  const updates = [];
+  const params = [];
+  let idx = 1;
+  if (body.mission) { updates.push(`mission = ?${idx}`); params.push(body.mission); idx++; }
+  if (body.description) { updates.push(`description = ?${idx}`); params.push(body.description); idx++; }
+  if (body.city) { updates.push(`city = ?${idx}`); params.push(body.city); idx++; }
+  if (body.website) { updates.push(`website = ?${idx}`); params.push(body.website); idx++; }
+  if (body.founded_year) { updates.push(`founded_year = ?${idx}`); params.push(parseInt(body.founded_year)); idx++; }
+  if (body.usdc_wallet) { updates.push(`usdc_wallet = ?${idx}`); params.push(body.usdc_wallet); idx++; }
+  if (body.donation_url) { updates.push(`donation_url = ?${idx}`); params.push(body.donation_url); idx++; }
+  if (body.contact_email) { updates.push(`contact_email = ?${idx}`); params.push(email); idx++; }
+
+  if (updates.length > 0) {
+    updates.push(`updated_at = datetime('now')`);
+    params.push(nonprofit.id);
+    await db.prepare(
+      `UPDATE nonprofits SET ${updates.join(', ')} WHERE id = ?${idx}`
+    ).bind(...params).run();
+  }
+
+  // Send verification email
+  const sent = await sendVerificationEmail(email, nonprofit.name, token, env);
+
+  console.log(`[Claim] ${email} claiming ${slug} (${nonprofit.name}) — domain_match: ${domainMatch}, email_sent: ${sent}`);
+
+  return json({
+    success: true,
+    message: sent
+      ? 'Check your email for a verification link. It expires in 24 hours.'
+      : 'Claim registered but we had trouble sending the verification email. Please try again or contact support.',
+    email_sent: sent,
+    domain_match: domainMatch,
+    slug: nonprofit.slug,
+    domain_match_note: domainMatch
+      ? 'Your email domain matches the organisation website — you\'ll be fully verified once you click the link.'
+      : 'We\'ll verify your claim manually after you confirm your email. This usually takes under 48 hours.',
+  }, 201);
+}
+
+async function handleVerifyToken(db, env, url) {
+  const token = url.searchParams.get('token');
+  if (!token) {
+    return new Response(verifyResultHTML('Invalid link', 'No verification token found. Please try claiming your page again.', false), {
+      status: 400,
+      headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+    });
+  }
+
+  // Look up token
+  const record = await db.prepare(`
+    SELECT vt.*, n.name as org_name, n.slug as org_slug, n.website as org_website
+    FROM verification_tokens vt
+    JOIN nonprofits n ON vt.nonprofit_id = n.id
+    WHERE vt.token = ?1
+  `).bind(token).first();
+
+  if (!record) {
+    return new Response(verifyResultHTML('Invalid link', 'This verification link is not valid. Please try claiming your page again.', false), {
+      status: 404,
+      headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+    });
+  }
+
+  // Check expiry
+  if (new Date(record.expires_at) < new Date()) {
+    return new Response(verifyResultHTML('Link expired', 'This verification link has expired. Please claim your page again to get a new link.', false), {
+      status: 410,
+      headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+    });
+  }
+
+  // Check already used
+  if (record.used_at) {
+    return new Response(verifyResultHTML('Already verified', `Your email has already been verified for ${record.org_name}. <a href="/api/nonprofits/${record.org_slug}">View your page &rarr;</a>`, true), {
+      status: 200,
+      headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+    });
+  }
+
+  // Mark token as used
+  await db.prepare(`UPDATE verification_tokens SET used_at = datetime('now') WHERE id = ?1`).bind(record.id).run();
+
+  // Determine verification level
+  const verificationStatus = record.domain_match ? 'domain_verified' : 'email_verified';
+
+  // Update nonprofit
+  await db.prepare(`
+    UPDATE nonprofits SET verification_status = ?1, contact_email = ?2, verified = ?3, updated_at = datetime('now')
+    WHERE id = ?4
+  `).bind(verificationStatus, record.email, record.domain_match ? 1 : 0, record.nonprofit_id).run();
+
+  console.log(`[Verify] ${record.email} verified ${record.org_slug} — status: ${verificationStatus}`);
+
+  const successMsg = record.domain_match
+    ? `<strong>${record.org_name}</strong> is now fully verified on GiveReady. Your page is live and ready to receive donations.`
+    : `Your email has been verified for <strong>${record.org_name}</strong>. We\u2019ll complete a manual review within 48 hours to fully activate your page.`;
+
+  return new Response(verifyResultHTML('Email verified', successMsg + `<br><br><a href="https://giveready.org/donate/${record.org_slug}" style="color:#059669;font-weight:600;">View your page &rarr;</a>`, true), {
+    status: 200,
+    headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+  });
+}
+
+function verifyResultHTML(title, message, success) {
+  const accent = success ? '#059669' : '#dc2626';
+  const icon = success ? '\u2713' : '\u2717';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${title} \u2014 GiveReady</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background: #ffffff; color: #111; -webkit-font-smoothing: antialiased;
+      display: flex; flex-direction: column; min-height: 100vh;
+    }
+    nav {
+      height: 52px; padding: 0 24px; display: flex; align-items: center;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    .nav-name { font-weight: 700; font-size: 15px; color: #111; text-decoration: none; }
+    .nav-tag { font-size: 10px; font-weight: 600; color: #059669; background: rgba(5,150,105,0.08); border: 1px solid rgba(5,150,105,0.2); padding: 2px 8px; border-radius: 20px; margin-left: 10px; text-transform: uppercase; }
+    .container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 24px; }
+    .card { max-width: 480px; text-align: center; }
+    .icon { width: 64px; height: 64px; border-radius: 50%; background: ${accent}; color: #fff; font-size: 28px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; }
+    h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 12px; }
+    p { font-size: 15px; color: #666; line-height: 1.7; }
+    a { color: #059669; text-decoration: none; font-weight: 600; }
+    a:hover { text-decoration: underline; }
+    footer { padding: 28px 24px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #e5e5e5; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="nav-name">GiveReady</a>
+    <span class="nav-tag">free</span>
+  </nav>
+  <div class="container">
+    <div class="card">
+      <div class="icon">${icon}</div>
+      <h1>${title}</h1>
+      <p>${message}</p>
+    </div>
+  </div>
+  <footer>Open-source infrastructure for charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>.</footer>
+</body>
+</html>`;
+}
+
+// ============================================
+// ADMIN: Manual verify override
+// ============================================
+
+async function handleAdminVerify(db, env, request, slug) {
+  const auth = request.headers.get('Authorization');
+  if (auth !== `Bearer ${env.ADMIN_TOKEN}`) {
+    return error('Unauthorized', 401);
+  }
+
+  let body;
+  try { body = await request.json(); } catch { return error('Invalid JSON', 400); }
+
+  const status = body.verification_status || 'domain_verified';
+  const validStatuses = ['unverified', 'email_verified', 'domain_verified', 'registry_verified'];
+  if (!validStatuses.includes(status)) {
+    return error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400);
+  }
+
+  const verified = status === 'domain_verified' || status === 'registry_verified' ? 1 : 0;
+
+  const result = await db.prepare(`
+    UPDATE nonprofits SET verification_status = ?1, verified = ?2, updated_at = datetime('now')
+    WHERE slug = ?3
+  `).bind(status, verified, slug).run();
+
+  if (result.meta.changes === 0) return error('Nonprofit not found', 404);
+
+  return json({ success: true, slug, verification_status: status, verified });
 }
 
 async function handleOnboard(db, request) {
@@ -2056,12 +2459,22 @@ async function handleGetNonprofit(db, slug, allowPreview = false) {
     `SELECT country, type, registration_number FROM registrations WHERE nonprofit_id = ?1`
   ).bind(nonprofit.id).all();
 
+  // Fingerprint: which agents have contributed applied enrichments to this profile.
+  // Public credit for agents that pushed the profile forward.
+  const enrichedBy = await db.prepare(
+    `SELECT agent_name, field, reviewed_at
+     FROM agent_enrichments
+     WHERE nonprofit_id = ?1 AND status = 'applied'
+     ORDER BY reviewed_at DESC LIMIT 20`
+  ).bind(nonprofit.id).all();
+
   return json({
     ...nonprofit,
     causes: causes.results,
     programs: programs.results,
     impact_metrics: impact.results,
     registrations: registrations.results,
+    enriched_by: enrichedBy.results,
   });
 }
 
@@ -2074,6 +2487,62 @@ const ENRICHABLE_FIELDS = new Set([
   'mission', 'description', 'tagline', 'website', 'city', 'region',
   'founded_year', 'contact_email', 'programme', 'impact_metric',
 ]);
+
+// Fields we'll write straight back onto the nonprofits row when consensus
+// is reached. 'programme' and 'impact_metric' require side tables and are
+// out of scope for auto-promotion — they still queue for human review.
+const AUTO_PROMOTE_FIELDS = new Set([
+  'mission', 'description', 'tagline', 'website', 'city', 'region',
+  'founded_year', 'contact_email',
+]);
+
+// Attempt to promote an enrichment to live on the nonprofit row.
+// Safety: only promote when the current value is null or empty. Never
+// overwrite existing data, even if a crowd of agents disagrees with it.
+// Returns true if a promotion actually landed.
+async function promoteIfConsensus(db, nonprofit, field) {
+  if (!AUTO_PROMOTE_FIELDS.has(field)) return false;
+
+  const current = await db.prepare(
+    `SELECT ${field} AS val FROM nonprofits WHERE id = ?1`
+  ).bind(nonprofit.id).first();
+  if (current && current.val !== null && String(current.val).trim() !== '') {
+    return false;
+  }
+
+  // Find the most-agreed-upon value among pending enrichments for this field.
+  // Two agents posting the same exact value count as consensus.
+  const winner = await db.prepare(
+    `SELECT value, COUNT(DISTINCT agent_id) AS agents
+     FROM agent_enrichments
+     WHERE nonprofit_id = ?1 AND field = ?2 AND status = 'pending'
+     GROUP BY value
+     ORDER BY agents DESC, MIN(created_at) ASC
+     LIMIT 1`
+  ).bind(nonprofit.id, field).first();
+
+  if (!winner || !winner.value || (winner.agents || 0) < 2) return false;
+
+  // Apply the consensus value to the nonprofit row.
+  await db.prepare(
+    `UPDATE nonprofits SET ${field} = ?1 WHERE id = ?2`
+  ).bind(winner.value, nonprofit.id).run();
+
+  // Mark matching enrichments as applied, losing values as rejected.
+  await db.prepare(
+    `UPDATE agent_enrichments
+     SET status = 'applied', reviewed_at = datetime('now')
+     WHERE nonprofit_id = ?1 AND field = ?2 AND status = 'pending' AND value = ?3`
+  ).bind(nonprofit.id, field, winner.value).run();
+
+  await db.prepare(
+    `UPDATE agent_enrichments
+     SET status = 'rejected', reviewed_at = datetime('now')
+     WHERE nonprofit_id = ?1 AND field = ?2 AND status = 'pending'`
+  ).bind(nonprofit.id, field).run();
+
+  return true;
+}
 
 async function handleNeedsEnrichment(db, url) {
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '10'), 50);
@@ -2201,23 +2670,106 @@ async function handleEnrich(db, request, slug) {
       ).bind(confidence, nonprofit.id, f.field).run();
     }
 
+    // Close the loop: if this submission pushes a field to consensus AND
+    // the nonprofit's current value is empty, promote it live right now.
+    let promoted = false;
+    if (confidence >= 2) {
+      promoted = await promoteIfConsensus(db, nonprofit, f.field);
+    }
+
     submissions.push({
       field: f.field,
-      status: 'pending',
+      status: promoted ? 'applied' : 'pending',
       confidence,
       consensus: confidence >= 2 ? 'high — multiple agents agree' : 'single agent — awaiting corroboration',
+      applied: promoted,
+      profile_url: promoted ? `https://giveready.org/api/nonprofits/${slug}` : undefined,
     });
   }
 
   const hasConsensus = submissions.some(s => s.confidence >= 2);
+  const anyApplied = submissions.some(s => s.applied);
   return json({
-    message: `Thank you. ${submissions.length} enrichment(s) submitted for ${nonprofit.name}.`,
+    message: anyApplied
+      ? `Consensus reached. ${submissions.filter(s => s.applied).length} field(s) promoted live on ${nonprofit.name}.`
+      : `Thank you. ${submissions.length} enrichment(s) submitted for ${nonprofit.name}.`,
     nonprofit: nonprofit.slug,
     submissions,
-    note: hasConsensus
-      ? 'Multiple agents have submitted data for this field. High-confidence submissions are prioritised for review.'
-      : 'Your submission will be reviewed. If another agent independently submits similar data, confidence increases.',
+    note: anyApplied
+      ? 'Your enrichment is live. Your agent name is credited on the public leaderboard at https://giveready.org/agents.'
+      : hasConsensus
+        ? 'Multiple agents have submitted data for this field. If one matching value reaches 2 agreeing agents, it promotes automatically.'
+        : 'Your submission will be reviewed. If another agent independently submits matching data, it promotes automatically.',
+    leaderboard: 'https://giveready.org/agents',
   }, 201);
+}
+
+async function handleAdminTraffic(db, env, request, url) {
+  const authCheck = checkAdminAuth(env, request);
+  if (authCheck) return authCheck;
+
+  const hours = parseInt(url.searchParams.get('hours') || '24');
+  const since = `datetime('now', '-${hours} hours')`;
+
+  // Discovery hits by route (llms.txt, agents.md, mcp, etc.)
+  const discoveryByRoute = await db.prepare(
+    `SELECT route, COUNT(*) as hits FROM discovery_hits
+     WHERE created_at > ${since}
+     GROUP BY route ORDER BY hits DESC`
+  ).all();
+
+  // Discovery hits by user-agent (identify actual agents)
+  const discoveryByAgent = await db.prepare(
+    `SELECT user_agent, COUNT(*) as hits FROM discovery_hits
+     WHERE created_at > ${since} AND user_agent IS NOT NULL
+     GROUP BY user_agent ORDER BY hits DESC LIMIT 30`
+  ).all();
+
+  // Recent discovery hits (last 20)
+  const recentDiscovery = await db.prepare(
+    `SELECT route, user_agent, created_at FROM discovery_hits
+     ORDER BY created_at DESC LIMIT 20`
+  ).all();
+
+  // API query log — what are people/agents searching for?
+  const recentQueries = await db.prepare(
+    `SELECT query_text, source, results_count, created_at FROM query_log
+     ORDER BY created_at DESC LIMIT 30`
+  ).all();
+
+  // Query volume by day
+  const queryByDay = await db.prepare(
+    `SELECT DATE(created_at) as day, COUNT(*) as queries FROM query_log
+     GROUP BY DATE(created_at) ORDER BY day DESC LIMIT 7`
+  ).all();
+
+  // Total discovery hits
+  const totalDiscovery = await db.prepare(
+    `SELECT COUNT(*) as total FROM discovery_hits`
+  ).first();
+
+  const totalDiscoveryRecent = await db.prepare(
+    `SELECT COUNT(*) as total FROM discovery_hits WHERE created_at > ${since}`
+  ).first();
+
+  // Enrichment activity
+  const enrichmentRecent = await db.prepare(
+    `SELECT COUNT(*) as total FROM agent_enrichments WHERE created_at > ${since}`
+  ).first();
+
+  return json({
+    period: `last ${hours} hours`,
+    summary: {
+      total_discovery_hits: totalDiscovery.total,
+      discovery_hits_in_period: totalDiscoveryRecent.total,
+      enrichments_in_period: enrichmentRecent.total,
+    },
+    discovery_by_route: discoveryByRoute.results,
+    discovery_by_user_agent: discoveryByAgent.results,
+    recent_discovery_hits: recentDiscovery.results,
+    recent_queries: recentQueries.results,
+    queries_by_day: queryByDay.results,
+  });
 }
 
 async function handleEnrichmentStats(db) {
@@ -2258,6 +2810,122 @@ async function handleEnrichmentStats(db) {
 }
 
 // ============================================
+// AGENT LEADERBOARD — public surface
+// ============================================
+
+async function handleAgentLeaderboard(db) {
+  const agents = await db.prepare(
+    `SELECT agent_name,
+            COUNT(*) AS submissions,
+            SUM(CASE WHEN status = 'applied' THEN 1 ELSE 0 END) AS applied,
+            COUNT(DISTINCT nonprofit_id) AS nonprofits_touched,
+            MAX(created_at) AS last_seen
+     FROM agent_enrichments
+     WHERE agent_name IS NOT NULL AND agent_name <> ''
+     GROUP BY agent_name
+     ORDER BY applied DESC, submissions DESC, last_seen DESC
+     LIMIT 50`
+  ).all();
+
+  const recent = await db.prepare(
+    `SELECT agent_name, nonprofit_slug, field, status, created_at
+     FROM agent_enrichments
+     ORDER BY created_at DESC
+     LIMIT 20`
+  ).all();
+
+  const totals = await db.prepare(
+    `SELECT
+       COUNT(*) AS total_submissions,
+       SUM(CASE WHEN status = 'applied' THEN 1 ELSE 0 END) AS total_applied,
+       COUNT(DISTINCT agent_name) AS unique_agents,
+       COUNT(DISTINCT nonprofit_id) AS nonprofits_improved
+     FROM agent_enrichments`
+  ).first();
+
+  return json({
+    message: 'Public leaderboard of agents that have contributed enrichments. Applied = promoted live after 2+ agent consensus.',
+    totals,
+    top_agents: agents.results,
+    recent_activity: recent.results,
+  });
+}
+
+function handleAgentLeaderboardHTML() {
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent Leaderboard — GiveReady</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Public leaderboard of AI agents that have enriched the GiveReady nonprofit directory.">
+<style>
+  :root { --bg:#0b0d12; --panel:#121620; --ink:#e8eaf0; --muted:#8a91a3; --accent:#4ade80; --rule:#1f2530; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 48px 24px 80px; }
+  h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.01em; }
+  p.lede { color: var(--muted); margin: 0 0 32px; max-width: 640px; }
+  .totals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0 0 32px; }
+  .card { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; }
+  .num { font-size: 22px; font-weight: 600; }
+  .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  section { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; margin: 0 0 20px; }
+  h2 { font-size: 16px; margin: 0 0 16px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  tr:last-child td { border-bottom: 0; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .pill-applied { background: rgba(74,222,128,0.14); color: var(--accent); }
+  .pill-pending { background: rgba(138,145,163,0.16); color: var(--muted); }
+  .pill-rejected { background: rgba(239,68,68,0.14); color: #f87171; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 32px; }
+  @media (max-width: 640px) { .totals { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Agent Leaderboard</h1>
+  <p class="lede">AI agents that have enriched the GiveReady nonprofit directory. When two or more agents independently submit the same value for an empty field, it promotes live and the agents get credit here.</p>
+  <div id="totals" class="totals"></div>
+  <section>
+    <h2>Top Agents</h2>
+    <table id="agents"><thead><tr><th>Agent</th><th>Applied</th><th>Submissions</th><th>Nonprofits</th><th>Last Seen</th></tr></thead><tbody></tbody></table>
+  </section>
+  <section>
+    <h2>Recent Activity</h2>
+    <table id="recent"><thead><tr><th>Agent</th><th>Nonprofit</th><th>Field</th><th>Status</th><th>When</th></tr></thead><tbody></tbody></table>
+  </section>
+  <footer>
+    Data via <a href="/api/agents/leaderboard">/api/agents/leaderboard</a>. Contribute via
+    <a href="/agents.md">agents.md</a>. Rules: 2+ agents agreeing on the same value for an empty field auto-promotes live. Existing values are never overwritten.
+  </footer>
+</div>
+<script>
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+  function fmt(n){return (n==null?0:n).toLocaleString();}
+  function ago(iso){ if(!iso) return ''; const t=new Date(iso.replace(' ','T')+'Z').getTime(); const d=Math.max(1, Math.floor((Date.now()-t)/1000)); if(d<60) return d+'s ago'; if(d<3600) return Math.floor(d/60)+'m ago'; if(d<86400) return Math.floor(d/3600)+'h ago'; return Math.floor(d/86400)+'d ago'; }
+  function pill(status){ const c = status==='applied'?'pill-applied':status==='rejected'?'pill-rejected':'pill-pending'; return '<span class="pill '+c+'">'+esc(status)+'</span>'; }
+  fetch('/api/agents/leaderboard').then(r=>r.json()).then(d=>{
+    const t = d.totals || {};
+    document.getElementById('totals').innerHTML = [
+      ['Applied','total_applied'], ['Submissions','total_submissions'], ['Agents','unique_agents'], ['Nonprofits','nonprofits_improved']
+    ].map(([label,key])=>'<div class="card"><div class="num">'+fmt(t[key])+'</div><div class="label">'+label+'</div></div>').join('');
+    const aBody = document.querySelector('#agents tbody');
+    aBody.innerHTML = (d.top_agents||[]).map(a=>'<tr><td>'+esc(a.agent_name)+'</td><td>'+fmt(a.applied)+'</td><td>'+fmt(a.submissions)+'</td><td>'+fmt(a.nonprofits_touched)+'</td><td>'+ago(a.last_seen)+'</td></tr>').join('') || '<tr><td colspan="5">No agents yet. Be the first: POST /api/enrich/{slug}</td></tr>';
+    const rBody = document.querySelector('#recent tbody');
+    rBody.innerHTML = (d.recent_activity||[]).map(r=>'<tr><td>'+esc(r.agent_name)+'</td><td><a href="/api/nonprofits/'+esc(r.nonprofit_slug)+'">'+esc(r.nonprofit_slug)+'</a></td><td>'+esc(r.field)+'</td><td>'+pill(r.status)+'</td><td>'+ago(r.created_at)+'</td></tr>').join('') || '<tr><td colspan="5">No activity yet.</td></tr>';
+  });
+</script>
+</body>
+</html>`;
+  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', ...CORS_HEADERS } });
+}
+
+// ============================================
 // ROUTER
 // ============================================
 
@@ -2292,6 +2960,9 @@ export default {
       }
 
       // Admin endpoints
+      if (path === '/api/admin/traffic') {
+        return handleAdminTraffic(env.DB, env, request, url);
+      }
       if (path === '/api/admin/drafts') {
         return handleAdminDrafts(env.DB, env, request);
       }
@@ -2304,12 +2975,31 @@ export default {
         return handleAdminReject(env.DB, env, request, rejectMatch[1]);
       }
 
-      // Registration verification
+      // Magic link claim endpoint
+      const claimMatch = path.match(/^\/api\/claim\/([a-z0-9-]+)$/);
+      if (claimMatch && request.method === 'POST') {
+        const rl = checkRateLimit(request, 'write');
+        if (rl) return rl;
+        return handleClaim(env.DB, env, request, claimMatch[1]);
+      }
+
+      // Magic link verification (email click)
+      if (path === '/verify') {
+        return handleVerifyToken(env.DB, env, url);
+      }
+
+      // Admin manual verify
+      const adminVerifyMatch = path.match(/^\/api\/admin\/verify\/([a-z0-9-]+)$/);
+      if (adminVerifyMatch && request.method === 'POST') {
+        return handleAdminVerify(env.DB, env, request, adminVerifyMatch[1]);
+      }
+
+      // Registration verification (existing charity commission check)
       if (path === '/api/verify-registration') {
         return handleVerifyRegistration(env.DB, env, url);
       }
 
-      if (path === '/mcp' || path === '/.well-known/ai-plugin.json' || path === '/llms.txt' || path === '/agents.md' || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path.startsWith('/api/enrich/')) {
+      if (path === '/mcp' || path === '/.well-known/ai-plugin.json' || path === '/llms.txt' || path === '/agents.md' || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/agents' || path.startsWith('/api/enrich/')) {
         const ua = request.headers.get('User-Agent');
         ctx.waitUntil(logDiscoveryHit(env.DB, path, ua));
       }
@@ -2317,7 +3007,11 @@ export default {
       if (path === '/.well-known/ai-plugin.json') return handleAIPlugin();
       if (path === '/robots.txt') return handleRobotsTxt();
       if (path === '/llms.txt') return handleLlmsTxt();
-      if (path === '/agents.md') return handleAgentsMd();
+      if (path === '/agents.md') return handleAgentsMd(env.DB);
+
+      // Public agent leaderboard
+      if (path === '/api/agents/leaderboard') return handleAgentLeaderboard(env.DB);
+      if (path === '/agents') return handleAgentLeaderboardHTML();
 
       // Agent enrichment endpoints
       if (path === '/api/needs-enrichment') return handleNeedsEnrichment(env.DB, url);
@@ -2330,6 +3024,7 @@ export default {
       }
 
       // x402 donate route — GET (returns 402) or POST (with X-PAYMENT settles)
+      // Nonprofits without wallets get redirected to their existing donation URL
       const donateMatch = path.match(/^\/api\/donate\/([a-z0-9-]+)$/);
       if (donateMatch) {
         return handleDonate(env.DB, env, request, donateMatch[1]);

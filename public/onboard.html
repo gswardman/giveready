@@ -386,8 +386,9 @@
         </div>
 
         <div class="form-group full-width">
-          <label>Contact email <span style="color: var(--accent);">*</span> <span class="hint">For verification</span></label>
-          <input type="email" id="claim-contact-email" required />
+          <label>Contact email <span style="color: var(--accent);">*</span> <span class="hint">We'll send a verification link</span></label>
+          <input type="email" id="claim-contact-email" required placeholder="you@yourcharity.org" />
+          <div id="domain-match-indicator" style="display: none; margin-top: 8px; font-size: 13px; padding: 8px 12px; border-radius: 6px;"></div>
         </div>
 
         <div class="form-group full-width">
@@ -511,15 +512,19 @@
 
       <div class="button-row">
         <button class="btn btn-secondary" onclick="goToStep(2)">Back</button>
-        <button class="btn btn-primary" id="step-3-submit" onclick="submitClaim()">Submit claim</button>
+        <button class="btn btn-primary" id="step-3-submit" onclick="submitClaim()">Submit & send verification email</button>
       </div>
     </div>
 
     <!-- SUCCESS SCREEN -->
     <div id="success-screen" style="display: none;">
       <div class="success-message">
-        <h2>Claim submitted</h2>
-        <p>We'll verify your details and email you at <strong id="success-email"></strong> within 48 hours.</p>
+        <h2 id="success-title">Check your email</h2>
+        <p id="success-body">We've sent a verification link to <strong id="success-email"></strong>. Click the link to activate your page.</p>
+        <p id="success-domain-note" style="display: none; font-size: 13px; color: var(--accent); margin-bottom: 16px;"></p>
+        <div style="padding: 16px; background: var(--surface); border-radius: 8px; margin-bottom: 24px; font-size: 13px; color: var(--muted);">
+          The link expires in 24 hours. Check your spam folder if you don't see it.
+        </div>
         <div class="success-links">
           <a href="/" class="btn btn-primary" style="display: inline-block; text-decoration: none; color: var(--bg);">Return to home</a>
           <a href="#" id="preview-link" target="_blank">Preview your page</a>
@@ -589,8 +594,9 @@
     searchInput.addEventListener('input', debounceSearch);
 
     // Step 2: Form fields
-    document.getElementById('claim-contact-email').addEventListener('change', e => {
+    document.getElementById('claim-contact-email').addEventListener('input', e => {
       formState.contactEmail = e.target.value;
+      checkDomainMatch();
     });
     document.getElementById('claim-website').addEventListener('change', e => {
       formState.website = e.target.value;
@@ -645,7 +651,7 @@
     try {
       const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=8`);
       const data = await response.json();
-      const results = data.results || data;
+      const results = data.nonprofits || data.results || [];
 
       if (!results || results.length === 0) {
         resultsDiv.innerHTML = '<div class="no-results">No charities found. Try registering a new one.</div>';
@@ -686,15 +692,23 @@
     document.querySelectorAll('.charity-card').forEach(c => c.classList.remove('selected'));
     cardElement.classList.add('selected');
 
-    // Fetch full charity data
+    // Show loading state on the clicked card
+    const btn = cardElement.querySelector('.charity-card-button');
+    if (btn) btn.textContent = 'Loading...';
+
+    // Fetch full charity data then auto-advance to step 2
     fetch(`/api/nonprofits/${slug}`)
       .then(r => r.json())
       .then(data => {
         formState.selectedCharitySlug = slug;
         formState.selectedCharityData = data;
         document.getElementById('step-1-next').disabled = false;
+        goToStep(2);
       })
-      .catch(err => console.error('Error fetching charity:', err));
+      .catch(err => {
+        console.error('Error fetching charity:', err);
+        if (btn) btn.textContent = 'Error — try again →';
+      });
   }
 
   function toggleRegisterForm() {
@@ -842,6 +856,35 @@
     formState.paymentType = type;
   }
 
+  function checkDomainMatch() {
+    const indicator = document.getElementById('domain-match-indicator');
+    const email = (document.getElementById('claim-contact-email').value || '').trim();
+    const org = formState.selectedCharityData;
+    if (!email || !email.includes('@') || !org) {
+      indicator.style.display = 'none';
+      return;
+    }
+    const eDomain = email.split('@')[1]?.toLowerCase() || '';
+    let wDomain = '';
+    try { wDomain = new URL(org.website || '').hostname.replace(/^www\./, '').toLowerCase(); } catch {}
+    if (!wDomain || !eDomain) {
+      indicator.style.display = 'none';
+      return;
+    }
+    indicator.style.display = 'block';
+    if (eDomain === wDomain || wDomain.endsWith('.' + eDomain) || eDomain.endsWith('.' + wDomain)) {
+      indicator.style.background = 'rgba(5,150,105,0.08)';
+      indicator.style.color = '#059669';
+      indicator.style.border = '1px solid rgba(5,150,105,0.2)';
+      indicator.innerHTML = '\u2713 Email matches organisation website \u2014 you\'ll be verified instantly.';
+    } else {
+      indicator.style.background = 'rgba(217,119,6,0.08)';
+      indicator.style.color = '#d97706';
+      indicator.style.border = '1px solid rgba(217,119,6,0.2)';
+      indicator.innerHTML = '\u26A0 Email domain doesn\'t match website. We\'ll verify manually after you confirm your email (usually under 48 hours).';
+    }
+  }
+
   async function submitClaim() {
     if (!formState.selectedCharitySlug) {
       alert('No charity selected');
@@ -856,29 +899,28 @@
 
     const btn = document.getElementById('step-3-submit');
     btn.classList.add('loading');
-    btn.innerHTML = '<span class="spinner"></span>Submitting...';
+    btn.innerHTML = '<span class="spinner"></span>Sending verification email...';
 
     try {
       const payload = {
-        claim_slug: formState.selectedCharitySlug,
-        contactEmail: email,
-        website: document.getElementById('claim-website').value || null,
-        city: document.getElementById('claim-city').value || null,
-        foundedYear: document.getElementById('claim-founded-year').value ? parseInt(document.getElementById('claim-founded-year').value) : null,
+        email: email,
         mission: document.getElementById('claim-mission').value || null,
         description: document.getElementById('claim-description').value || null,
-        causes: formState.causes,
-        paymentType: formState.paymentType,
-        cryptoWallet: formState.cryptoWallet || null,
-        everyorgUrl: formState.everyorgUrl || null,
-        skipPayment: formState.skipPayment,
+        city: document.getElementById('claim-city').value || null,
+        website: document.getElementById('claim-website').value || null,
+        founded_year: document.getElementById('claim-founded-year').value ? parseInt(document.getElementById('claim-founded-year').value) : null,
+        usdc_wallet: formState.cryptoWallet || null,
+        donation_url: formState.everyorgUrl || null,
+        contact_email: email,
       };
 
-      const response = await fetch('/api/onboard', {
+      const response = await fetch(`/api/claim/${formState.selectedCharitySlug}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
+      const data = await response.json();
 
       if (response.ok) {
         // Show success
@@ -887,10 +929,20 @@
         document.getElementById('success-email').textContent = email;
         document.getElementById('preview-link').href = `/api/nonprofits/${formState.selectedCharitySlug}?preview=1`;
 
+        // Show domain match note
+        if (data.domain_match) {
+          document.getElementById('success-domain-note').style.display = 'block';
+          document.getElementById('success-domain-note').textContent = 'Your email matches the organisation website \u2014 you\'ll be fully verified once you click the link.';
+        }
+
+        if (!data.email_sent) {
+          document.getElementById('success-title').textContent = 'Claim registered';
+          document.getElementById('success-body').innerHTML = 'We had trouble sending the verification email to <strong>' + escapeHtml(email) + '</strong>. Please try again or contact support.';
+        }
+
         document.querySelector('.form-container').scrollIntoView({ behavior: 'smooth' });
       } else {
-        const error = await response.text();
-        alert('Error: ' + (error || 'Something went wrong'));
+        alert('Error: ' + (data.error || 'Something went wrong'));
         btn.classList.remove('loading');
         btn.innerHTML = 'Submit claim';
       }
