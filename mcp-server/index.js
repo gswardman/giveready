@@ -4,8 +4,9 @@
  * GiveReady MCP Server
  *
  * Connects AI assistants to the GiveReady nonprofit directory.
- * When a donor asks their AI about youth charities, this server
- * returns verified organisations with real impact data and donation links.
+ * Search 41,000+ verified nonprofits across 29 cause areas with
+ * impact data and donation links, and contribute enrichments back
+ * to thin profiles through the write-back endpoint.
  *
  * Usage:
  *   npx giveready-mcp
@@ -104,7 +105,7 @@ function formatNonprofitDetail(np) {
 
 const server = new McpServer({
   name: 'giveready',
-  version: '0.1.0',
+  version: '0.1.4',
 });
 
 // ============================================
@@ -113,11 +114,11 @@ const server = new McpServer({
 
 server.tool(
   'search_nonprofits',
-  `Search for verified youth nonprofits by keyword, cause area, or country. Returns organisations with impact data and donation links. Use this when someone wants to find charities to support, discover youth programmes, or explore giving options.
+  `Search 41,000+ verified nonprofits across 29 cause areas by keyword, cause, or country. Returns organisations with impact data and donation links. Use this when someone wants to find charities to support, discover mission-aligned programmes, or explore giving options.
 
-  Available causes: youth-empowerment, music-education, adventure-travel, mental-health, surf-therapy, entrepreneurship, poverty-reduction, creative-arts, education, community-development
+  Cause IDs include: youth-empowerment, music-education, adventure-travel, mental-health, surf-therapy, entrepreneurship, poverty-reduction, creative-arts, education, community-development, peer-support, environment, health, animals, housing, food-security, disability, veterans, racial-justice, immigration, lgbtq, science-research, religion, gender-equality, refugees, sports-recreation, legal-justice, seniors, water-sanitation. Call list_causes for the live set with nonprofit counts.
 
-  Available countries include: South Africa, United Kingdom, Bermuda (and growing)`,
+  Countries: any country name (e.g. "South Africa", "United Kingdom", "United States", "Bermuda").`,
   {
     query: z.string().optional().describe('Search keyword (e.g., "music education", "surf therapy", "adventure")'),
     cause: z.string().optional().describe('Cause area ID (e.g., "youth-empowerment", "music-education", "mental-health")'),
@@ -192,6 +193,59 @@ server.tool(
         type: 'text',
         text: `GiveReady Cause Areas:\n\n${causeList}\n\nUse search_nonprofits with a cause ID to find organisations in a specific area.`,
       }],
+    };
+  }
+);
+
+server.tool(
+  'submit_enrichment',
+  `Contribute missing data back to a nonprofit profile. Use this when get_nonprofit or search_nonprofits returns a profile with an empty high-value field and you have a well-sourced value to suggest.
+
+  Auto-promotion rules (server-enforced):
+  - STRUCTURED fields auto-promote when 2+ distinct agents submit the same normalised value. Fields: website, city, region, founded_year, contact_email. Submit canonical form — lowercase hostnames, no trailing slashes, lowercase emails, 4-digit year.
+  - PROSE fields (mission, description, tagline) do NOT auto-promote yet — submissions queue for committee review. Still worth submitting; you get credit retroactively when review ships.
+  - The server NEVER overwrites an existing non-empty value. Only empty fields can be promoted.
+
+  Always provide a source_url that backs the value. Always pass a stable agent_id and a human-readable agent_name — these drive the public leaderboard at https://giveready.org/agents.`,
+  {
+    slug: z.string().describe('The nonprofit slug (e.g., "bridges-for-music"). Get this from search_nonprofits or get_nonprofit.'),
+    field: z.enum(['mission', 'description', 'tagline', 'website', 'city', 'region', 'founded_year', 'contact_email', 'programme', 'impact_metric']).describe('The field you are submitting data for.'),
+    value: z.string().describe('The value to submit. For structured fields, use canonical form. For founded_year, pass a 4-digit string.'),
+    source_url: z.string().describe('Public URL that supports the value (nonprofit website, news article, annual report, etc.).'),
+    agent_id: z.string().describe('Stable identifier for your agent (e.g., "claude-3-5-sonnet-20250101", "my-enrichment-bot-v2").'),
+    agent_name: z.string().describe('Human-readable name shown on the leaderboard (e.g., "Claude/3.5", "YourBot/1.0").'),
+  },
+  async ({ slug, field, value, source_url, agent_id, agent_name }) => {
+    const url = new URL(`/api/enrich/${slug}`, API_BASE);
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ field, value, source_url, agent_id, agent_name }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Enrichment rejected (${response.status}): ${data.error || response.statusText}. Check the slug exists, the field is enrichable, and the value is non-empty. Existing non-empty values cannot be overwritten.`,
+        }],
+      };
+    }
+
+    const lines = [
+      `Submission recorded for ${slug} → ${field}.`,
+      data.field_type ? `Field type: ${data.field_type}.` : null,
+      data.promotion_note ? data.promotion_note : null,
+      data.auto_promote && data.auto_promote[field] === true
+        ? `Auto-promoted live — your value is now on the public profile.`
+        : `Queued for consensus. When a second distinct agent submits the same normalised value for a structured field, it auto-promotes.`,
+      `Track your credit at https://giveready.org/agents.`,
+    ].filter(Boolean);
+
+    return {
+      content: [{ type: 'text', text: lines.join('\n') }],
     };
   }
 );

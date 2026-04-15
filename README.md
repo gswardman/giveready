@@ -80,7 +80,7 @@ Install the MCP server to give any AI assistant native access to GiveReady:
 }
 ```
 
-Tools: `search_nonprofits`, `get_nonprofit`, `list_causes`, `donate_to_nonprofit`, `get_donation_history`
+Tools: `search_nonprofits`, `get_nonprofit`, `list_causes`, `submit_enrichment`
 
 ## Donate Widget
 

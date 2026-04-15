@@ -9,17 +9,17 @@
 
 **Name:** giveready-mcp
 
-**One-liner:** Open infrastructure that makes 41,000+ nonprofits discoverable and payable by AI agents.
+**One-liner:** Open infrastructure that makes 41,000+ nonprofits discoverable, improvable, and payable by AI agents.
 
 **Short description (under 200 chars):**
-Search 41,000+ verified nonprofits across 29 cause areas. Get impact data, donation links, and agent enrichment endpoints. Zero fees — 100% reaches the nonprofit.
+Search 41,000+ verified nonprofits across 29 cause areas, submit enrichments back to thin profiles, and donate via x402 + USDC on Solana. Zero fees — 100% reaches the nonprofit.
 
 **Full description:**
 GiveReady is open giving infrastructure for AI agents. It provides a verified directory of 41,000+ nonprofits across 29 cause areas — from mental health to environmental conservation to youth empowerment.
 
-AI agents can search nonprofits by keyword, cause, or country; retrieve full profiles with mission, programmes, impact metrics, and legal registrations; and initiate USDC donations on Solana via the x402 payment protocol. Agents can also enrich thin nonprofit profiles by submitting missing data (mission, description, website) through write-back endpoints.
+AI agents can search nonprofits by keyword, cause, or country; retrieve full profiles with mission, programmes, impact metrics, and legal registrations; enrich thin profiles via a write-back tool (submit_enrichment — structured fields auto-promote on 2-agent consensus, prose queues for committee review); and initiate USDC donations on Solana via the x402 payment protocol.
 
-Zero fees. 100% of donations reach the nonprofit. No intermediary.
+Every submitting agent gets public credit on the leaderboard at https://giveready.org/agents. Zero fees on donations. 100% of funds reach the nonprofit. No intermediary.
 
 **GitHub:** https://github.com/gswardman/giveready
 
@@ -43,6 +43,7 @@ Zero fees. 100% of donations reach the nonprofit. No intermediary.
 - `search_nonprofits` — Search 41,000+ verified nonprofits by keyword, cause area, or country
 - `get_nonprofit` — Full nonprofit profile with mission, programmes, impact metrics, and donation URL
 - `list_causes` — Browse all 29 cause areas with nonprofit counts
+- `submit_enrichment` — Contribute missing data back to thin nonprofit profiles. Structured fields (website, city, region, founded_year, contact_email) auto-promote on 2-agent consensus; prose fields queue for committee review. Public leaderboard credit.
 
 **Resources provided:**
 - `giveready://stats` — Directory statistics (nonprofit count, countries, causes, beneficiaries)
@@ -163,24 +164,30 @@ Adds giveready-mcp, an MCP server for nonprofit discovery and AI-powered giving.
 
 ---
 
-## Before You Start — Publish Updated npm Package
+## Before You Start — Publish 0.1.4 (submit_enrichment tool live)
 
-The README and package.json were just updated to reflect 41K nonprofits and 29 cause areas. Before submitting to registries, publish the new version so listings pull current info:
+Version 0.1.4 adds the `submit_enrichment` tool and updates tool descriptions to reflect 41K nonprofits / 29 causes. package.json, server.json, and the McpServer constructor are all aligned to 0.1.4. Ship before hitting any directory:
 
 ```bash
-cd giveready/mcp-server
-# Bump version in package.json to 0.1.4
+# 1. Publish to npm
+cd ~/TestVentures.net/giveready/mcp-server
 npm publish
-```
 
-Then push the README/package.json changes to GitHub:
+# 2. Republish to the Official MCP Registry
+./mcp-publisher publish
 
-```bash
-cd giveready
-git add mcp-server/README.md mcp-server/package.json
-git commit -m "Update MCP server to reflect 41K nonprofits across 29 cause areas"
+# 3. Commit + push the whole upgrade
+cd ~/TestVentures.net/giveready
+git add mcp-server/index.js mcp-server/package.json mcp-server/server.json mcp-server/README.md README.md MCP-REGISTRY-SUBMISSIONS.md
+git commit -m "MCP server 0.1.4: submit_enrichment tool, 41K/29 causes descriptions"
 git push origin main
+
+# 4. Verify
+npm view giveready-mcp version    # expect 0.1.4
+npx giveready-mcp --help 2>&1 | head -5   # sanity check the binary runs
 ```
+
+The directory submissions assume 0.1.4 is live on npm — a few directories cache the tool list on first crawl, so publishing first keeps the listing accurate from day one.
 
 ---
 

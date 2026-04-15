@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.gswardman/giveready",
-  "description": "Verified nonprofit directory — search charities, fundraising data, and donation links.",
+  "description": "Search 41K+ nonprofits, get impact data, submit enrichments, donate USDC via x402.",
   "repository": {
     "url": "https://github.com/gswardman/giveready",
     "source": "github"
   },
-  "version": "0.1.3",
+  "version": "0.1.4",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "giveready-mcp",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "transport": {
         "type": "stdio"
       }
