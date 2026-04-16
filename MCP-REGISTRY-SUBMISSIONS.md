@@ -1,7 +1,10 @@
 # GiveReady MCP Registry Submission Cheat Sheet
 
-**Status:** Already listed on the Official MCP Registry as `io.github.gswardman/giveready`.
-**Goal:** Get listed on 5+ directories (currently 1). Servers on 5+ directories get ~10x more installs.
+> **SUPERSEDED 2026-04-15** by the `publish-mcp-server` skill at `<vault>/.claude/skills/publish-mcp-server/SKILL.md`.
+> Kept here as the canonical manual fallback if the skill ever fails, and as historical reference for the original push. New rollouts should invoke the skill, not follow this doc.
+
+**Status (as of 2026-04-15):** 6 directories live or submitted (Official Registry, npm, mcpservers.org, Glama, PulseMCP, mcp.so). Smithery deferred — needs HTTP/remote transport.
+**Original goal:** Get listed on 5+ directories. **Hit and exceeded.**
 
 ---
 

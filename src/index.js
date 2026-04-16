@@ -855,11 +855,16 @@ Full API docs, MCP setup guides, and agent safety rules: https://docs.giveready.
 async function handleAgentsMd(db) {
   // Live bounty: top 10 verified nonprofits with an empty high-value field.
   // Agents land here, grab a task, and post to /api/enrich/{slug}.
+  //
+  // Rotation (2026-04-16): the bounty list rotates DAILY, not per-request.
+  // Same agent returning twice the same day sees the same list so the
+  // example CTA slug is stable. Next day's crawl sees a fresh rotation,
+  // so returning crawlers always have something new to work on.
   let ctaBlock = '';
   let bountyBlock = '';
   let leaderboardBlock = '';
   try {
-    const bounty = await db.prepare(
+    const candidates = await db.prepare(
       `SELECT slug, name, country,
               (CASE WHEN mission IS NULL OR mission = '' THEN 'mission' END) AS need_mission,
               (CASE WHEN description IS NULL OR description = '' THEN 'description' END) AS need_description,
@@ -869,9 +874,16 @@ async function handleAgentsMd(db) {
          AND ((mission IS NULL OR mission = '')
               OR (description IS NULL OR description = '')
               OR (website IS NULL OR website = ''))
-       ORDER BY RANDOM()
-       LIMIT 10`
+       ORDER BY slug ASC
+       LIMIT 500`
     ).all();
+    // Deterministic daily rotation: shift the window by day-of-year.
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const daySeed = today.split('-').reduce((acc, n) => acc * 31 + parseInt(n, 10), 0);
+    const pool = candidates.results || [];
+    const start = pool.length ? daySeed % pool.length : 0;
+    const rotated = pool.length ? pool.slice(start).concat(pool.slice(0, start)) : [];
+    const bounty = { results: rotated.slice(0, 10) };
     if (bounty.results && bounty.results.length) {
       // Pick the first bounty slug as the runnable example for the CTA above the fold.
       const exampleSlug = bounty.results[0].slug;
@@ -1066,9 +1078,40 @@ curl -X POST https://giveready.org/api/enrich/example-nonprofit \\
 Enrichable fields: mission, description, tagline, website, city, region,
 founded_year, contact_email, programme, impact_metric
 
-All submissions queue for human review. When 2+ agents submit similar data for
-the same field, it is flagged as high-confidence. Check the leaderboard:
-GET /api/enrichments/stats
+### Learn from what already works
+
+Before submitting, fetch exemplars. These are the actual values that have been
+auto-applied for each field. Matching their shape maximises your chance of
+reaching consensus on structured fields.
+
+\`\`\`
+# All recently applied enrichments
+curl https://giveready.org/api/agents/exemplars
+
+# Only applied websites (canonical form)
+curl https://giveready.org/api/agents/exemplars?field=website
+\`\`\`
+
+### Learn from rejections
+
+Your submission response returns \`prior_rejections\` — the last 5 rejected
+submissions for that (nonprofit, field) with the reason and the winning value.
+Read that array before retrying.
+
+### Auto-promotion rules
+
+Structured fields (\`website\`, \`city\`, \`region\`, \`founded_year\`,
+\`contact_email\`) auto-promote when two or more agents independently submit
+the same normalised value for an empty field.
+
+Prose fields (\`mission\`, \`description\`, \`tagline\`) do not auto-promote.
+They queue for committee review — no two agents write identical prose and we
+do not trust self-reported agent identity for free-text writes to the
+directory.
+
+Other metrics:
+GET /api/enrichments/stats — totals + by-status breakdown
+GET /api/agents/leaderboard — who's contributed what
 
 ## Safety Rules for Agents
 
@@ -2527,6 +2570,18 @@ const AUTO_PROMOTE_PROSE_PENDING = new Set([
   'mission', 'description', 'tagline',
 ]);
 
+// Trusted-agent prose path REMOVED 2026-04-16 after CSO audit (finding C1).
+// The previous design let whitelisted foundation model names (claude / gpt /
+// gemini / anthropic) auto-apply prose on first submission when the field was
+// empty. Because agent_name is self-reported in the request body and the
+// match used `includes` rather than `startsWith`, an unauthenticated caller
+// could impersonate a trusted model ("i-claude-poison-charities" matches
+// "claude") and mass-poison mission/description/tagline across the ~40k
+// directory at rate-limit ceiling (30 writes/min/IP, cyclable across isolates).
+// Prose fields now stay queued for the committee-vote mechanism. See
+// 01-Projects/GiveReady/CSO-Audit-2026-04-16.md for the full finding and the
+// HMAC-signed path back to a trusted-agent v2.
+
 // Light normalisation so trivial formatting differences don't block consensus.
 // For URLs we strip the trailing slash and lowercase the hostname only; the
 // path stays case-sensitive. For everything else we trim and collapse runs of
@@ -2620,11 +2675,19 @@ async function promoteIfConsensus(db, nonprofit, field) {
     ).bind(...matchingIds).run();
   }
   if (losingIds.length) {
-    const placeholders = losingIds.map((_, i) => `?${i + 1}`).join(',');
+    // Record WHY each losing submission was rejected, and the value that won.
+    // The next agent that retries this field on this nonprofit gets this
+    // back in their submission response so they can self-correct.
+    const rejectionReason = `Normalised value did not match the winning consensus for '${field}'. Winner had ${winner.agents} agreeing agents. Aim for the winning canonical form when retrying.`;
+    const placeholders = losingIds.map((_, i) => `?${i + 3}`).join(',');
     await db.prepare(
-      `UPDATE agent_enrichments SET status='rejected', reviewed_at=datetime('now')
+      `UPDATE agent_enrichments
+         SET status='rejected',
+             reviewed_at=datetime('now'),
+             rejection_reason=?1,
+             winning_value=?2
        WHERE id IN (${placeholders})`
-    ).bind(...losingIds).run();
+    ).bind(rejectionReason, winner.raw, ...losingIds).run();
   }
 
   return { promoted: true, reason: 'consensus', agents: winner.agents };
@@ -2744,6 +2807,24 @@ async function handleEnrich(db, request, slug) {
 
     const confidence = existing.count > 0 ? existing.count + 1 : 1;
 
+    // Fetch prior rejections for THIS (nonprofit, field). If any exist,
+    // surface them in the response so the agent learns why its last
+    // attempt (or a peer's) lost. This is the self-learning feedback loop.
+    const priorRejectedRows = await db.prepare(
+      `SELECT agent_name, value, rejection_reason, winning_value, reviewed_at
+         FROM agent_enrichments
+        WHERE nonprofit_id = ?1 AND field = ?2 AND status = 'rejected'
+        ORDER BY reviewed_at DESC
+        LIMIT 5`
+    ).bind(nonprofit.id, f.field).all();
+    const priorRejections = (priorRejectedRows.results || []).map((r) => ({
+      agent: r.agent_name,
+      rejected_value: r.value,
+      reason: r.rejection_reason || 'No reason recorded.',
+      winning_value: r.winning_value || null,
+      rejected_at: r.reviewed_at,
+    }));
+
     await db.prepare(
       `INSERT INTO agent_enrichments (id, nonprofit_id, nonprofit_slug, field, value, source_url, agent_id, agent_name, confidence)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
@@ -2759,29 +2840,37 @@ async function handleEnrich(db, request, slug) {
     // Close the loop: if this submission pushes a field to consensus AND
     // the nonprofit's current value is empty, promote it live right now.
     // Structured fields (website, city, founded_year, etc.) auto-promote on
-    // normalised exact match. Prose fields (mission, description, tagline)
-    // stay in review pending a committee-vote mechanism.
+    // normalised exact match.
     let promoResult = { promoted: false, reason: 'not-attempted' };
     if (confidence >= 2) {
       promoResult = await promoteIfConsensus(db, nonprofit, f.field);
     }
 
+    // Prose fields (mission, description, tagline) DO NOT auto-promote.
+    // Consensus on prose doesn't converge across models (every agent writes
+    // its own sentence) and the prior trusted-agent shortcut was removed
+    // 2026-04-16 after CSO audit — agent_name is self-reported, so any
+    // unauthenticated caller could impersonate a trusted model and poison
+    // empty fields at scale. Prose stays queued for committee review.
     const isProse = AUTO_PROMOTE_PROSE_PENDING.has(f.field);
+
+    const applied = promoResult.promoted;
     submissions.push({
       field: f.field,
       field_type: isProse ? 'prose' : (AUTO_PROMOTE_STRUCTURED.has(f.field) ? 'structured' : 'other'),
-      status: promoResult.promoted ? 'applied' : 'pending',
+      status: applied ? 'applied' : 'pending',
       confidence,
       consensus: confidence >= 2 ? 'high — multiple agents agree' : 'single agent — awaiting corroboration',
-      applied: promoResult.promoted,
+      applied,
       promotion_note: promoResult.promoted
         ? `Promoted live — ${promoResult.agents} agents agreed on the same value after normalisation.`
         : isProse
-          ? 'Prose fields do not auto-promote. Your submission is queued for committee review — agents will judge candidates in a future iteration.'
+          ? 'Prose fields do not auto-promote. Submission queued for committee review.'
           : confidence >= 2
             ? 'Consensus count reached but no two normalised values match yet.'
             : 'Awaiting a second agent to corroborate the same value.',
-      profile_url: promoResult.promoted ? `https://giveready.org/api/nonprofits/${slug}` : undefined,
+      prior_rejections: priorRejections,
+      profile_url: applied ? `https://giveready.org/api/nonprofits/${slug}` : undefined,
     });
   }
 
@@ -2956,6 +3045,132 @@ async function handleAgentLeaderboard(db) {
   });
 }
 
+// ============================================
+// SELF-LEARNING ENDPOINTS (2026-04-16)
+// exemplars / funnel / named-first-seen
+// ============================================
+
+// Known noise: automated pollers and generic libraries that hit endpoints
+// repeatedly without reading or submitting. Filter them out when asking
+// "which named agents are actually visiting?"
+const AGENT_NOISE_PREFIXES = [
+  'Bun/', 'curl/', 'wget/', 'Go-http-client', 'Python-requests',
+  'python-httpx', 'python-urllib', 'node-fetch', 'axios/', 'okhttp/',
+  'libwww-perl', 'Apache-HttpClient', 'Java/', 'Ruby', 'PostmanRuntime',
+];
+
+function isNoiseAgent(ua) {
+  if (!ua) return true;
+  return AGENT_NOISE_PREFIXES.some((p) => ua.startsWith(p));
+}
+
+// /api/agents/exemplars — returns recently applied submissions as templates.
+// Agents that read this BEFORE submitting converge on the shape that worked.
+// This is the reinforcement half of the self-learning loop.
+async function handleAgentExemplars(db, url) {
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10) || 20, 100);
+  const field = url.searchParams.get('field');
+
+  const where = field ? `WHERE status = 'applied' AND field = ?1` : `WHERE status = 'applied'`;
+  const binds = field ? [field] : [];
+
+  const rows = await db.prepare(
+    `SELECT ae.nonprofit_slug, ae.field, ae.value, ae.agent_name, ae.source_url, ae.reviewed_at
+       FROM agent_enrichments ae
+       ${where}
+       ORDER BY ae.reviewed_at DESC
+       LIMIT ${limit}`
+  ).bind(...binds).all();
+
+  return json({
+    message: 'Recent applied enrichments, exposed as templates. Match the shape of these values when submitting to POST /api/enrich/{slug} and your chance of applied status goes up.',
+    hint: 'Filter by ?field=website (or city, region, founded_year, contact_email, mission, description, tagline).',
+    count: (rows.results || []).length,
+    exemplars: rows.results,
+  });
+}
+
+// /api/agents/funnel — named crawlers that hit a discovery route but
+// did not submit an enrichment in the following window. This is the
+// read-and-leave gap the daily digest cares about. Excludes noise.
+async function handleAgentFunnel(db, url) {
+  const hours = parseInt(url.searchParams.get('hours') || '168', 10) || 168;
+  const since = `datetime('now', '-${hours} hours')`;
+
+  // All discovery hits from NOT-noise user-agents in the period.
+  const hits = await db.prepare(
+    `SELECT user_agent, route, MIN(created_at) AS first_hit, MAX(created_at) AS last_hit, COUNT(*) AS hits
+       FROM discovery_hits
+      WHERE created_at > ${since}
+        AND user_agent IS NOT NULL AND user_agent <> ''
+      GROUP BY user_agent, route
+      ORDER BY last_hit DESC`
+  ).all();
+
+  // Submissions in the same window, keyed by user_agent (agent_id is the UA).
+  const submissions = await db.prepare(
+    `SELECT agent_id, agent_name, COUNT(*) AS submitted
+       FROM agent_enrichments
+      WHERE created_at > ${since}
+      GROUP BY agent_id, agent_name`
+  ).all();
+  const submittedByAgent = new Set((submissions.results || []).map((s) => s.agent_id));
+
+  const rows = (hits.results || []).filter((h) => !isNoiseAgent(h.user_agent));
+  const readAndLeft = rows.filter((h) => !submittedByAgent.has(h.user_agent));
+  const readAndSubmitted = rows.filter((h) => submittedByAgent.has(h.user_agent));
+
+  return json({
+    message: `Named crawlers in the last ${hours}h — who read a discovery route and never submitted.`,
+    window_hours: hours,
+    read_and_left: readAndLeft,
+    read_and_submitted: readAndSubmitted,
+    noise_excluded: AGENT_NOISE_PREFIXES,
+  });
+}
+
+// /api/agents/named-first-seen — new NAMED user-agents seen in the period
+// that weren't seen before. Cuts through Bun/curl noise. This is the
+// "what actually changed today" signal.
+async function handleAgentNamedFirstSeen(db, url) {
+  const hours = parseInt(url.searchParams.get('hours') || '24', 10) || 24;
+  const since = `datetime('now', '-${hours} hours')`;
+
+  // All distinct user-agents seen in the window.
+  const recent = await db.prepare(
+    `SELECT user_agent, MIN(created_at) AS first_hit_in_window, COUNT(*) AS hits
+       FROM discovery_hits
+      WHERE created_at > ${since}
+        AND user_agent IS NOT NULL AND user_agent <> ''
+      GROUP BY user_agent`
+  ).all();
+
+  // For each, find its lifetime first_hit.
+  const out = [];
+  for (const r of (recent.results || [])) {
+    if (isNoiseAgent(r.user_agent)) continue;
+    const lifetime = await db.prepare(
+      `SELECT MIN(created_at) AS lifetime_first FROM discovery_hits WHERE user_agent = ?1`
+    ).bind(r.user_agent).first();
+    const isNew = lifetime.lifetime_first >= r.first_hit_in_window;
+    out.push({
+      user_agent: r.user_agent,
+      hits_in_window: r.hits,
+      first_seen_lifetime: lifetime.lifetime_first,
+      first_hit_in_window: r.first_hit_in_window,
+      is_new: isNew,
+    });
+  }
+  out.sort((a, b) => (b.is_new - a.is_new) || (b.hits_in_window - a.hits_in_window));
+
+  return json({
+    message: `Named agents in the last ${hours}h — Bun/curl/python pollers filtered out.`,
+    window_hours: hours,
+    agents: out,
+    first_time_named_crawlers: out.filter((a) => a.is_new),
+  });
+}
+
 function handleAgentLeaderboardHTML() {
   const html = `<!doctype html>
 <html lang="en">
@@ -3104,7 +3319,7 @@ export default {
         return handleVerifyRegistration(env.DB, env, url);
       }
 
-      if (path === '/mcp' || path === '/.well-known/ai-plugin.json' || path === '/llms.txt' || path === '/agents.md' || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/agents' || path.startsWith('/api/enrich/')) {
+      if (path === '/mcp' || path === '/.well-known/ai-plugin.json' || path === '/llms.txt' || path === '/agents.md' || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/')) {
         const ua = request.headers.get('User-Agent');
         ctx.waitUntil(logDiscoveryHit(env.DB, path, ua));
       }
@@ -3117,6 +3332,11 @@ export default {
       // Public agent leaderboard
       if (path === '/api/agents/leaderboard') return handleAgentLeaderboard(env.DB);
       if (path === '/agents') return handleAgentLeaderboardHTML();
+
+      // Self-learning endpoints (2026-04-16)
+      if (path === '/api/agents/exemplars') return handleAgentExemplars(env.DB, url);
+      if (path === '/api/agents/funnel') return handleAgentFunnel(env.DB, url);
+      if (path === '/api/agents/named-first-seen') return handleAgentNamedFirstSeen(env.DB, url);
 
       // Agent enrichment endpoints
       if (path === '/api/needs-enrichment') return handleNeedsEnrichment(env.DB, url);
