@@ -113,7 +113,7 @@ async function handleRoot() {
     mcp: {
       install: 'npx giveready-mcp',
       registry: 'io.github.gswardman/giveready',
-      tools: ['search_nonprofits', 'get_nonprofit', 'list_causes'],
+      tools: ['search_nonprofits', 'get_nonprofit', 'list_causes', 'submit_enrichment'],
     },
   });
 }
