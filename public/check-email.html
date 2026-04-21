@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Check your email — GiveReady</title>
+  <meta name="robots" content="noindex" />
+  <link rel="canonical" href="https://giveready.org/check-email" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0a; --surface: #151515; --card: #181818; --border: #2a2a2a;
+      --text: #f5f5f5; --muted: #a0a0a0; --light: #666;
+      --accent: #34d399; --accent-dim: rgba(52,211,153,0.12); --accent-border: rgba(52,211,153,0.25);
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    html.light {
+      --bg: #ffffff; --surface: #f9fafb; --card: #f9fafb; --border: #e5e5e5;
+      --text: #111111; --muted: #666666; --light: #999999;
+      --accent: #059669; --accent-dim: rgba(5,150,105,0.08); --accent-border: rgba(5,150,105,0.2);
+    }
+    body { font-family: var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; min-height: 100vh; display: flex; flex-direction: column; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    nav { height: 52px; padding: 0 20px; display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+    .brand-name { font-weight: 800; font-size: 17px; color: var(--text); letter-spacing: -0.01em; }
+    .wrap { max-width: 460px; margin: 0 auto; padding: 60px 24px 40px; flex: 1; text-align: center; }
+    .icon-circle { width: 72px; height: 72px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); border: 2px solid var(--accent-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-size: 30px; }
+    h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 14px; }
+    p { color: var(--muted); font-size: 15px; line-height: 1.6; margin-bottom: 10px; }
+    .email-shown { color: var(--text); font-weight: 700; }
+    .hint-box { margin-top: 32px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; font-size: 13px; color: var(--muted); text-align: left; }
+    .hint-box strong { color: var(--text); }
+    footer { padding: 20px; text-align: center; font-size: 11px; color: var(--light); border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" style="text-decoration: none;"><span class="brand-name">GiveReady</span></a>
+  </nav>
+  <div class="wrap">
+    <div class="icon-circle">&#9993;</div>
+    <h1>Check your email</h1>
+    <p>We sent a sign-in link to <span class="email-shown" id="emailShown">your inbox</span>.</p>
+    <p>The link is valid for <strong style="color: var(--text);">15 minutes</strong> and can only be used once.</p>
+
+    <div class="hint-box">
+      <strong>Not seeing it?</strong><br/>
+      Check your spam folder, and make sure you entered the right email address. If it still doesn't arrive, <a href="/signin">request a new link</a>.
+    </div>
+  </div>
+  <footer>
+    &copy; GiveReady &middot; <a href="/" style="color: var(--light);">Home</a>
+  </footer>
+  <script>
+    try { if (localStorage.getItem('gr-theme') === 'light') document.documentElement.classList.add('light'); } catch(e) {}
+    const params = new URLSearchParams(window.location.search);
+    const email = params.get('email');
+    if (email) document.getElementById('emailShown').textContent = email;
+  </script>
+</body>
+</html>

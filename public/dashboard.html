@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — GiveReady</title>
+  <meta name="robots" content="noindex" />
+  <link rel="canonical" href="https://giveready.org/dashboard" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0a; --surface: #151515; --surface-hover: #1c1c1c; --card: #181818;
+      --border: #2a2a2a; --border-light: #333;
+      --text: #f5f5f5; --muted: #a0a0a0; --light: #666;
+      --accent: #34d399; --accent-dim: rgba(52,211,153,0.12); --accent-border: rgba(52,211,153,0.25);
+      --warn: #f59e0b; --warn-dim: rgba(245,158,11,0.1); --warn-border: rgba(245,158,11,0.3);
+      --nav-bg: rgba(10,10,10,0.85);
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --radius: 12px; --radius-sm: 8px;
+    }
+    html.light {
+      --bg: #ffffff; --surface: #f9fafb; --surface-hover: #f3f4f6; --card: #f9fafb;
+      --border: #e5e5e5; --border-light: #d4d4d4;
+      --text: #111111; --muted: #666666; --light: #999999;
+      --accent: #059669; --accent-dim: rgba(5,150,105,0.08); --accent-border: rgba(5,150,105,0.2);
+      --warn: #b45309; --warn-dim: rgba(245,158,11,0.08); --warn-border: rgba(245,158,11,0.25);
+      --nav-bg: rgba(255,255,255,0.92);
+    }
+    body { font-family: var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; min-height: 100vh; display: flex; flex-direction: column; font-size: 15px; line-height: 1.6; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    button { font-family: inherit; cursor: pointer; border: none; background: transparent; color: inherit; }
+    input, textarea, select { font-family: inherit; font-size: 14px; color: var(--text); border: 2px solid var(--border); border-radius: var(--radius); padding: 12px 14px; width: 100%; background: var(--surface); transition: border-color 0.15s; }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 80px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+
+    /* Nav */
+    nav.topnav { background: var(--nav-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); height: 52px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 90; }
+    .nav-left { display: flex; align-items: center; gap: 10px; }
+    .nav-name { font-weight: 700; font-size: 15px; color: var(--text); letter-spacing: -0.02em; }
+    .nav-badge { font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); padding: 2px 8px; border-radius: 20px; letter-spacing: 0.03em; text-transform: uppercase; }
+    .nav-right { display: flex; align-items: center; gap: 8px; }
+    .nav-icon-btn { width: 34px; height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--muted); padding: 0; cursor: pointer; }
+    .nav-icon-btn svg { width: 16px; height: 16px; }
+    .icon-sun { display: none; }
+    html.light .icon-sun { display: block; }
+    html.light .icon-moon { display: none; }
+
+    .wrap { max-width: 480px; margin: 0 auto; padding: 28px 20px 40px; flex: 1; width: 100%; }
+
+    /* Session bar */
+    .session-bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; }
+    .session-info { display: flex; flex-direction: column; min-width: 0; }
+    .session-charity { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; }
+    .session-email { font-size: 11px; color: var(--muted); margin-top: 2px; word-break: break-all; }
+    .session-actions { display: flex; gap: 8px; flex-shrink: 0; position: relative; }
+    .session-action { font-size: 11px; color: var(--accent); font-weight: 600; padding: 4px 8px; border-radius: 12px; cursor: pointer; }
+    .session-action.muted { color: var(--muted); }
+    .session-action:hover { background: var(--accent-dim); }
+    .session-action.muted:hover { color: var(--text); background: var(--surface-hover); }
+
+    /* Switch dropdown */
+    .switch-dropdown { display: none; position: absolute; top: calc(100% + 4px); right: 0; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,0.25); min-width: 240px; z-index: 80; padding: 6px; }
+    .switch-dropdown.show { display: block; }
+    .switch-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: var(--radius-sm); cursor: pointer; text-decoration: none; color: var(--text); }
+    .switch-item:hover { background: var(--surface); text-decoration: none; }
+    .switch-item.active { background: var(--accent-dim); }
+    .switch-item-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+    .switch-item-info { flex: 1; min-width: 0; }
+    .switch-item-name { font-size: 13px; font-weight: 600; }
+    .switch-item-meta { font-size: 11px; color: var(--muted); }
+
+    /* Welcome card */
+    .welcome-card { background: linear-gradient(135deg, var(--accent-dim), rgba(52,211,153,0.04)); border: 1px solid var(--accent-border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 20px; position: relative; }
+    .welcome-card h3 { font-size: 15px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
+    .welcome-card p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+    .welcome-steps { display: flex; flex-direction: column; gap: 8px; }
+    .welcome-step { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+    .welcome-step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #0a0a0a; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    html.light .welcome-step-num { color: #fff; }
+    .welcome-dismiss { position: absolute; top: 12px; right: 12px; color: var(--muted); font-size: 18px; padding: 4px 8px; line-height: 1; cursor: pointer; }
+
+    /* Tabs */
+    .dash-tabs { display: flex; gap: 4px; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 24px; }
+    .dash-tab { flex: 1; padding: 10px 12px; background: transparent; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; color: var(--muted); text-align: center; transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
+    .dash-tab:hover { color: var(--text); }
+    .dash-tab.active { background: var(--surface-hover); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+    .dash-tab-pill { font-size: 10px; color: var(--light); font-weight: 600; }
+    .dash-tab.active .dash-tab-pill { color: var(--accent); }
+
+    /* Cards */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .card-header h3 { font-size: 14px; font-weight: 700; }
+    .card-header .hint { font-size: 11px; color: var(--light); }
+
+    /* Strength card */
+    .strength-card { background: linear-gradient(135deg, var(--accent-dim), rgba(52,211,153,0.04)); border: 1px solid var(--accent-border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 20px; }
+    .strength-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .strength-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .strength-number { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); line-height: 1; }
+    .strength-number .small { font-size: 14px; color: var(--muted); font-weight: 600; }
+    .strength-bar-wrap { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 14px; }
+    .strength-bar { height: 100%; background: var(--accent); transition: width 0.4s; }
+    .strength-gap { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .strength-gap strong { color: var(--text); }
+
+    /* Empty states */
+    .empty-state { text-align: center; padding: 24px 16px; border: 1px dashed var(--border); border-radius: var(--radius); background: var(--surface); }
+    .empty-state-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+    .empty-state-sub { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 14px; max-width: 340px; margin-left: auto; margin-right: auto; }
+    .empty-state-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; background: var(--accent); color: #0a0a0a; font-size: 13px; font-weight: 700; border-radius: 20px; text-decoration: none; border: none; cursor: pointer; }
+    html.light .empty-state-btn { color: #fff; }
+    .empty-state-btn:hover { opacity: 0.9; }
+    .empty-state-stat { font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 10px; }
+
+    /* Primary button */
+    .primary-btn { display: block; width: 100%; padding: 14px; background: var(--accent); border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700; color: #0a0a0a; text-align: center; cursor: pointer; }
+    html.light .primary-btn { color: #fff; }
+    .primary-btn:hover { opacity: 0.9; }
+
+    /* Sticky save bar */
+    .sticky-save-bar { position: sticky; bottom: 0; z-index: 20; background: var(--bg); border-top: 1px solid var(--border); padding: 12px 14px; margin: 16px -20px -40px; display: flex; align-items: center; justify-content: space-between; gap: 12px; backdrop-filter: blur(14px); }
+    .save-status { font-size: 11px; color: var(--light); }
+    .save-status.dirty { color: var(--warn); font-weight: 600; }
+    .save-status.saved { color: var(--accent); font-weight: 600; }
+    .sticky-save-bar .save-btn { padding: 10px 20px; background: var(--accent); color: #0a0a0a; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 700; cursor: pointer; }
+    html.light .sticky-save-bar .save-btn { color: #fff; }
+    .sticky-save-bar .save-btn:disabled { opacity: 0.45; cursor: default; }
+
+    /* Queries */
+    .stats-row { display: flex; gap: 8px; margin-bottom: 20px; }
+    .stat-cell { flex: 1; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); text-align: center; }
+    .stat-cell-val { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+    .stat-cell-lbl { font-size: 10px; color: var(--light); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+    .query-row { padding: 14px 0; border-bottom: 1px solid var(--border); }
+    .query-row:last-child { border-bottom: none; }
+    .query-text { font-size: 14px; color: var(--text); font-weight: 500; margin-bottom: 6px; }
+    .query-meta { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); }
+    .query-hits { color: var(--accent); font-weight: 700; background: var(--accent-dim); padding: 2px 10px; border-radius: 20px; }
+
+    /* Share tab */
+    .url-box { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    .url-box-url { flex: 1; font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .url-box-btn { padding: 8px 14px; background: var(--accent); color: #0a0a0a; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); cursor: pointer; border: none; flex-shrink: 0; }
+    html.light .url-box-btn { color: #fff; }
+    .code-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 12px; color: var(--text); line-height: 1.6; overflow-x: auto; position: relative; }
+    html.light .code-block { background: #1c1c1c; color: #f5f5f5; border-color: #2a2a2a; }
+    .code-copy { position: absolute; top: 10px; right: 10px; padding: 5px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--muted); cursor: pointer; }
+    html.light .code-copy { background: #2a2a2a; color: #a0a0a0; border-color: #333; }
+    .code-token-tag { color: #34d399; }
+    .code-token-attr { color: #fbbf24; }
+    .code-token-str { color: #f87171; }
+    .qr-preview { display: flex; align-items: center; gap: 14px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    .qr-box { width: 96px; height: 96px; background: #fff; border-radius: 8px; padding: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .qr-box img { width: 100%; height: 100%; }
+    .qr-side { flex: 1; min-width: 0; }
+    .qr-side-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .qr-side-sub { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; }
+    .qr-side-btn { font-size: 11px; font-weight: 600; color: var(--accent); padding: 4px 10px; border: 1px solid var(--accent-border); border-radius: 20px; background: transparent; cursor: pointer; }
+    .share-btn { display: inline-flex; align-items: center; gap: 6px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; text-decoration: none; }
+    .share-btn svg { width: 14px; height: 14px; }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 100px); background: var(--text); color: var(--bg); padding: 12px 20px; border-radius: 40px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); z-index: 150; opacity: 0; transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s; }
+    .toast.show { transform: translate(-50%, 0); opacity: 1; }
+    .toast svg { width: 14px; height: 14px; color: var(--accent); }
+    .toast.error { background: #dc2626; color: #fff; }
+    .toast.error svg { color: #fff; }
+
+    /* Demo banner */
+    .demo-banner { background: var(--warn-dim); border: 1px solid var(--warn-border); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+    .demo-banner-badge { font-size: 11px; font-weight: 700; color: var(--warn); text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 8px; background: var(--warn-dim); border: 1px solid var(--warn-border); border-radius: 20px; }
+    .demo-banner-text { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    /* Hidden */
+    .hidden { display: none !important; }
+
+    /* Loading */
+    .loading-screen { text-align: center; padding: 80px 24px; color: var(--muted); font-size: 14px; }
+
+    @media (max-width: 480px) { .wrap { padding: 20px 16px 32px; } .dash-tabs { flex-wrap: wrap; } nav.topnav { padding: 0 16px; } }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <div class="nav-left">
+      <a href="/" style="text-decoration: none;"><span class="nav-name">GiveReady</span></a>
+      <span class="nav-badge">dashboard</span>
+    </div>
+    <div class="nav-right">
+      <button class="nav-icon-btn" onclick="toggleTheme()" aria-label="Toggle light/dark mode">
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Loading state until /api/charity/me resolves -->
+  <div id="loadingView" class="wrap">
+    <div class="loading-screen">Loading your dashboard...</div>
+  </div>
+
+  <!-- Authenticated dashboard -->
+  <div id="dashView" class="wrap hidden">
+    <div class="session-bar">
+      <div class="session-info">
+        <div class="session-charity" id="sessCharity">...</div>
+        <div class="session-email" id="sessEmail">...</div>
+      </div>
+      <div class="session-actions">
+        <a href="#" class="session-action" id="sessSwitch" onclick="toggleSwitchDropdown(event)" style="display: none;">Switch &#9662;</a>
+        <div id="switchDropdown" class="switch-dropdown" role="menu"></div>
+        <a href="/help" class="session-action muted">Help</a>
+        <a href="#" class="session-action muted" onclick="signOut(event)">Sign out</a>
+      </div>
+    </div>
+
+    <!-- First-visit welcome card (hidden by default, shown if profile looks fresh) -->
+    <div id="welcomeCard" class="welcome-card hidden">
+      <button class="welcome-dismiss" onclick="dismissWelcome()" aria-label="Dismiss">&times;</button>
+      <h3 id="welcomeTitle">Welcome to GiveReady</h3>
+      <p>You're verified. Here are three quick wins to get your profile matching more donors.</p>
+      <div class="welcome-steps">
+        <div class="welcome-step"><span class="welcome-step-num">1</span><span>Sharpen your description</span></div>
+        <div class="welcome-step"><span class="welcome-step-num">2</span><span>Fill in year founded and beneficiaries</span></div>
+        <div class="welcome-step"><span class="welcome-step-num">3</span><span><a href="#" onclick="switchTab('share'); dismissWelcome(); return false;">Share your donation page</a></span></div>
+      </div>
+    </div>
+
+    <div class="dash-tabs">
+      <button class="dash-tab active" data-tab="profile" onclick="switchTab('profile')"><span>Profile</span></button>
+      <button class="dash-tab" data-tab="queries" onclick="switchTab('queries')"><span>Searches</span></button>
+      <button class="dash-tab" data-tab="donations" onclick="switchTab('donations')"><span>Donations</span><span class="dash-tab-pill">Soon</span></button>
+      <button class="dash-tab" data-tab="share" onclick="switchTab('share')"><span>Share</span></button>
+    </div>
+
+    <!-- PROFILE -->
+    <div id="tab-profile" class="dash-tab-content">
+      <h1 style="font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px;">Profile</h1>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 18px;">How AI sees your charity. More detail = better matches.</p>
+
+      <div class="strength-card">
+        <div class="strength-top">
+          <div>
+            <div class="strength-label">Profile completeness</div>
+            <div class="strength-number"><span id="strengthScore">0</span><span class="small">/100</span></div>
+          </div>
+        </div>
+        <div class="strength-bar-wrap"><div class="strength-bar" id="strengthBar" style="width: 0%;"></div></div>
+        <div class="strength-gap" id="strengthGap">Loading...</div>
+        <div class="strength-gap" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--accent-border);">
+          <strong>Hypothesis we're testing:</strong> charities with richer profiles match more donor intents. Live results appear in your Searches tab as data accrues.
+        </div>
+      </div>
+
+      <form id="profileForm" onsubmit="event.preventDefault(); saveProfile();">
+        <div class="card">
+          <div class="card-header"><h3>The basics</h3><span class="hint">Visible to agents &amp; donors</span></div>
+          <div style="margin-bottom: 14px;"><label>Charity name</label><input type="text" name="name" /></div>
+          <div style="margin-bottom: 14px;"><label>One-line tagline</label><input type="text" name="tagline" /></div>
+          <div style="margin-bottom: 14px;"><label>Mission</label><textarea name="mission"></textarea></div>
+          <div><label>Full description</label><textarea name="description" style="min-height: 120px;"></textarea></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h3>Details</h3></div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div><label>City / region</label><input type="text" name="city" /></div>
+            <div><label>Year founded</label><input type="number" name="founded_year" /></div>
+            <div><label>Country</label><input type="text" name="country" /></div>
+            <div><label>Beneficiaries / year</label><input type="number" name="beneficiaries_per_year" /></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h3>Contact</h3></div>
+          <div style="margin-bottom: 14px;"><label>Website</label><input type="text" name="website" /></div>
+          <div><label>Contact email</label><input type="email" name="contact_email" /></div>
+        </div>
+
+        <div class="sticky-save-bar">
+          <span id="saveStatus" class="save-status">Not yet saved</span>
+          <button type="submit" class="save-btn" id="profileSaveBtn">Save changes</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- QUERIES -->
+    <div id="tab-queries" class="dash-tab-content hidden">
+      <h1 style="font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px;">Who searched for you</h1>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 14px;">What donors asked AI assistants in the last 30 days.</p>
+
+      <div id="queriesLoading" class="loading-screen" style="padding: 40px 24px;">Loading searches...</div>
+
+      <div id="queriesEmpty" class="hidden">
+        <div class="card" style="text-align: center; padding: 32px 20px;">
+          <div style="font-size: 32px; margin-bottom: 10px;">&#128269;</div>
+          <h3 style="font-size: 16px; font-weight: 800; margin-bottom: 8px;">No searches yet</h3>
+          <p style="color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 16px;">AI agents typically take 1-2 weeks to index a new profile. Strengthen your description now so you're ready when they arrive.</p>
+          <p style="font-size: 11px; color: var(--light);">Your first matches will appear here within days of going live.</p>
+        </div>
+      </div>
+
+      <div id="queriesPopulated" class="hidden">
+        <div class="demo-banner">
+          <span class="demo-banner-badge">Demo data</span>
+          <span class="demo-banner-text">Live attribution begins Month 1 of the Gates pilot. Numbers below are illustrative.</span>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Top queries</h3><span class="hint">Anonymised</span></div>
+          <div id="queriesList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DONATIONS -->
+    <div id="tab-donations" class="dash-tab-content hidden">
+      <h1 style="font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px;">Donations</h1>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 18px;">AI-initiated gifts to your charity.</p>
+      <div class="card" style="background: var(--warn-dim); border-color: var(--warn-border);">
+        <div style="font-size: 12px; font-weight: 700; color: var(--warn); margin-bottom: 4px;">Coming Month 1-3 of the Gates grant</div>
+        <p style="font-size: 12px; color: var(--muted); line-height: 1.6;">Each donation will show the referring query, the AI assistant that matched it, payment path (Stripe or USDC), on-chain hash, and Gift Aid eligibility.</p>
+      </div>
+    </div>
+
+    <!-- SHARE -->
+    <div id="tab-share" class="dash-tab-content hidden">
+      <h1 style="font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px;">Share &amp; embed</h1>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Your donate page, widget, and QR code. Funds go straight to you.</p>
+
+      <div class="card">
+        <div class="card-header"><h3>Your donation page</h3><span class="hint">100% reaches you</span></div>
+        <label>Page URL</label>
+        <div class="url-box" style="margin-bottom: 14px;">
+          <span class="url-box-url" id="shareUrl">giveready.org/donate/...</span>
+          <button class="url-box-btn" onclick="copyShareUrl(this)">Copy</button>
+        </div>
+        <div class="qr-preview">
+          <div class="qr-box"><img id="qrImg" alt="QR code" /></div>
+          <div class="qr-side">
+            <div class="qr-side-title">QR code</div>
+            <div class="qr-side-sub">Use on posters, Instagram stories, event signs, packaging.</div>
+            <a id="qrDownload" class="qr-side-btn" href="#" download="donation-qr.png">Download PNG</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>Embed on your website</h3><span class="hint">One script tag</span></div>
+        <label>Paste this one line into your site's HTML</label>
+        <div class="code-block" id="embedCode">
+          <button class="code-copy" onclick="copyEmbed(this)">Copy</button>
+          <span id="embedSnippet">&lt;script src="https://giveready.org/widget.js" data-slug="..."&gt;&lt;/script&gt;</span>
+        </div>
+        <p style="font-size: 11px; color: var(--light); margin-top: 12px; line-height: 1.5;">Works on WordPress, Squarespace, Wix, Webflow, plain HTML. Matches your site's dark or light mode automatically.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toasts -->
+  <div id="saveToast" class="toast" role="status" aria-live="polite">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    <span>Saved.</span>
+  </div>
+  <div id="errorToast" class="toast error" role="alert" aria-live="assertive">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span id="errorToastText">Something went wrong.</span>
+  </div>
+
+  <script>
+    // ---- Theme ----
+    try { if (localStorage.getItem('gr-theme') === 'light') document.documentElement.classList.add('light'); } catch(e) {}
+    function toggleTheme() {
+      document.documentElement.classList.toggle('light');
+      try { localStorage.setItem('gr-theme', document.documentElement.classList.contains('light') ? 'light' : 'dark'); } catch(e) {}
+    }
+
+    // ---- State ----
+    let me = null;          // { email, charities[], active_charity }
+    let profile = null;     // full nonprofit record
+    let profileDirty = false;
+
+    // ---- API ----
+    async function api(path, opts) {
+      const resp = await fetch(path, { credentials: 'same-origin', ...opts });
+      if (resp.status === 401) { window.location.href = '/signin?next=' + encodeURIComponent('/dashboard'); return null; }
+      return resp;
+    }
+
+    async function loadMe() {
+      const resp = await api('/api/charity/me');
+      if (!resp || !resp.ok) return null;
+      return await resp.json();
+    }
+    async function loadProfile() {
+      const resp = await api('/api/charity/profile');
+      if (!resp || !resp.ok) return null;
+      return await resp.json();
+    }
+    async function loadQueries() {
+      const resp = await api('/api/charity/queries?days=30');
+      if (!resp || !resp.ok) return null;
+      return await resp.json();
+    }
+
+    // ---- Render ----
+    function renderSession() {
+      document.getElementById('sessCharity').textContent = me.active_charity?.name || 'Your charity';
+      document.getElementById('sessEmail').textContent = me.email || '';
+      const switchLink = document.getElementById('sessSwitch');
+      if (me.charities && me.charities.length > 1) {
+        switchLink.style.display = '';
+        renderSwitchDropdown();
+      }
+    }
+
+    function renderSwitchDropdown() {
+      const dd = document.getElementById('switchDropdown');
+      dd.innerHTML = '';
+      me.charities.forEach(c => {
+        const a = document.createElement('a');
+        a.href = '#';
+        a.className = 'switch-item' + (c.nonprofit_id === me.active_charity?.id ? ' active' : '');
+        a.setAttribute('role', 'menuitem');
+        a.onclick = (e) => { e.preventDefault(); switchCharity(c.nonprofit_id); };
+        a.innerHTML = '<div class="switch-item-avatar">' + initials(c.name) + '</div>' +
+                      '<div class="switch-item-info"><div class="switch-item-name">' + esc(c.name) + '</div></div>';
+        dd.appendChild(a);
+      });
+    }
+
+    function initials(name) {
+      if (!name) return '?';
+      const parts = name.split(/\s+/);
+      if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+      return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+    }
+    function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+    function renderProfile() {
+      if (!profile) return;
+      const form = document.getElementById('profileForm');
+      const fields = ['name', 'tagline', 'mission', 'description', 'city', 'founded_year', 'country', 'beneficiaries_per_year', 'website', 'contact_email'];
+      fields.forEach(f => {
+        const el = form.querySelector('[name="' + f + '"]');
+        if (el) el.value = profile[f] || '';
+      });
+      renderStrength();
+      renderShareTab();
+      maybeShowWelcome();
+    }
+
+    function renderStrength() {
+      // Rubric (matches mockup):
+      // Name + tagline + mission + description: 30
+      // Country + city + founded + beneficiaries/year: 20
+      // Website + contact_email: 10
+      // Logo: 5
+      // Programmes: 20 (deferred, Month 1-3)
+      // Impact metrics: 10 (deferred, Month 1-3)
+      // Causes/tags: 5 (deferred, Month 1-3)
+      let score = 0;
+      const gaps = [];
+
+      let basics = 0;
+      ['name', 'tagline', 'mission', 'description'].forEach(f => { if ((profile[f] || '').trim().length > 0) basics += 7.5; });
+      score += Math.round(basics);
+      if (basics < 30) gaps.push(`<strong>Complete the basics</strong> (+${30 - Math.round(basics)})`);
+
+      let details = 0;
+      ['country', 'city', 'founded_year', 'beneficiaries_per_year'].forEach(f => { if (profile[f]) details += 5; });
+      score += details;
+      if (details < 20) gaps.push(`<strong>Details</strong> (+${20 - details})`);
+
+      let contact = 0;
+      ['website', 'contact_email'].forEach(f => { if ((profile[f] || '').trim().length > 0) contact += 5; });
+      score += contact;
+      if (contact < 10) gaps.push(`<strong>Contact info</strong> (+${10 - contact})`);
+
+      if (profile.logo_url) score += 5;
+      else gaps.push('<strong>Logo</strong> (+5)');
+
+      // Unshipped fields (always missing in MVP):
+      gaps.push('<strong>Programmes</strong> (+20, ships Month 1-3)');
+      gaps.push('<strong>Impact metrics</strong> (+10, ships Month 1-3)');
+      gaps.push('<strong>Causes/tags</strong> (+5, ships Month 1-3)');
+
+      document.getElementById('strengthScore').textContent = score;
+      document.getElementById('strengthBar').style.width = score + '%';
+      document.getElementById('strengthGap').innerHTML = gaps.length ? 'Missing: ' + gaps.join(', ') + '.' : 'Your profile is complete.';
+    }
+
+    function renderShareTab() {
+      if (!profile?.slug) return;
+      const url = 'giveready.org/donate/' + profile.slug;
+      document.getElementById('shareUrl').textContent = url;
+      const fullUrl = 'https://' + url;
+      const qrImg = document.getElementById('qrImg');
+      qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=' + encodeURIComponent(fullUrl);
+      qrImg.alt = 'QR code for ' + url;
+      document.getElementById('qrDownload').href = 'https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=' + encodeURIComponent(fullUrl);
+      document.getElementById('embedSnippet').innerHTML =
+        '<span class="code-token-str">&lt;</span><span class="code-token-tag">script</span> <span class="code-token-attr">src</span>=<span class="code-token-str">"https://giveready.org/widget.js"</span> <span class="code-token-attr">data-slug</span>=<span class="code-token-str">"' + esc(profile.slug) + '"</span><span class="code-token-str">&gt;</span>&lt;/<span class="code-token-tag">script</span>&gt;';
+    }
+
+    function renderQueries(data) {
+      document.getElementById('queriesLoading').classList.add('hidden');
+      if (!data || !data.queries || data.queries.length === 0) {
+        document.getElementById('queriesEmpty').classList.remove('hidden');
+        return;
+      }
+      document.getElementById('queriesPopulated').classList.remove('hidden');
+      const list = document.getElementById('queriesList');
+      list.innerHTML = data.queries.map(q =>
+        '<div class="query-row">' +
+          '<div class="query-text">&ldquo;' + esc(q.query_text) + '&rdquo;</div>' +
+          '<div class="query-meta"><span>' + (q.hits === 1 ? '1 search' : q.hits + ' searches') + '</span><span class="query-hits">' + q.hits + '</span></div>' +
+        '</div>'
+      ).join('');
+    }
+
+    function maybeShowWelcome() {
+      // Show welcome card if profile looks fresh (no description or no mission)
+      const fresh = !(profile.description && profile.description.length > 80) || !profile.mission;
+      try { if (localStorage.getItem('gr-welcome-dismissed') === '1') return; } catch(e) {}
+      if (fresh) {
+        document.getElementById('welcomeCard').classList.remove('hidden');
+        document.getElementById('welcomeTitle').textContent = 'Welcome, ' + (me.active_charity?.name || 'your charity');
+      }
+    }
+
+    function dismissWelcome() {
+      document.getElementById('welcomeCard').classList.add('hidden');
+      try { localStorage.setItem('gr-welcome-dismissed', '1'); } catch(e) {}
+    }
+
+    // ---- Tabs ----
+    function switchTab(tab) {
+      ['profile', 'queries', 'donations', 'share'].forEach(t => {
+        document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+        document.querySelector('.dash-tab[data-tab="' + t + '"]').classList.toggle('active', t === tab);
+      });
+      if (tab === 'queries' && !document.getElementById('queriesLoading').classList.contains('hidden')) {
+        loadQueries().then(renderQueries).catch(() => {
+          document.getElementById('queriesLoading').classList.add('hidden');
+          document.getElementById('queriesEmpty').classList.remove('hidden');
+        });
+      }
+    }
+
+    // ---- Save ----
+    function markDirty() {
+      profileDirty = true;
+      const s = document.getElementById('saveStatus');
+      s.textContent = 'Unsaved changes';
+      s.className = 'save-status dirty';
+    }
+
+    async function saveProfile() {
+      const form = document.getElementById('profileForm');
+      const data = {};
+      ['name', 'tagline', 'mission', 'description', 'city', 'country', 'website', 'contact_email'].forEach(f => {
+        const el = form.querySelector('[name="' + f + '"]');
+        if (el) data[f] = el.value;
+      });
+      ['founded_year', 'beneficiaries_per_year'].forEach(f => {
+        const el = form.querySelector('[name="' + f + '"]');
+        if (el && el.value) data[f] = parseInt(el.value, 10);
+      });
+
+      const btn = document.getElementById('profileSaveBtn');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try {
+        const resp = await api('/api/charity/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (!resp || !resp.ok) { showErrorToast('Save failed. Try again.'); return; }
+        const result = await resp.json();
+        profile = { ...profile, ...data };
+        showSaveToast(result.changes === 0 ? 'No changes.' : 'Saved.');
+        profileDirty = false;
+        const s = document.getElementById('saveStatus');
+        s.textContent = 'Saved just now'; s.className = 'save-status saved';
+        setTimeout(() => { if (!profileDirty) { s.textContent = 'Last saved just now'; s.className = 'save-status'; } }, 3000);
+        renderStrength();
+      } catch (e) {
+        showErrorToast('Network error. Try again.');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Save changes';
+      }
+    }
+
+    // ---- Switch charity ----
+    async function switchCharity(nonprofit_id) {
+      document.getElementById('switchDropdown').classList.remove('show');
+      const resp = await api('/api/charity/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nonprofit_id }),
+      });
+      if (!resp || !resp.ok) { showErrorToast('Could not switch charity.'); return; }
+      // Reload everything
+      window.location.reload();
+    }
+
+    function toggleSwitchDropdown(e) {
+      e.preventDefault();
+      document.getElementById('switchDropdown').classList.toggle('show');
+    }
+
+    document.addEventListener('click', (e) => {
+      const dd = document.getElementById('switchDropdown');
+      if (dd.classList.contains('show') && !e.target.closest('.session-actions')) dd.classList.remove('show');
+    });
+
+    // ---- Sign out ----
+    async function signOut(e) {
+      e.preventDefault();
+      try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch(e) {}
+      window.location.href = '/';
+    }
+
+    // ---- Copy helpers ----
+    function copyShareUrl(btn) {
+      const text = document.getElementById('shareUrl').textContent.trim();
+      navigator.clipboard.writeText('https://' + text).then(() => flash(btn));
+    }
+    function copyEmbed(btn) {
+      const slug = profile?.slug || '';
+      const snippet = '<script src="https://giveready.org/widget.js" data-slug="' + slug + '"><' + '/script>';
+      navigator.clipboard.writeText(snippet).then(() => flash(btn));
+    }
+    function flash(btn) {
+      const original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = original; }, 1800);
+    }
+
+    // ---- Toasts ----
+    function showSaveToast(msg) {
+      const t = document.getElementById('saveToast');
+      t.querySelector('span').textContent = msg || 'Saved.';
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+    function showErrorToast(msg) {
+      const t = document.getElementById('errorToast');
+      document.getElementById('errorToastText').textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3200);
+    }
+
+    // ---- Dirty tracking ----
+    document.addEventListener('input', (e) => {
+      if (e.target && e.target.closest && e.target.closest('#tab-profile')) markDirty();
+    });
+
+    // ---- Boot ----
+    (async () => {
+      me = await loadMe();
+      if (!me) return; // already redirected to /signin
+      profile = await loadProfile();
+      if (!profile) { showErrorToast('Could not load your profile.'); return; }
+      document.getElementById('loadingView').classList.add('hidden');
+      document.getElementById('dashView').classList.remove('hidden');
+      renderSession();
+      renderProfile();
+    })();
+  </script>
+</body>
+</html>

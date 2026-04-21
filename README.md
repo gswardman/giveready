@@ -121,13 +121,11 @@ The nonprofit is now discoverable by every AI agent on the internet, payable via
 
 ## The Consortium
 
-Built with three pilot nonprofits:
+Grant lead: TestVentures.net. Platform operator: Clean Tactile Ventures UK Ltd. Pilot nonprofits for the 2026 Gates application:
 
-**Bridges for Music** — UK/US/SA. 250+ students/year in Langa township, Cape Town. Music, entrepreneurship, mindfulness.
+**City Kids Surfing** — UK youth surf charity. Named design partner. Receives lifetime free access to the GiveReady donation platform (fiat via Stripe Connect and USDC via x402). Live pilot for real donation flow.
 
-**The Wave Project** — UK surf therapy. 32 locations, 5,000+ young people served. First charity to offer surfing on prescription.
-
-**Finn Wardman World Explorer Fund** — Youth adventure grants. Bermuda-based endowment. [finnwardman.com](https://finnwardman.com)
+**Finn Wardman World Explorer Fund** — Youth adventure grants. Bermuda-based endowment. Internal pilot (eat-your-own-cooking). [finnwardman.com](https://finnwardman.com)
 
 ## About
 

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claim your charity — GiveReady</title>
+  <meta name="description" content="Claim your charity's free GiveReady page. Zero fees, discoverable by AI assistants, in 3 minutes." />
+  <link rel="canonical" href="https://giveready.org/claim" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0a; --surface: #151515; --surface-hover: #1c1c1c; --card: #181818;
+      --border: #2a2a2a; --border-light: #333;
+      --text: #f5f5f5; --muted: #a0a0a0; --light: #666;
+      --accent: #34d399; --accent-dim: rgba(52,211,153,0.12); --accent-border: rgba(52,211,153,0.25);
+      --warn: #f59e0b; --warn-dim: rgba(245,158,11,0.1); --warn-border: rgba(245,158,11,0.3);
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    html.light {
+      --bg: #ffffff; --surface: #f9fafb; --surface-hover: #f3f4f6; --card: #f9fafb;
+      --border: #e5e5e5; --border-light: #d4d4d4;
+      --text: #111111; --muted: #666666; --light: #999999;
+      --accent: #059669; --accent-dim: rgba(5,150,105,0.08); --accent-border: rgba(5,150,105,0.2);
+      --warn: #b45309; --warn-dim: rgba(245,158,11,0.08); --warn-border: rgba(245,158,11,0.25);
+    }
+    body { font-family: var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; min-height: 100vh; display: flex; flex-direction: column; font-size: 15px; line-height: 1.6; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    button { font-family: inherit; cursor: pointer; border: none; background: transparent; color: inherit; }
+    input, textarea, select { font-family: inherit; font-size: 14px; color: var(--text); border: 2px solid var(--border); border-radius: 12px; padding: 12px 14px; width: 100%; background: var(--surface); }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 80px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+
+    nav { height: 52px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+    .nav-name { font-weight: 700; font-size: 15px; }
+    .nav-badge { font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); padding: 2px 8px; border-radius: 20px; text-transform: uppercase; }
+    .nav-icon-btn { width: 34px; height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--muted); padding: 0; cursor: pointer; }
+    .nav-icon-btn svg { width: 16px; height: 16px; }
+    .icon-sun { display: none; }
+    html.light .icon-sun { display: block; }
+    html.light .icon-moon { display: none; }
+
+    .wrap { max-width: 480px; margin: 0 auto; padding: 28px 20px 40px; flex: 1; width: 100%; }
+
+    .np-header { text-align: center; margin-bottom: 28px; }
+    .np-avatar { width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-dim), var(--surface)); border: 2px solid var(--accent-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 22px; font-weight: 800; color: var(--accent); letter-spacing: -0.02em; }
+    .np-name { font-size: clamp(20px, 5vw, 26px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; margin-bottom: 8px; }
+    .np-mission { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+
+    .trust-strip { display: flex; justify-content: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .trust-item { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; color: var(--muted); }
+    .trust-item svg { width: 14px; height: 14px; color: var(--accent); }
+
+    .section-label { font-size: 12px; font-weight: 600; color: var(--light); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: block; }
+
+    .search-input-wrap { position: relative; margin-bottom: 12px; }
+    .search-input-wrap svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); width: 16px; height: 16px; }
+    .search-input-wrap input { padding-left: 42px; }
+
+    .search-result { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; }
+    .search-result:hover { border-color: var(--accent); background: var(--surface-hover); }
+    .search-result-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+    .search-result-info { flex: 1; min-width: 0; }
+    .search-result-name { font-size: 13px; font-weight: 700; }
+    .search-result-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .search-result-arrow { color: var(--accent); font-size: 18px; }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+
+    .primary-btn { display: block; width: 100%; padding: 14px; background: var(--accent); border: none; border-radius: 12px; font-size: 15px; font-weight: 700; color: #0a0a0a; text-align: center; cursor: pointer; }
+    html.light .primary-btn { color: #fff; }
+    .primary-btn:hover { opacity: 0.92; }
+    .primary-btn:disabled { opacity: 0.5; cursor: default; }
+    .ghost-btn { background: transparent; color: var(--muted); font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; }
+
+    .back-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); margin-bottom: 16px; padding: 4px 0; cursor: pointer; }
+    .back-link:hover { color: var(--text); text-decoration: none; }
+
+    .progress { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 24px; }
+    .progress-bar { height: 100%; background: var(--accent); transition: width 0.3s; }
+
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+
+    .verify-banner-good { display: flex; align-items: center; gap: 10px; background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+    .verify-dot-good { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #0a0a0a; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+    html.light .verify-dot-good { color: #fff; }
+    .verify-banner-warn { display: flex; align-items: center; gap: 10px; background: var(--warn-dim); border: 1px solid var(--warn-border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+    .verify-dot-warn { width: 24px; height: 24px; border-radius: 50%; background: var(--warn); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+    .verify-text { font-size: 12px; color: var(--text); line-height: 1.5; }
+    .verify-text strong { color: var(--accent); font-weight: 700; display: block; margin-bottom: 2px; }
+    .verify-text.warn strong { color: var(--warn); }
+
+    .status-screen { text-align: center; padding: 20px 0; }
+    .status-icon { width: 64px; height: 64px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); border: 2px solid var(--accent-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 28px; font-weight: 700; }
+    .status-icon.warn { background: var(--warn-dim); color: var(--warn); border-color: var(--warn-border); }
+    .status-screen h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 12px; }
+    .status-screen p { color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 8px; }
+
+    .login-strip { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); }
+    .login-strip a { font-weight: 600; color: var(--accent); }
+
+    .hidden { display: none !important; }
+
+    .error-box { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; display: none; }
+    html.light .error-box { color: #b91c1c; }
+    .error-box.show { display: block; }
+
+    footer { padding: 24px 20px; text-align: center; font-size: 11px; color: var(--light); border-top: 1px solid var(--border); }
+
+    @media (max-width: 480px) { .wrap { padding: 20px 16px 32px; } }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" style="text-decoration: none; display: flex; align-items: center; gap: 10px;">
+      <span class="nav-name">GiveReady</span>
+      <span class="nav-badge">claim</span>
+    </a>
+    <button class="nav-icon-btn" onclick="toggleTheme()" aria-label="Toggle light/dark mode">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/></svg>
+    </button>
+  </nav>
+
+  <!-- ===== STEP 0: landing / search ===== -->
+  <div id="view-landing" class="wrap">
+    <div class="np-header">
+      <div class="np-avatar">&#9734;</div>
+      <h1 class="np-name">Claim your charity's free page</h1>
+      <p class="np-mission">A zero-fee donation page, discoverable by AI assistants. Takes about 3 minutes. No platform fees, ever.</p>
+    </div>
+    <div class="trust-strip">
+      <div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Free forever</div>
+      <div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> No platform fees</div>
+      <div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Discoverable by AI</div>
+    </div>
+    <label class="section-label">Find your charity</label>
+    <div class="search-input-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="searchInput" placeholder="Name or Charity Commission number" autocomplete="off" />
+    </div>
+    <p style="font-size: 12px; color: var(--muted); margin-bottom: 20px;">We've pre-loaded 41,000+ UK and US registered charities. Most likely yours is already listed.</p>
+    <div id="searchResults"></div>
+    <div id="searchStatus" style="font-size: 12px; color: var(--light); text-align: center; padding: 12px;"></div>
+    <div class="card" style="margin-top: 20px;">
+      <h3 style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">What you'll get</h3>
+      <ul style="list-style: none; padding: 0; font-size: 13px; color: var(--muted); line-height: 1.9;">
+        <li>&check; A shareable donation page at <code style="color: var(--accent); font-size: 12px;">giveready.org/donate/your-charity</code></li>
+        <li>&check; 100% of donations reach your bank account &mdash; zero platform fees</li>
+        <li>&check; Discovery by Claude, ChatGPT, and Gemini for "find me a charity" searches</li>
+        <li>&check; A dashboard to edit your profile and see who's searched for you</li>
+        <li>&check; UK Gift Aid capture built in</li>
+      </ul>
+    </div>
+    <div class="login-strip">
+      <span>Already claimed?</span>
+      <a href="/signin">Sign in to manage &rarr;</a>
+    </div>
+  </div>
+
+  <!-- ===== STEP 1: your details ===== -->
+  <div id="view-step1" class="wrap hidden">
+    <a class="back-link" onclick="showView('landing')">&larr; Search again</a>
+    <div class="row" style="margin-bottom: 16px;">
+      <div>
+        <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;">Claiming</div>
+        <div style="font-size: 15px; font-weight: 700; margin-top: 2px;" id="claimCharityName">...</div>
+      </div>
+      <div style="font-size: 11px; color: var(--muted);">Step 1 of 2</div>
+    </div>
+    <div class="progress"><div class="progress-bar" style="width: 50%;"></div></div>
+    <h1 style="font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px;">Tell us who you are</h1>
+    <p style="color: var(--muted); font-size: 13px; margin-bottom: 24px;">So we can verify you're authorised to manage this charity's page. We'll email you a sign-in link once approved.</p>
+    <form onsubmit="event.preventDefault(); showView('step2');">
+      <div style="margin-bottom: 16px;">
+        <label>Your email</label>
+        <input type="email" id="claimEmail" required oninput="checkDomainMatch()" />
+        <p style="font-size: 11px; color: var(--light); margin-top: 6px;">Using your charity email (like joe@yourcharity.org) is fastest &mdash; we can verify you instantly. Personal email addresses work too, but take up to 48 hours for us to check manually.</p>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label>Your full name</label>
+        <input type="text" id="claimName" />
+      </div>
+      <div style="margin-bottom: 20px;">
+        <label>Your role</label>
+        <select id="claimRole">
+          <option>Trustee</option>
+          <option>CEO / Director</option>
+          <option>Administrator</option>
+          <option>Fundraiser</option>
+          <option>Staff member</option>
+          <option>Authorised volunteer</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <button type="submit" class="primary-btn">Continue &rarr;</button>
+    </form>
+    <div class="login-strip">
+      <span>Already have access?</span>
+      <a href="/signin">Sign in instead &rarr;</a>
+    </div>
+  </div>
+
+  <!-- ===== STEP 2: verify ===== -->
+  <div id="view-step2" class="wrap hidden">
+    <a class="back-link" onclick="showView('step1')">&larr; Back</a>
+    <div class="row" style="margin-bottom: 16px;">
+      <div>
+        <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;">Claiming</div>
+        <div style="font-size: 15px; font-weight: 700; margin-top: 2px;" id="claimCharityName2">...</div>
+      </div>
+      <div style="font-size: 11px; color: var(--muted);">Step 2 of 2</div>
+    </div>
+    <div class="progress"><div class="progress-bar" style="width: 100%;"></div></div>
+    <h1 style="font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px;">Verify you represent this charity</h1>
+    <p style="color: var(--muted); font-size: 13px; margin-bottom: 24px;">We cross-check your details before activating your page.</p>
+    <div id="errorBox" class="error-box" role="alert"></div>
+    <form onsubmit="event.preventDefault(); submitClaim();">
+      <div style="margin-bottom: 16px;">
+        <label>Charity registration number (UK: Charity Commission, US: EIN)</label>
+        <input type="text" id="claimRegNum" placeholder="e.g. 1182899 or 84-4729011" />
+      </div>
+      <div style="margin-bottom: 20px;">
+        <label>How do you represent this charity?</label>
+        <textarea id="claimMessage" placeholder="e.g. Trustee since 2018. Listed on the Charity Commission register."></textarea>
+      </div>
+      <div id="bannerDomainMatch" class="verify-banner-good hidden">
+        <div class="verify-dot-good">&check;</div>
+        <div class="verify-text"><strong>Email domain matches charity website</strong><span id="domainMatchDetail">You'll be verified automatically.</span></div>
+      </div>
+      <div id="bannerManualReview" class="verify-banner-warn hidden">
+        <div class="verify-dot-warn">&#9432;</div>
+        <div class="verify-text warn"><strong>Manual review required</strong>Your email doesn't match the charity's website. We'll verify your claim manually within 48 hours &mdash; no action needed on your side.</div>
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button type="button" class="ghost-btn" onclick="showView('step1')">Back</button>
+        <button type="submit" class="primary-btn" id="submitClaimBtn" style="flex: 1;">Submit claim &rarr;</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ===== SUBMITTED ===== -->
+  <div id="view-submitted" class="wrap hidden">
+    <div class="status-screen">
+      <div id="submittedIcon" class="status-icon">&check;</div>
+      <h1 id="submittedTitle">Claim received</h1>
+      <p id="submittedMsg">We'll email you a sign-in link as soon as your claim is approved.</p>
+      <p style="margin-top: 24px;">You can close this tab.</p>
+    </div>
+  </div>
+
+  <footer>&copy; GiveReady &middot; <a href="/" style="color: var(--light);">Home</a></footer>
+
+  <script>
+    // ---- Theme ----
+    try { if (localStorage.getItem('gr-theme') === 'light') document.documentElement.classList.add('light'); } catch(e) {}
+    function toggleTheme() {
+      document.documentElement.classList.toggle('light');
+      try { localStorage.setItem('gr-theme', document.documentElement.classList.contains('light') ? 'light' : 'dark'); } catch(e) {}
+    }
+
+    // ---- Views ----
+    const VIEWS = ['landing', 'step1', 'step2', 'submitted'];
+    function showView(v) {
+      VIEWS.forEach(name => document.getElementById('view-' + name).classList.toggle('hidden', name !== v));
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+
+    // ---- State ----
+    let selectedCharity = null; // { id, slug, name, website, ... }
+
+    // ---- Helpers ----
+    function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+    function initials(name) {
+      if (!name) return '?';
+      const parts = name.split(/\s+/);
+      if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+      return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+    }
+    function emailDomain(e) { const at = (e || '').lastIndexOf('@'); return at >= 0 ? e.slice(at + 1).toLowerCase() : ''; }
+    function urlDomain(u) { try { const x = new URL(u.startsWith('http') ? u : 'https://' + u); return x.hostname.replace(/^www\./, '').toLowerCase(); } catch(e) { return ''; } }
+    function domainsMatch(e, w) {
+      const ed = emailDomain(e); const wd = urlDomain(w || '');
+      if (!ed || !wd) return false;
+      return ed === wd || wd.endsWith('.' + ed) || ed.endsWith('.' + wd);
+    }
+
+    // ---- Search ----
+    let searchTimer = null;
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      clearTimeout(searchTimer);
+      const q = e.target.value.trim();
+      if (q.length < 2) { document.getElementById('searchResults').innerHTML = ''; document.getElementById('searchStatus').textContent = ''; return; }
+      searchTimer = setTimeout(() => doSearch(q), 250);
+    });
+
+    async function doSearch(q) {
+      document.getElementById('searchStatus').textContent = 'Searching...';
+      try {
+        const resp = await fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=6');
+        const data = await resp.json();
+        renderResults(data.nonprofits || data.results || []);
+      } catch (e) {
+        document.getElementById('searchStatus').textContent = 'Search failed. Try again.';
+      }
+    }
+
+    function renderResults(results) {
+      const c = document.getElementById('searchResults');
+      const s = document.getElementById('searchStatus');
+      if (results.length === 0) {
+        c.innerHTML = '';
+        s.innerHTML = '<span>No matches. Email <a href="mailto:help@giveready.org">help@giveready.org</a> and we\u2019ll add your charity.</span>';
+        return;
+      }
+      s.textContent = '';
+      c.innerHTML = results.map(r =>
+        '<div class="search-result" onclick=\'selectCharity(' + JSON.stringify(r).replace(/\'/g, '&apos;') + ')\'>' +
+          '<div class="search-result-avatar">' + esc(initials(r.name)) + '</div>' +
+          '<div class="search-result-info">' +
+            '<div class="search-result-name">' + esc(r.name) + '</div>' +
+            '<div class="search-result-meta">' + esc([r.country, r.city].filter(Boolean).join(' · ')) + '</div>' +
+          '</div>' +
+          '<span class="search-result-arrow">&rarr;</span>' +
+        '</div>'
+      ).join('');
+    }
+
+    function selectCharity(r) {
+      selectedCharity = r;
+      document.getElementById('claimCharityName').textContent = r.name;
+      document.getElementById('claimCharityName2').textContent = r.name;
+      showView('step1');
+    }
+
+    // ---- Domain match indicator on Step 2 ----
+    function checkDomainMatch() {
+      const email = document.getElementById('claimEmail').value.trim();
+      const goodBanner = document.getElementById('bannerDomainMatch');
+      const warnBanner = document.getElementById('bannerManualReview');
+      if (!selectedCharity || !email) {
+        goodBanner.classList.add('hidden'); warnBanner.classList.add('hidden'); return;
+      }
+      if (domainsMatch(email, selectedCharity.website)) {
+        goodBanner.classList.remove('hidden'); warnBanner.classList.add('hidden');
+        document.getElementById('domainMatchDetail').textContent = ' ' + emailDomain(email) + ' → ' + urlDomain(selectedCharity.website || '') + '. You\u2019ll be verified automatically.';
+      } else {
+        goodBanner.classList.add('hidden'); warnBanner.classList.remove('hidden');
+      }
+    }
+
+    // ---- Submit claim ----
+    async function submitClaim() {
+      const email = document.getElementById('claimEmail').value.trim().toLowerCase();
+      const name = document.getElementById('claimName').value.trim();
+      const role = document.getElementById('claimRole').value;
+      const regNum = document.getElementById('claimRegNum').value.trim();
+      const message = document.getElementById('claimMessage').value.trim();
+      const errorBox = document.getElementById('errorBox');
+      errorBox.classList.remove('show');
+
+      if (!email || !selectedCharity) { errorBox.textContent = 'Missing email or charity. Start again.'; errorBox.classList.add('show'); return; }
+
+      const domainMatch = domainsMatch(email, selectedCharity.website);
+      const msgComposed = [
+        'Role: ' + role,
+        name ? 'Name: ' + name : null,
+        regNum ? 'Registration: ' + regNum : null,
+        message,
+      ].filter(Boolean).join('\n');
+
+      const btn = document.getElementById('submitClaimBtn');
+      btn.disabled = true; btn.textContent = 'Submitting...';
+      try {
+        const resp = await fetch('/api/charity/claim-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            nonprofit_id: selectedCharity.id,
+            charity_registration_number: regNum || null,
+            message: msgComposed,
+          }),
+        });
+        if (resp.status !== 204) {
+          const data = await resp.json().catch(() => ({}));
+          errorBox.textContent = data?.error?.message || 'Submission failed. Try again.';
+          errorBox.classList.add('show');
+          return;
+        }
+        // Success
+        if (domainMatch) {
+          document.getElementById('submittedTitle').textContent = 'Claim received';
+          document.getElementById('submittedMsg').textContent = 'Your email domain matches the charity website, so we can fast-path your verification. We\u2019ll email ' + email + ' a sign-in link shortly.';
+        } else {
+          document.getElementById('submittedIcon').className = 'status-icon warn';
+          document.getElementById('submittedIcon').innerHTML = '&#8987;';
+          document.getElementById('submittedTitle').textContent = 'Claim received';
+          document.getElementById('submittedMsg').textContent = 'We\u2019ll check your claim against the charity register within 48 hours, then email ' + email + ' with a sign-in link.';
+        }
+        showView('submitted');
+      } catch (e) {
+        errorBox.textContent = 'Network error. Check your connection and try again.';
+        errorBox.classList.add('show');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Submit claim →';
+      }
+    }
+
+    // ---- Preselect via URL param (?slug=...) ----
+    (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const slug = params.get('slug');
+      if (slug) {
+        try {
+          const resp = await fetch('/api/nonprofits/' + encodeURIComponent(slug));
+          if (resp.ok) {
+            const r = await resp.json();
+            selectCharity({ id: r.id, slug: r.slug, name: r.name, website: r.website, country: r.country, city: r.city });
+          }
+        } catch(e) {}
+      }
+    })();
+  </script>
+</body>
+</html>

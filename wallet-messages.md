@@ -1,5 +1,7 @@
 # Wallet Setup Messages — April 6, 2026
 
+> **Partner status (as of April 17, 2026):** Current pilot nonprofits for the 2026 Gates application are City Kids Surfing (named design partner) and Finn Wardman World Explorer Fund (internal pilot). Messages below are preserved as historical outreach. Bridges for Music has not committed.
+
 ## Message 1: Bridges for Music
 
 Quick one for the GiveReady build. I need a USDC wallet address for Bridges for Music so AI agents can send donations directly to you — no intermediary, no platform fees, 100% lands in your wallet.
@@ -14,7 +16,7 @@ This is part of the prototype for the Gates grant application. Each consortium o
 
 ---
 
-## Message 2: Joe Taylor (The Wave Project)
+## Message 2: Joe Taylor (City Kids Surfing)
 
 Joe — one thing I need from you for the GiveReady build. I'm setting up the payment layer so AI agents can send USDC donations directly to each consortium org's wallet. No middleman, no fees. The money just arrives.
 

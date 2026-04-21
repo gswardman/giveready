@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in — GiveReady</title>
+  <meta name="description" content="Sign in to your GiveReady charity dashboard. Passwordless, one-time email link." />
+  <meta name="robots" content="noindex" />
+  <link rel="canonical" href="https://giveready.org/signin" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0a; --surface: #151515; --card: #181818; --border: #2a2a2a;
+      --text: #f5f5f5; --muted: #a0a0a0; --light: #666;
+      --accent: #34d399; --accent-dim: rgba(52,211,153,0.12); --accent-border: rgba(52,211,153,0.25);
+      --warn: #f59e0b; --warn-dim: rgba(245,158,11,0.1); --warn-border: rgba(245,158,11,0.3);
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    html.light {
+      --bg: #ffffff; --surface: #f9fafb; --card: #f9fafb; --border: #e5e5e5;
+      --text: #111111; --muted: #666666; --light: #999999;
+      --accent: #059669; --accent-dim: rgba(5,150,105,0.08); --accent-border: rgba(5,150,105,0.2);
+      --warn: #b45309; --warn-dim: rgba(245,158,11,0.08); --warn-border: rgba(245,158,11,0.25);
+    }
+    body { font-family: var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; min-height: 100vh; display: flex; flex-direction: column; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    button { font-family: inherit; cursor: pointer; border: none; }
+    input { font-family: inherit; font-size: 14px; color: var(--text); border: 2px solid var(--border); border-radius: 12px; padding: 12px 14px; width: 100%; background: var(--surface); transition: border-color 0.15s; }
+    input:focus { outline: none; border-color: var(--accent); }
+    input::placeholder { color: var(--light); }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+    nav { height: 52px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); background: var(--bg); }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-name { font-weight: 800; font-size: 17px; color: var(--text); letter-spacing: -0.01em; }
+    .brand-tag { font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); padding: 2px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .theme-toggle { width: 34px; height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--muted); padding: 0; cursor: pointer; }
+    .theme-toggle svg { width: 16px; height: 16px; }
+    .theme-toggle .icon-sun { display: none; }
+    html.light .theme-toggle .icon-sun { display: block; }
+    html.light .theme-toggle .icon-moon { display: none; }
+    .wrap { max-width: 420px; margin: 0 auto; padding: 60px 20px 40px; flex: 1; width: 100%; }
+    h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
+    .sub { color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+    form { display: flex; flex-direction: column; gap: 18px; }
+    .primary-btn { display: block; width: 100%; padding: 14px; background: var(--accent); border: none; border-radius: 12px; font-size: 15px; font-weight: 700; color: #0a0a0a; text-align: center; cursor: pointer; }
+    html.light .primary-btn { color: #fff; }
+    .primary-btn:hover { opacity: 0.92; }
+    .primary-btn:disabled { opacity: 0.5; cursor: default; }
+    .error-box { display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; }
+    html.light .error-box { color: #b91c1c; }
+    .error-box.show { display: block; }
+    .alt { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); text-align: center; }
+    .alt strong { color: var(--text); }
+    footer { padding: 20px; text-align: center; font-size: 11px; color: var(--light); border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="brand" style="text-decoration: none;">
+      <span class="brand-name">GiveReady</span>
+      <span class="brand-tag">charity sign-in</span>
+    </a>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle light/dark mode">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+  </nav>
+
+  <div class="wrap">
+    <h1>Sign in to manage your charity</h1>
+    <p class="sub">Enter the email address linked to your charity on GiveReady. We'll email you a one-time sign-in link. No passwords.</p>
+
+    <div id="errorBox" class="error-box" role="alert" aria-live="assertive"></div>
+
+    <form id="signinForm" onsubmit="submitSignin(event)">
+      <div>
+        <label for="email">Email address</label>
+        <input type="email" id="email" name="email" placeholder="you@yourcharity.org" autocomplete="email" required />
+      </div>
+      <button type="submit" id="submitBtn" class="primary-btn">Email me a sign-in link &rarr;</button>
+    </form>
+
+    <div class="alt">
+      <div>Not registered yet? <a href="/claim">Claim your charity's free page &rarr;</a></div>
+    </div>
+  </div>
+
+  <footer>
+    &copy; GiveReady &middot; Zero platform fees &middot; <a href="https://giveready.org" style="color: var(--light);">Home</a>
+  </footer>
+
+  <script>
+    // Theme persistence
+    try { if (localStorage.getItem('gr-theme') === 'light') document.documentElement.classList.add('light'); } catch(e) {}
+    function toggleTheme() {
+      document.documentElement.classList.toggle('light');
+      try { localStorage.setItem('gr-theme', document.documentElement.classList.contains('light') ? 'light' : 'dark'); } catch(e) {}
+    }
+
+    async function submitSignin(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim().toLowerCase();
+      const submitBtn = document.getElementById('submitBtn');
+      const errorBox = document.getElementById('errorBox');
+      errorBox.classList.remove('show');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending...';
+
+      try {
+        const resp = await fetch('/api/auth/request', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        if (resp.status === 204) {
+          // Success — go to check-email
+          const url = '/check-email?email=' + encodeURIComponent(email);
+          window.location.href = url;
+          return;
+        }
+        // Handle errors
+        const data = await resp.json().catch(() => ({}));
+        let msg = 'Could not send sign-in link. Please try again.';
+        if (data?.error?.code === 'RATE_LIMITED') msg = 'Too many requests for this email. Try again in an hour.';
+        else if (data?.error?.code === 'VALIDATION_FAILED') msg = 'Please enter a valid email address.';
+        else if (data?.error?.message) msg = data.error.message;
+        errorBox.textContent = msg;
+        errorBox.classList.add('show');
+      } catch (err) {
+        errorBox.textContent = 'Network error. Check your connection and try again.';
+        errorBox.classList.add('show');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Email me a sign-in link →';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -6,11 +6,20 @@
  * https://giveready.org
  */
 
+// CORS. Dashboard auth is same-origin (giveready.org/dashboard → giveready.org/api/*),
+// so Allow-Credentials is unnecessary and was incompatible with Allow-Origin: * anyway.
+// Public endpoints (MCP, widget.js, nonprofit search) stay wildcard-open.
+// CSP + anti-clickjacking headers apply to every response as defence-in-depth.
+// CSO 2026-04-20 (H1 + M1): removed Allow-Credentials, added CSP + frame-ancestors.
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-PAYMENT',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-PAYMENT, Cookie',
   'Access-Control-Expose-Headers': 'PAYMENT-REQUIRED, PAYMENT-RESPONSE',
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://api.qrserver.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.resend.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  'X-Frame-Options': 'DENY',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
 };
 
 function json(data, status = 200) {
@@ -2904,24 +2913,36 @@ async function handleAdminTraffic(db, env, request, url) {
 
   const hours = parseInt(url.searchParams.get('hours') || '24');
   const since = `datetime('now', '-${hours} hours')`;
+  const includeNoise = url.searchParams.get('include_noise') === 'true';
+
+  // Build a SQL fragment that excludes known non-agent pollers
+  // (Bun/curl/python/etc.) using the same prefix list as isNoiseAgent().
+  // This keeps the admin dashboard focused on real agent signal by default.
+  // Use ?include_noise=true to see raw totals.
+  const noiseConds = AGENT_NOISE_PREFIXES
+    .map((p) => `user_agent LIKE '${p.replace(/'/g, "''")}%'`)
+    .join(' OR ');
+  const noiseFilter = includeNoise ? '' : ` AND NOT (${noiseConds})`;
 
   // Discovery hits by route (llms.txt, agents.md, mcp, etc.)
   const discoveryByRoute = await db.prepare(
     `SELECT route, COUNT(*) as hits FROM discovery_hits
-     WHERE created_at > ${since}
+     WHERE created_at > ${since}${noiseFilter}
      GROUP BY route ORDER BY hits DESC`
   ).all();
 
   // Discovery hits by user-agent (identify actual agents)
   const discoveryByAgent = await db.prepare(
     `SELECT user_agent, COUNT(*) as hits FROM discovery_hits
-     WHERE created_at > ${since} AND user_agent IS NOT NULL
+     WHERE created_at > ${since} AND user_agent IS NOT NULL${noiseFilter}
      GROUP BY user_agent ORDER BY hits DESC LIMIT 30`
   ).all();
 
-  // Recent discovery hits (last 20)
+  // Recent discovery hits (last 20) — always filtered view so the digest
+  // doesn't get flooded with Bun pollers in the recent list either.
   const recentDiscovery = await db.prepare(
     `SELECT route, user_agent, created_at FROM discovery_hits
+     WHERE 1=1${noiseFilter}
      ORDER BY created_at DESC LIMIT 20`
   ).all();
 
@@ -2937,14 +2958,28 @@ async function handleAdminTraffic(db, env, request, url) {
      GROUP BY DATE(created_at) ORDER BY day DESC LIMIT 7`
   ).all();
 
-  // Total discovery hits
+  // Total discovery hits (raw, lifetime)
   const totalDiscovery = await db.prepare(
     `SELECT COUNT(*) as total FROM discovery_hits`
   ).first();
 
-  const totalDiscoveryRecent = await db.prepare(
+  // Period totals: raw and filtered so we can show both.
+  const totalDiscoveryRecentRaw = await db.prepare(
     `SELECT COUNT(*) as total FROM discovery_hits WHERE created_at > ${since}`
   ).first();
+
+  const totalDiscoveryRecentFiltered = await db.prepare(
+    `SELECT COUNT(*) as total FROM discovery_hits
+     WHERE created_at > ${since} AND NOT (${noiseConds})`
+  ).first();
+
+  // Top 5 filtered-out noise UAs in the period, so we can still see what
+  // infrastructure is polling us without it dominating the main numbers.
+  const noiseBreakdown = await db.prepare(
+    `SELECT user_agent, COUNT(*) as hits FROM discovery_hits
+     WHERE created_at > ${since} AND (${noiseConds})
+     GROUP BY user_agent ORDER BY hits DESC LIMIT 5`
+  ).all();
 
   // Enrichment activity
   const enrichmentRecent = await db.prepare(
@@ -2953,13 +2988,20 @@ async function handleAdminTraffic(db, env, request, url) {
 
   return json({
     period: `last ${hours} hours`,
+    noise_filtered: !includeNoise,
+    noise_prefixes: AGENT_NOISE_PREFIXES,
     summary: {
       total_discovery_hits: totalDiscovery.total,
-      discovery_hits_in_period: totalDiscoveryRecent.total,
+      discovery_hits_in_period: includeNoise
+        ? totalDiscoveryRecentRaw.total
+        : totalDiscoveryRecentFiltered.total,
+      discovery_hits_in_period_raw: totalDiscoveryRecentRaw.total,
+      discovery_hits_in_period_agents_only: totalDiscoveryRecentFiltered.total,
       enrichments_in_period: enrichmentRecent.total,
     },
     discovery_by_route: discoveryByRoute.results,
     discovery_by_user_agent: discoveryByAgent.results,
+    noise_breakdown: noiseBreakdown.results,
     recent_discovery_hits: recentDiscovery.results,
     recent_queries: recentQueries.results,
     queries_by_day: queryByDay.results,
@@ -3246,6 +3288,427 @@ function handleAgentLeaderboardHTML() {
 }
 
 // ============================================
+// CHARITY DASHBOARD: AUTH + PROFILE + QUERIES
+// Migration: 011-charity-dashboard.sql
+// Reviewed: /plan-eng-review 2026-04-20
+// ============================================
+
+// ---- helpers ----
+
+function randomHex(bytes) {
+  const buf = new Uint8Array(bytes);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function sha256Hex(input) {
+  const data = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function apiError(code, message, status = 400, details) {
+  return json({ error: { code, message, details: details || {} } }, status);
+}
+
+function getCookie(request, name) {
+  const header = request.headers.get('Cookie') || '';
+  const re = new RegExp('(?:^|; )' + name + '=([^;]*)');
+  const m = header.match(re);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+// Per-email rate limit for /api/auth/request. D1-backed count of magic_link_tokens
+// created in the last hour for this email. Eventually consistent but sufficient
+// for the real abuse case at this scale. DO upgrade tracked as follow-up.
+async function isAuthEmailRateLimited(db, email) {
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS c FROM magic_link_tokens
+     WHERE email = ?1 AND created_at > datetime('now', '-1 hour')`
+  ).bind(email).first();
+  return (row?.c ?? 0) >= 5;
+}
+
+// ---- email template ----
+
+async function sendLoginMagicLink(email, token, env) {
+  const url = `https://giveready.org/api/auth/verify?token=${token}`;
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+      <h2 style="font-size: 20px; font-weight: 700; color: #111; margin-bottom: 16px;">Sign in to GiveReady</h2>
+      <p style="font-size: 15px; color: #444; line-height: 1.6; margin-bottom: 24px;">
+        Click the button below to sign in to your GiveReady dashboard. The link is valid for 15 minutes and can only be used once.
+      </p>
+      <a href="${url}" style="display: inline-block; background: #059669; color: #fff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 12px 28px; border-radius: 8px; margin-bottom: 24px;">Sign in &rarr;</a>
+      <p style="font-size: 13px; color: #999; line-height: 1.6; margin-top: 24px;">
+        If you didn\u2019t request this, you can safely ignore this email. No one can access your account without clicking this link.
+      </p>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+      <p style="font-size: 12px; color: #bbb;">GiveReady \u2014 Making small nonprofits discoverable.</p>
+    </div>
+  `;
+  try {
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'GiveReady <login@giveready.org>',
+        to: [email],
+        subject: 'Sign in to GiveReady',
+        html,
+      }),
+    });
+    if (!resp.ok) {
+      const t = await resp.text();
+      console.error('[Auth] Resend failed:', t);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('[Auth] Resend error:', e);
+    return false;
+  }
+}
+
+// ---- auth handlers ----
+
+async function handleAuthRequest(db, env, ctx, request) {
+  const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+
+  // Per-IP rate limit (reuse existing in-memory limiter for writes)
+  const rl = checkRateLimit(request, 'write');
+  if (rl) {
+    console.log(`[Auth.reject] request ip-rate-limit ip=${ip}`);
+    return rl;
+  }
+
+  let body;
+  try { body = await request.json(); } catch {
+    console.log(`[Auth.reject] request invalid-json ip=${ip}`);
+    return apiError('VALIDATION_FAILED', 'Invalid JSON');
+  }
+
+  const email = (body.email || '').trim().toLowerCase();
+  if (!email || !isValidEmail(email)) {
+    console.log(`[Auth.reject] request invalid-email ip=${ip} raw=${(body.email || '').slice(0, 40)}`);
+    return apiError('VALIDATION_FAILED', 'Valid email required');
+  }
+
+  // Per-email rate limit
+  if (await isAuthEmailRateLimited(db, email)) {
+    console.log(`[Auth.reject] request email-rate-limit ip=${ip} email=${email}`);
+    return apiError('RATE_LIMITED', 'Too many login requests for this email. Try again in an hour.', 429);
+  }
+
+  // Generate token, store hash, expire in 15 min
+  const token = randomHex(16);              // 128-bit
+  const tokenHash = await sha256Hex(token);
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  const ua = request.headers.get('user-agent') || null;
+
+  await db.prepare(
+    `INSERT INTO magic_link_tokens (token_hash, email, expires_at, ip_address, user_agent)
+     VALUES (?1, ?2, ?3, ?4, ?5)`
+  ).bind(tokenHash, email, expiresAt, ip, ua).run();
+
+  // Fire email asynchronously so the client navigates to /check-email immediately
+  ctx.waitUntil(sendLoginMagicLink(email, token, env));
+
+  console.log(`[Auth] Magic link requested: ${email}`);
+
+  // 204 tells the client "accepted, go show the check-email page"
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+async function handleAuthVerify(db, env, request, url) {
+  const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+  const token = url.searchParams.get('token');
+  if (!token) {
+    console.log(`[Auth.reject] verify missing-token ip=${ip}`);
+    return apiError('TOKEN_INVALID', 'Sign-in link is not valid. Request a new one.', 410);
+  }
+
+  const tokenHash = await sha256Hex(token);
+  const row = await db.prepare(
+    `SELECT token_hash, email, expires_at, used_at FROM magic_link_tokens WHERE token_hash = ?1`
+  ).bind(tokenHash).first();
+
+  // CSO M2 (2026-04-20): collapse missing/used/expired into single TOKEN_INVALID response
+  // to prevent token-existence information disclosure. Log the distinction server-side.
+  if (!row || row.used_at || new Date(row.expires_at) < new Date()) {
+    const reason = !row ? 'missing' : row.used_at ? 'used' : 'expired';
+    console.log(`[Auth.reject] verify ${reason} ip=${ip}${row ? ` email=${row.email}` : ''}`);
+    return apiError('TOKEN_INVALID', 'Sign-in link is not valid. Request a new one.', 410);
+  }
+
+  // Mark used before creating session (prevents double-use race)
+  await db.prepare(
+    `UPDATE magic_link_tokens SET used_at = datetime('now') WHERE token_hash = ?1`
+  ).bind(tokenHash).run();
+
+  // Find all charities for this email
+  const users = await db.prepare(`
+    SELECT cu.id AS user_id, cu.nonprofit_id, n.slug, n.name
+    FROM charity_users cu
+    JOIN nonprofits n ON cu.nonprofit_id = n.id
+    WHERE cu.email = ?1 AND cu.revoked_at IS NULL
+    ORDER BY n.name
+  `).bind(row.email).all();
+
+  const list = users.results || [];
+  if (list.length === 0) {
+    // Valid email, no access. Point them at claim-request.
+    return new Response(verifyResultHTML(
+      'No dashboard access yet',
+      `This email is verified, but no GiveReady charity is linked to it yet. ` +
+      `<a href="/dashboard/claim-request?email=${encodeURIComponent(row.email)}">Request access to a charity &rarr;</a>`,
+      false
+    ), { status: 403, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  }
+
+  // Create session. 256-bit token, 24h expiry.
+  const sessionToken = randomHex(32);
+  const sessionHash = await sha256Hex(sessionToken);
+  const sessionExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const ua = request.headers.get('user-agent') || null;
+  const first = list[0];
+
+  await db.prepare(`
+    INSERT INTO charity_sessions (token_hash, charity_user_id, active_nonprofit_id, expires_at, last_seen_at, ip_address, user_agent)
+    VALUES (?1, ?2, ?3, ?4, datetime('now'), ?5, ?6)
+  `).bind(sessionHash, first.user_id, first.nonprofit_id, sessionExpiresAt, ip, ua).run();
+
+  const cookie = `gr_session=${sessionToken}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${24 * 60 * 60}`;
+  const redirect = list.length > 1 ? '/dashboard/pick-charity' : '/dashboard';
+
+  console.log(`[Auth] Sign-in success: ${row.email} (${list.length} charity binding(s))`);
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      'Location': redirect,
+      'Set-Cookie': cookie,
+      ...CORS_HEADERS,
+    },
+  });
+}
+
+async function handleAuthLogout(db, request) {
+  const token = getCookie(request, 'gr_session');
+  if (token) {
+    const hash = await sha256Hex(token);
+    await db.prepare(
+      `UPDATE charity_sessions SET revoked_at = datetime('now') WHERE token_hash = ?1 AND revoked_at IS NULL`
+    ).bind(hash).run();
+  }
+  const clear = `gr_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
+  return new Response(null, {
+    status: 302,
+    headers: { 'Location': '/dashboard', 'Set-Cookie': clear, ...CORS_HEADERS },
+  });
+}
+
+// ---- session middleware ----
+
+async function requireCharitySession(db, request) {
+  const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+  const path = new URL(request.url).pathname;
+  const token = getCookie(request, 'gr_session');
+  if (!token) {
+    console.log(`[Auth.reject] session no-cookie path=${path} ip=${ip}`);
+    return { error: apiError('UNAUTHORIZED', 'Sign in required', 401) };
+  }
+  const hash = await sha256Hex(token);
+  const session = await db.prepare(`
+    SELECT cs.token_hash, cs.charity_user_id, cs.active_nonprofit_id, cs.expires_at, cs.revoked_at, cu.email
+    FROM charity_sessions cs
+    JOIN charity_users cu ON cs.charity_user_id = cu.id
+    WHERE cs.token_hash = ?1
+  `).bind(hash).first();
+  if (!session) {
+    console.log(`[Auth.reject] session invalid path=${path} ip=${ip}`);
+    return { error: apiError('UNAUTHORIZED', 'Invalid session', 401) };
+  }
+  if (session.revoked_at) {
+    console.log(`[Auth.reject] session revoked path=${path} ip=${ip} email=${session.email}`);
+    return { error: apiError('UNAUTHORIZED', 'Session revoked', 401) };
+  }
+  if (new Date(session.expires_at) < new Date()) {
+    console.log(`[Auth.reject] session expired path=${path} ip=${ip} email=${session.email}`);
+    return { error: apiError('UNAUTHORIZED', 'Session expired', 401) };
+  }
+  // Best-effort last_seen refresh (don't block on errors)
+  db.prepare(`UPDATE charity_sessions SET last_seen_at = datetime('now') WHERE token_hash = ?1`)
+    .bind(hash).run().catch(() => {});
+  return { session };
+}
+
+// ---- charity endpoints ----
+
+async function handleCharityMe(db, request) {
+  const auth = await requireCharitySession(db, request);
+  if (auth.error) return auth.error;
+  const users = await db.prepare(`
+    SELECT cu.id AS user_id, cu.nonprofit_id, n.slug, n.name
+    FROM charity_users cu
+    JOIN nonprofits n ON cu.nonprofit_id = n.id
+    WHERE cu.email = ?1 AND cu.revoked_at IS NULL
+    ORDER BY n.name
+  `).bind(auth.session.email).all();
+  const active = await db.prepare(
+    `SELECT id, slug, name FROM nonprofits WHERE id = ?1`
+  ).bind(auth.session.active_nonprofit_id).first();
+  return json({
+    email: auth.session.email,
+    charities: users.results || [],
+    active_charity: active,
+  });
+}
+
+async function handleCharitySwitch(db, request) {
+  const auth = await requireCharitySession(db, request);
+  if (auth.error) return auth.error;
+  let body;
+  try { body = await request.json(); } catch { return apiError('VALIDATION_FAILED', 'Invalid JSON'); }
+  const np = body?.nonprofit_id;
+  if (!np) return apiError('VALIDATION_FAILED', 'nonprofit_id required');
+  const user = await db.prepare(
+    `SELECT cu.id FROM charity_users cu
+     WHERE cu.email = ?1 AND cu.nonprofit_id = ?2 AND cu.revoked_at IS NULL`
+  ).bind(auth.session.email, np).first();
+  if (!user) return apiError('FORBIDDEN', 'You do not have access to this charity', 403);
+  await db.prepare(
+    `UPDATE charity_sessions SET active_nonprofit_id = ?1, charity_user_id = ?2 WHERE token_hash = ?3`
+  ).bind(np, user.id, auth.session.token_hash).run();
+  return json({ ok: true, active_nonprofit_id: np });
+}
+
+async function handleCharityProfileGet(db, request) {
+  const auth = await requireCharitySession(db, request);
+  if (auth.error) return auth.error;
+  const np = await db.prepare(`SELECT * FROM nonprofits WHERE id = ?1`)
+    .bind(auth.session.active_nonprofit_id).first();
+  if (!np) return apiError('NOT_FOUND', 'Charity not found', 404);
+  return json(np);
+}
+
+const ALLOWED_PROFILE_FIELDS = [
+  'name', 'tagline', 'mission', 'description', 'website',
+  'city', 'region', 'country', 'founded_year',
+  'beneficiaries_per_year', 'donation_url', 'contact_email',
+  'logo_url', 'annual_budget_usd', 'budget_year', 'team_size',
+];
+
+async function handleCharityProfilePatch(db, request) {
+  const auth = await requireCharitySession(db, request);
+  if (auth.error) return auth.error;
+  let body;
+  try { body = await request.json(); } catch { return apiError('VALIDATION_FAILED', 'Invalid JSON'); }
+  if (!body || typeof body !== 'object') return apiError('VALIDATION_FAILED', 'JSON object required');
+
+  const existing = await db.prepare(`SELECT * FROM nonprofits WHERE id = ?1`)
+    .bind(auth.session.active_nonprofit_id).first();
+  if (!existing) return apiError('NOT_FOUND', 'Charity not found', 404);
+
+  const updates = [];
+  const params = [];
+  const audit = [];
+  let idx = 1;
+  for (const f of ALLOWED_PROFILE_FIELDS) {
+    if (f in body && body[f] !== existing[f]) {
+      updates.push(`${f} = ?${idx}`);
+      params.push(body[f]);
+      audit.push({ field: f, old: existing[f], next: body[f] });
+      idx++;
+    }
+  }
+  if (updates.length === 0) return json({ ok: true, changes: 0 });
+
+  updates.push(`updated_at = datetime('now')`);
+  params.push(auth.session.active_nonprofit_id);
+
+  await db.prepare(
+    `UPDATE nonprofits SET ${updates.join(', ')} WHERE id = ?${idx}`
+  ).bind(...params).run();
+
+  // Audit rows (fire-and-log-on-fail)
+  for (const c of audit) {
+    await db.prepare(`
+      INSERT INTO profile_edits (id, charity_user_id, nonprofit_id, field, old_value, new_value)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+    `).bind(
+      crypto.randomUUID(),
+      auth.session.charity_user_id,
+      auth.session.active_nonprofit_id,
+      c.field,
+      c.old == null ? null : String(c.old),
+      c.next == null ? null : String(c.next)
+    ).run().catch(e => console.error('[profile_edits] insert failed:', e));
+  }
+
+  return json({ ok: true, changes: audit.length });
+}
+
+async function handleCharityQueries(db, request, url) {
+  const auth = await requireCharitySession(db, request);
+  if (auth.error) return auth.error;
+  const daysRaw = parseInt(url.searchParams.get('days') || '30', 10);
+  const days = Math.min(Math.max(Number.isFinite(daysRaw) ? daysRaw : 30, 1), 90);
+  // Single aggregate query. No N+1.
+  const rows = await db.prepare(`
+    SELECT ql.query_text, COUNT(*) AS hits, MAX(ql.created_at) AS last_seen
+    FROM query_matches qm
+    JOIN query_log ql ON qm.query_log_id = ql.id
+    WHERE qm.nonprofit_id = ?1
+      AND ql.created_at > datetime('now', ?2)
+      AND ql.query_text IS NOT NULL
+      AND ql.query_text <> ''
+    GROUP BY ql.query_text
+    ORDER BY hits DESC, last_seen DESC
+    LIMIT 50
+  `).bind(auth.session.active_nonprofit_id, `-${days} days`).all();
+  return json({ days, queries: rows.results || [] });
+}
+
+async function handleCharityDonations(db, request) {
+  const auth = await requireCharitySession(db, request);
+  if (auth.error) return auth.error;
+  // Stub for MVP. Ships in Month 1-3 of the grant period.
+  return json({
+    donations: [],
+    total_count: 0,
+    note: 'Donation ledger ships in Month 1-3 of the Gates grant period. ' +
+          'Will show AI-initiated donations with on-chain attribution and Gift Aid eligibility.',
+  });
+}
+
+async function handleClaimRequest(db, request) {
+  // Unauthenticated. Rate-limited per IP.
+  const rl = checkRateLimit(request, 'write');
+  if (rl) return rl;
+
+  let body;
+  try { body = await request.json(); } catch { return apiError('VALIDATION_FAILED', 'Invalid JSON'); }
+  const email = (body.email || '').trim().toLowerCase();
+  if (!email || !isValidEmail(email)) return apiError('VALIDATION_FAILED', 'Valid email required');
+  const np = body.nonprofit_id || null;
+  const reg = (body.charity_registration_number || '').trim() || null;
+  if (!np && !reg) return apiError('VALIDATION_FAILED', 'nonprofit_id or charity_registration_number required');
+  const ip = request.headers.get('cf-connecting-ip') || null;
+
+  await db.prepare(`
+    INSERT INTO claim_requests (id, nonprofit_id, charity_registration_number, email, message, ip_address)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+  `).bind(crypto.randomUUID(), np, reg, email, body.message || null, ip).run();
+
+  console.log(`[Claim-Request] ${email} -> ${np || reg}`);
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+// ============================================
 // ROUTER
 // ============================================
 
@@ -3259,8 +3722,8 @@ export default {
       return new Response(null, { headers: CORS_HEADERS });
     }
 
-    // Allow GET and POST (POST for x402 payment settlement)
-    if (request.method !== 'GET' && request.method !== 'POST') {
+    // Allow GET, POST, PATCH (PATCH for /api/charity/profile editing)
+    if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'PATCH') {
       return error('Method not allowed', 405);
     }
 
@@ -3303,9 +3766,71 @@ export default {
         return handleClaim(env.DB, env, request, claimMatch[1]);
       }
 
-      // Magic link verification (email click)
+      // Magic link verification (email click) — one-time claim flow
       if (path === '/verify') {
         return handleVerifyToken(env.DB, env, url);
+      }
+
+      // ============================================
+      // Charity self-serve dashboard (migration 011)
+      // ============================================
+
+      // Static HTML pages for the dashboard flow — fetch from ASSETS, wrap with CSP + CORS.
+      // Paths without extension (clean URLs) fall through here since not_found_handling = none.
+      const DASHBOARD_PAGES = {
+        '/signin': '/signin.html',
+        '/check-email': '/check-email.html',
+        '/dashboard': '/dashboard.html',
+        '/claim': '/claim.html',
+      };
+      if (DASHBOARD_PAGES[path] && request.method === 'GET') {
+        const assetUrl = new URL(DASHBOARD_PAGES[path], request.url).toString();
+        const assetResp = await env.ASSETS.fetch(assetUrl);
+        const html = await assetResp.text();
+        return new Response(html, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/html; charset=UTF-8',
+            'Cache-Control': 'public, max-age=300, must-revalidate',
+            ...CORS_HEADERS,
+          },
+        });
+      }
+
+      // Passwordless login
+      if (path === '/api/auth/request' && request.method === 'POST') {
+        return handleAuthRequest(env.DB, env, ctx, request);
+      }
+      if (path === '/api/auth/verify' && request.method === 'GET') {
+        return handleAuthVerify(env.DB, env, request, url);
+      }
+      if (path === '/api/auth/logout' && request.method === 'POST') {
+        return handleAuthLogout(env.DB, request);
+      }
+
+      // Authenticated charity endpoints
+      if (path === '/api/charity/me' && request.method === 'GET') {
+        return handleCharityMe(env.DB, request);
+      }
+      if (path === '/api/charity/switch' && request.method === 'POST') {
+        return handleCharitySwitch(env.DB, request);
+      }
+      if (path === '/api/charity/profile' && request.method === 'GET') {
+        return handleCharityProfileGet(env.DB, request);
+      }
+      if (path === '/api/charity/profile' && request.method === 'PATCH') {
+        return handleCharityProfilePatch(env.DB, request);
+      }
+      if (path === '/api/charity/queries' && request.method === 'GET') {
+        return handleCharityQueries(env.DB, request, url);
+      }
+      if (path === '/api/charity/donations' && request.method === 'GET') {
+        return handleCharityDonations(env.DB, request);
+      }
+
+      // Unauthenticated: request access to a charity (admin reviews)
+      if (path === '/api/charity/claim-request' && request.method === 'POST') {
+        return handleClaimRequest(env.DB, request);
       }
 
       // Admin manual verify
