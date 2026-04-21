@@ -3355,7 +3355,7 @@ async function sendLoginMagicLink(email, token, env) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'GiveReady <login@giveready.org>',
+        from: 'GiveReady <login@send.giveready.org>',
         to: [email],
         subject: 'Sign in to GiveReady',
         html,

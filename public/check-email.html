@@ -57,8 +57,14 @@
   </footer>
   <script>
     try { if (localStorage.getItem('gr-theme') === 'light') document.documentElement.classList.add('light'); } catch(e) {}
-    const params = new URLSearchParams(window.location.search);
-    const email = params.get('email');
+    // Prefer sessionStorage (no PII in URL = no Safe Browsing false-positive).
+    // Fall back to ?email= for bookmark/refresh compatibility.
+    let email = null;
+    try { email = sessionStorage.getItem('gr_signin_email'); } catch(e) {}
+    if (!email) {
+      const params = new URLSearchParams(window.location.search);
+      email = params.get('email');
+    }
     if (email) document.getElementById('emailShown').textContent = email;
   </script>
 </body>

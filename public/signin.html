@@ -118,9 +118,9 @@
           body: JSON.stringify({ email }),
         });
         if (resp.status === 204) {
-          // Success — go to check-email
-          const url = '/check-email?email=' + encodeURIComponent(email);
-          window.location.href = url;
+          // Success — stash email client-side (no PII in URL), go to check-email
+          try { sessionStorage.setItem('gr_signin_email', email); } catch(e) {}
+          window.location.href = '/check-email';
           return;
         }
         // Handle errors
