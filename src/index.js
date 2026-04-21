@@ -3469,10 +3469,12 @@ async function handleAuthVerify(db, env, request, url) {
     ), { status: 403, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
   }
 
-  // Create session. 256-bit token, 24h expiry.
+  // Create session. 256-bit token, 30-day expiry (convenience over strict 24h).
+  // Revocable via revoked_at. Rotates on each /verify.
   const sessionToken = randomHex(32);
   const sessionHash = await sha256Hex(sessionToken);
-  const sessionExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const SESSION_TTL_DAYS = 30;
+  const sessionExpiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const ua = request.headers.get('user-agent') || null;
   const first = list[0];
 
@@ -3481,7 +3483,7 @@ async function handleAuthVerify(db, env, request, url) {
     VALUES (?1, ?2, ?3, ?4, datetime('now'), ?5, ?6)
   `).bind(sessionHash, first.user_id, first.nonprofit_id, sessionExpiresAt, ip, ua).run();
 
-  const cookie = `gr_session=${sessionToken}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${24 * 60 * 60}`;
+  const cookie = `gr_session=${sessionToken}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_DAYS * 24 * 60 * 60}`;
   const redirect = list.length > 1 ? '/dashboard/pick-charity' : '/dashboard';
 
   console.log(`[Auth] Sign-in success: ${row.email} (${list.length} charity binding(s))`);
