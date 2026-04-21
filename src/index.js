@@ -3355,7 +3355,9 @@ async function sendLoginMagicLink(email, token, env) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'GiveReady <login@send.giveready.org>',
+        // Resend has giveready.org (root) verified, not send.giveready.org.
+        // The `send.` subdomain is just where Resend's SES infrastructure records live.
+        from: 'GiveReady <login@giveready.org>',
         to: [email],
         subject: 'Sign in to GiveReady',
         html,
