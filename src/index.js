@@ -2592,9 +2592,11 @@ const AUTO_PROMOTE_PROSE_PENDING = new Set([
 // HMAC-signed path back to a trusted-agent v2.
 
 // Light normalisation so trivial formatting differences don't block consensus.
-// For URLs we strip the trailing slash and lowercase the hostname only; the
-// path stays case-sensitive. For everything else we trim and collapse runs of
-// whitespace. Year fields coerce to a 4-digit integer string.
+// URLs: lowercase host + path, strip www., strip trailing slash, strip tracking
+// params (utm_*, fbclid, ref) and fragment. Path is lowercased because virtually
+// all web servers are case-insensitive and the old case-sensitive path was hiding
+// real consensus behind false rejections (/About vs /about). See CSO-Audit
+// 2026-04-23 recommendation. Year fields coerce to 4-digit integer string.
 function normaliseFieldValue(field, raw) {
   if (raw == null) return '';
   let v = String(raw).trim().replace(/\s+/g, ' ');
@@ -2602,6 +2604,17 @@ function normaliseFieldValue(field, raw) {
     try {
       const u = new URL(v.startsWith('http') ? v : `https://${v}`);
       u.hostname = u.hostname.toLowerCase();
+      u.pathname = u.pathname.toLowerCase();
+      // Strip www. prefix — www.example.org and example.org are the same site
+      if (u.hostname.startsWith('www.')) u.hostname = u.hostname.slice(4);
+      // Strip tracking params that agents pick up from different sources
+      for (const key of [...u.searchParams.keys()]) {
+        if (key.startsWith('utm_') || key === 'fbclid' || key === 'ref' || key === 'gclid') {
+          u.searchParams.delete(key);
+        }
+      }
+      // Strip fragment
+      u.hash = '';
       let out = u.toString();
       if (out.endsWith('/') && u.pathname === '/') out = out.slice(0, -1);
       return out;
