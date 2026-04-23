@@ -2914,15 +2914,26 @@ async function handleAdminTraffic(db, env, request, url) {
   const hours = parseInt(url.searchParams.get('hours') || '24');
   const since = `datetime('now', '-${hours} hours')`;
   const includeNoise = url.searchParams.get('include_noise') === 'true';
+  const useBlocklist = env.AGENT_FILTER_MODE === 'blocklist';
 
-  // Build a SQL fragment that excludes known non-agent pollers
-  // (Bun/curl/python/etc.) using the same prefix list as isNoiseAgent().
-  // This keeps the admin dashboard focused on real agent signal by default.
-  // Use ?include_noise=true to see raw totals.
-  const noiseConds = AGENT_NOISE_PREFIXES
-    .map((p) => `user_agent LIKE '${p.replace(/'/g, "''")}%'`)
-    .join(' OR ');
-  const noiseFilter = includeNoise ? '' : ` AND NOT (${noiseConds})`;
+  // Build SQL fragment for agent filtering.
+  // Allowlist mode (default): only include rows matching known agent patterns.
+  // Blocklist mode (legacy): exclude rows matching known noise prefixes.
+  let noiseFilter = '';
+  let noiseConds;
+  let allowConds;
+  if (useBlocklist) {
+    noiseConds = AGENT_NOISE_PREFIXES
+      .map((p) => `user_agent LIKE '${p.replace(/'/g, "''")}%'`)
+      .join(' OR ');
+    noiseFilter = includeNoise ? '' : ` AND NOT (${noiseConds})`;
+  } else {
+    allowConds = KNOWN_AGENT_PATTERNS
+      .map((entry) => `user_agent LIKE '%${entry.pattern.replace(/'/g, "''")}%'`)
+      .join(' OR ');
+    noiseConds = allowConds; // used by noise breakdown query (inverted)
+    noiseFilter = includeNoise ? '' : ` AND (${allowConds})`;
+  }
 
   // Discovery hits by route (llms.txt, agents.md, mcp, etc.)
   const discoveryByRoute = await db.prepare(
@@ -2968,16 +2979,24 @@ async function handleAdminTraffic(db, env, request, url) {
     `SELECT COUNT(*) as total FROM discovery_hits WHERE created_at > ${since}`
   ).first();
 
+  // Agents-only count and noise breakdown, inverted per filter mode.
+  const agentsOnlyFilter = useBlocklist
+    ? `AND NOT (${noiseConds})`
+    : `AND (${allowConds})`;
+  const noiseOnlyFilter = useBlocklist
+    ? `AND (${noiseConds})`
+    : `AND NOT (${allowConds})`;
+
   const totalDiscoveryRecentFiltered = await db.prepare(
     `SELECT COUNT(*) as total FROM discovery_hits
-     WHERE created_at > ${since} AND NOT (${noiseConds})`
+     WHERE created_at > ${since} ${agentsOnlyFilter}`
   ).first();
 
   // Top 5 filtered-out noise UAs in the period, so we can still see what
   // infrastructure is polling us without it dominating the main numbers.
   const noiseBreakdown = await db.prepare(
     `SELECT user_agent, COUNT(*) as hits FROM discovery_hits
-     WHERE created_at > ${since} AND (${noiseConds})
+     WHERE created_at > ${since} ${noiseOnlyFilter}
      GROUP BY user_agent ORDER BY hits DESC LIMIT 5`
   ).all();
 
@@ -2989,7 +3008,9 @@ async function handleAdminTraffic(db, env, request, url) {
   return json({
     period: `last ${hours} hours`,
     noise_filtered: !includeNoise,
-    noise_prefixes: AGENT_NOISE_PREFIXES,
+    filter_mode: useBlocklist ? 'blocklist' : 'allowlist',
+    known_agents: useBlocklist ? undefined : KNOWN_AGENT_PATTERNS.map((e) => e.name),
+    noise_prefixes: useBlocklist ? AGENT_NOISE_PREFIXES : undefined,
     summary: {
       total_discovery_hits: totalDiscovery.total,
       discovery_hits_in_period: includeNoise
@@ -3092,18 +3113,59 @@ async function handleAgentLeaderboard(db) {
 // exemplars / funnel / named-first-seen
 // ============================================
 
-// Known noise: automated pollers and generic libraries that hit endpoints
-// repeatedly without reading or submitting. Filter them out when asking
-// "which named agents are actually visiting?"
+// Agent filter: allowlist of known AI agents and crawlers we want to track.
+// Inverted from the old prefix-based blocklist after CSO audit finding H2:
+// the old startsWith('Bun/') approach was trivially spoofed by prepending
+// 'Mozilla' or any non-matching string to a noise UA. An attacker could also
+// impersonate a real agent by using its prefix. The allowlist uses substring
+// matching against verified crawler identifiers.
+//
+// Feature flag: set AGENT_FILTER_MODE=blocklist in env to revert to old behavior.
+// Default: allowlist (new, secure).
+const KNOWN_AGENT_PATTERNS = [
+  // AI model crawlers (the agents we built GiveReady for)
+  { pattern: 'ClaudeBot', name: 'Anthropic Claude' },
+  { pattern: 'Claude-SearchBot', name: 'Anthropic Claude Search' },
+  { pattern: 'GPTBot', name: 'OpenAI GPT' },
+  { pattern: 'ChatGPT-User', name: 'OpenAI ChatGPT' },
+  { pattern: 'Google-Extended', name: 'Google AI' },
+  { pattern: 'PerplexityBot', name: 'Perplexity' },
+  { pattern: 'cohere-ai', name: 'Cohere' },
+  // Search engine crawlers (they read /llms.txt, /agents.md, /mcp too)
+  { pattern: 'Googlebot', name: 'Google Search' },
+  { pattern: 'bingbot', name: 'Microsoft Bing' },
+  { pattern: 'Applebot', name: 'Apple' },
+  { pattern: 'DuckDuckBot', name: 'DuckDuckGo' },
+  { pattern: 'YandexBot', name: 'Yandex' },
+  { pattern: 'Amzn-SearchBot', name: 'Amazon Search' },
+  { pattern: 'SemrushBot', name: 'SEMrush' },
+  // MCP ecosystem crawlers
+  { pattern: 'MCPRegistry', name: 'MCP Registry' },
+  { pattern: 'Smithery', name: 'Smithery' },
+  { pattern: 'PulseMCP', name: 'PulseMCP' },
+  { pattern: 'GlamaMCP', name: 'Glama MCP' },
+];
+
+// Legacy blocklist kept for feature flag rollback (AGENT_FILTER_MODE=blocklist).
 const AGENT_NOISE_PREFIXES = [
   'Bun/', 'curl/', 'wget/', 'Go-http-client', 'Python-requests',
   'python-httpx', 'python-urllib', 'node-fetch', 'axios/', 'okhttp/',
   'libwww-perl', 'Apache-HttpClient', 'Java/', 'Ruby', 'PostmanRuntime',
 ];
 
-function isNoiseAgent(ua) {
-  if (!ua) return true;
-  return AGENT_NOISE_PREFIXES.some((p) => ua.startsWith(p));
+function isKnownAgent(ua) {
+  if (!ua) return false;
+  return KNOWN_AGENT_PATTERNS.some((entry) => ua.includes(entry.pattern));
+}
+
+function isNoiseAgent(ua, env) {
+  // Feature flag: AGENT_FILTER_MODE=blocklist reverts to old prefix-based filter
+  if (env && env.AGENT_FILTER_MODE === 'blocklist') {
+    if (!ua) return true;
+    return AGENT_NOISE_PREFIXES.some((p) => ua.startsWith(p));
+  }
+  // Default (allowlist): anything not a known agent is noise
+  return !isKnownAgent(ua);
 }
 
 // /api/agents/exemplars — returns recently applied submissions as templates.
@@ -3135,7 +3197,7 @@ async function handleAgentExemplars(db, url) {
 // /api/agents/funnel — named crawlers that hit a discovery route but
 // did not submit an enrichment in the following window. This is the
 // read-and-leave gap the daily digest cares about. Excludes noise.
-async function handleAgentFunnel(db, url) {
+async function handleAgentFunnel(db, url, env) {
   const hours = parseInt(url.searchParams.get('hours') || '168', 10) || 168;
   const since = `datetime('now', '-${hours} hours')`;
 
@@ -3158,23 +3220,25 @@ async function handleAgentFunnel(db, url) {
   ).all();
   const submittedByAgent = new Set((submissions.results || []).map((s) => s.agent_id));
 
-  const rows = (hits.results || []).filter((h) => !isNoiseAgent(h.user_agent));
+  const rows = (hits.results || []).filter((h) => !isNoiseAgent(h.user_agent, env));
   const readAndLeft = rows.filter((h) => !submittedByAgent.has(h.user_agent));
   const readAndSubmitted = rows.filter((h) => submittedByAgent.has(h.user_agent));
 
+  const useBlocklist = env && env.AGENT_FILTER_MODE === 'blocklist';
   return json({
     message: `Named crawlers in the last ${hours}h — who read a discovery route and never submitted.`,
     window_hours: hours,
+    filter_mode: useBlocklist ? 'blocklist' : 'allowlist',
     read_and_left: readAndLeft,
     read_and_submitted: readAndSubmitted,
-    noise_excluded: AGENT_NOISE_PREFIXES,
+    noise_excluded: useBlocklist ? AGENT_NOISE_PREFIXES : KNOWN_AGENT_PATTERNS.map((e) => e.name),
   });
 }
 
 // /api/agents/named-first-seen — new NAMED user-agents seen in the period
 // that weren't seen before. Cuts through Bun/curl noise. This is the
 // "what actually changed today" signal.
-async function handleAgentNamedFirstSeen(db, url) {
+async function handleAgentNamedFirstSeen(db, url, env) {
   const hours = parseInt(url.searchParams.get('hours') || '24', 10) || 24;
   const since = `datetime('now', '-${hours} hours')`;
 
@@ -3190,7 +3254,7 @@ async function handleAgentNamedFirstSeen(db, url) {
   // For each, find its lifetime first_hit.
   const out = [];
   for (const r of (recent.results || [])) {
-    if (isNoiseAgent(r.user_agent)) continue;
+    if (isNoiseAgent(r.user_agent, env)) continue;
     const lifetime = await db.prepare(
       `SELECT MIN(created_at) AS lifetime_first FROM discovery_hits WHERE user_agent = ?1`
     ).bind(r.user_agent).first();
@@ -3205,9 +3269,11 @@ async function handleAgentNamedFirstSeen(db, url) {
   }
   out.sort((a, b) => (b.is_new - a.is_new) || (b.hits_in_window - a.hits_in_window));
 
+  const useBlocklist = env && env.AGENT_FILTER_MODE === 'blocklist';
   return json({
-    message: `Named agents in the last ${hours}h — Bun/curl/python pollers filtered out.`,
+    message: `Named agents in the last ${hours}h — ${useBlocklist ? 'noise prefixes' : 'non-allowlisted UAs'} filtered out.`,
     window_hours: hours,
+    filter_mode: useBlocklist ? 'blocklist' : 'allowlist',
     agents: out,
     first_time_named_crawlers: out.filter((a) => a.is_new),
   });
@@ -3864,8 +3930,8 @@ export default {
 
       // Self-learning endpoints (2026-04-16)
       if (path === '/api/agents/exemplars') return handleAgentExemplars(env.DB, url);
-      if (path === '/api/agents/funnel') return handleAgentFunnel(env.DB, url);
-      if (path === '/api/agents/named-first-seen') return handleAgentNamedFirstSeen(env.DB, url);
+      if (path === '/api/agents/funnel') return handleAgentFunnel(env.DB, url, env);
+      if (path === '/api/agents/named-first-seen') return handleAgentNamedFirstSeen(env.DB, url, env);
 
       // Agent enrichment endpoints
       if (path === '/api/needs-enrichment') return handleNeedsEnrichment(env.DB, url);

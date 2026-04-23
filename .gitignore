@@ -39,3 +39,4 @@ npm-debug.log*
 
 # MCP publisher binary
 mcp-publisher
+.gstack/
