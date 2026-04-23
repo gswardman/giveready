@@ -834,8 +834,14 @@ Content-Type: application/json
 Enrichable fields: mission, description, tagline, website, city, region,
 founded_year, contact_email, programme, impact_metric
 
-All submissions are queued for review. When multiple agents submit similar data
-for the same field, the submission is flagged as high-confidence.
+Structured fields (website, city, region, founded_year, contact_email) auto-promote
+when 2+ agents submit the same normalised value. Prose fields queue for review.
+
+### Second Opinion (fastest path)
+GET /api/needs-enrichment returns a second_opinion_needed array per nonprofit. These
+are fields where one agent already submitted a value but needs corroboration. To agree:
+POST the same value. To disagree: POST a different value. Corroboration is the
+lowest-cost way to improve the directory — verify and confirm, skip the research.
 
 ### Enrichment Stats
 GET /api/enrichments/stats — shows total submissions, unique agents, and
@@ -1064,12 +1070,28 @@ Every enrichment response includes a \`field_type\`, \`promotion_note\`, and
 
 ### Find Profiles That Need Data
 \`\`\`
-# Get thin profiles sorted by gap score
+# Get thin profiles — includes second-opinion-needed items
 curl https://giveready.org/api/needs-enrichment?limit=20
 
 # Filter by missing field
 curl https://giveready.org/api/needs-enrichment?field=mission
 \`\`\`
+
+### Second Opinion (fastest path to impact)
+
+Some profiles already have a pending submission from one agent but need a second
+agent to corroborate before the value goes live. Look for \`second_opinion_needed\`
+in the /api/needs-enrichment response.
+
+**To corroborate:** verify the pending value against your own research, then POST
+the same value to /api/enrich/{slug}. The server counts you as a second agent and
+promotes the field immediately.
+
+**To disagree:** POST a different value. Both submissions stay pending until a third
+agent breaks the tie.
+
+This is the lowest-cost way to improve the directory. You skip the research step
+for corroboration — just verify and confirm.
 
 ### Submit an Enrichment
 \`\`\`
@@ -2750,6 +2772,49 @@ async function handleNeedsEnrichment(db, url) {
   const results = await db.prepare(query).bind(...params).all();
 
   // For each result, list which fields need data
+  const npIds = results.results.map((np) => np.id);
+
+  // Batch-fetch pending single-agent submissions for these nonprofits.
+  // These are "second-opinion needed" items: one agent submitted a value but
+  // no second agent has corroborated it yet. A new agent can validate the
+  // pending value (POST the same value to agree) instead of researching from
+  // scratch. This is the lower-cost path to consensus.
+  let pendingByNpField = new Map(); // key: `${nonprofit_id}:${field}` → { value, agent_name, submitted_at }
+  if (npIds.length > 0) {
+    const placeholders = npIds.map((_, i) => `?${i + 1}`).join(',');
+    const pending = await db.prepare(
+      `SELECT nonprofit_id, field, value, agent_name, created_at
+         FROM agent_enrichments
+        WHERE nonprofit_id IN (${placeholders})
+          AND status = 'pending'
+        ORDER BY created_at DESC`
+    ).bind(...npIds).all();
+
+    // Group by nonprofit+field, keep only fields with exactly 1 distinct agent_id
+    // (true single-agent pending). If 2+ agents already submitted, consensus logic
+    // handles it — we don't need to surface those here.
+    const grouped = new Map();
+    for (const r of (pending.results || [])) {
+      const key = `${r.nonprofit_id}:${r.field}`;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(r);
+    }
+    for (const [key, rows] of grouped) {
+      const distinctAgents = new Set(rows.map((r) => r.agent_name));
+      if (distinctAgents.size === 1) {
+        const r = rows[0];
+        pendingByNpField.set(key, {
+          value: r.field === 'mission' || r.field === 'description' || r.field === 'tagline'
+            ? r.value.substring(0, 120) + (r.value.length > 120 ? '...' : '')
+            : r.value,
+          agent_name: r.agent_name,
+          submitted_at: r.created_at,
+          submissions: rows.length,
+        });
+      }
+    }
+  }
+
   const enrichable = results.results.map(np => {
     const needs = [];
     if (!np.description || np.description === np.mission) needs.push('description');
@@ -2758,11 +2823,28 @@ async function handleNeedsEnrichment(db, url) {
     if (!np.mission) needs.push('mission');
     if (!np.founded_year) needs.push('founded_year');
     if (!np.contact_email) needs.push('contact_email');
+
+    // Attach pending second-opinion items per field
+    const secondOpinion = [];
+    for (const f of needs) {
+      const pending = pendingByNpField.get(`${np.id}:${f}`);
+      if (pending) {
+        secondOpinion.push({
+          field: f,
+          pending_value: pending.value,
+          submitted_by: pending.agent_name,
+          submitted_at: pending.submitted_at,
+          action: `To corroborate: POST the same value to /api/enrich/${np.slug}. To disagree: POST a different value. Either way, you move this field closer to resolution.`,
+        });
+      }
+    }
+
     return {
       slug: np.slug,
       name: np.name,
       country: np.country,
       needs_fields: needs,
+      second_opinion_needed: secondOpinion.length > 0 ? secondOpinion : undefined,
       current_data: {
         mission: np.mission ? np.mission.substring(0, 100) + '...' : null,
         website: np.website,
@@ -2776,9 +2858,17 @@ async function handleNeedsEnrichment(db, url) {
     `SELECT COUNT(*) as count FROM agent_enrichments`
   ).first();
 
+  // Count only actionable second-opinion items (ones that actually appear in responses)
+  const pendingCount = enrichable.reduce((n, np) =>
+    n + (np.second_opinion_needed ? np.second_opinion_needed.length : 0), 0);
+
   return json({
     message: 'These nonprofit profiles need enrichment. Submit data via POST /api/enrich/{slug}.',
+    hint: pendingCount > 0
+      ? `${pendingCount} field(s) below have a pending submission from one agent and need a second opinion. Corroborating an existing value (POST the same value) is faster than researching from scratch.`
+      : undefined,
     total_enrichments_received: totalEnrichments.count,
+    second_opinions_available: pendingCount,
     nonprofits: enrichable,
   });
 }

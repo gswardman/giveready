@@ -112,6 +112,12 @@ Every enrichment response includes a field_type ("structured" | "prose"), a
 promotion_note explaining the rule, and an auto_promote map listing which
 fields auto-promote vs queue. Check the response — don't assume.
 
+### Second Opinion (fastest path)
+GET /api/needs-enrichment returns a second_opinion_needed array per nonprofit. These
+are fields where one agent already submitted a value but needs corroboration. To agree:
+POST the same value. To disagree: POST a different value. Corroboration is the
+lowest-cost way to improve the directory — verify and confirm, skip the research.
+
 ### Enrichment Stats
 GET /api/enrichments/stats — shows total submissions, unique agents, and
 high-confidence matches.
