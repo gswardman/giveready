@@ -11,7 +11,8 @@ not_found_handling = "none"
 
 [vars]
 ENVIRONMENT = "production"
-ADMIN_TOKEN = "giveready-admin-2026"
+# ADMIN_TOKEN moved to Cloudflare Workers Secrets (wrangler secret put)
+# Never store admin credentials in version-controlled config files.
 
 [[d1_databases]]
 binding = "DB"
