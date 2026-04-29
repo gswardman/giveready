@@ -39,14 +39,16 @@ FROM nonprofits n
 WHERE n.slug = 'city-kids-surfing'
 LIMIT 1;
 
--- 2. Demo query_log rows — spread across the last ~8 days with varied UAs
-INSERT OR IGNORE INTO query_log (id, query_text, source, results_count, created_at) VALUES
-  ('q-demo-cks-01', 'surf therapy charity UK youth', 'ClaudeBot', 3, datetime('now', '-2 hours')),
-  ('q-demo-cks-02', 'mental health charity for teenagers', 'GPTBot',   5, datetime('now', '-1 day')),
-  ('q-demo-cks-03', 'small charity brighton young people', 'Google-Extended', 2, datetime('now', '-3 days')),
-  ('q-demo-cks-04', 'ocean therapy kids anxiety', 'ClaudeBot', 2, datetime('now', '-4 days')),
-  ('q-demo-cks-05', 'city kids surfing uk', 'PerplexityBot', 1, datetime('now', '-6 days')),
-  ('q-demo-cks-06', 'underprivileged youth outdoor programmes england', 'ClaudeBot', 3, datetime('now', '-8 days'));
+-- 2. Demo query_log rows — spread across the last ~8 days with varied UAs.
+-- is_demo=1 keeps these out of /api/admin/traffic recent_queries so they
+-- don't pollute the daily digest's real-traffic read. See migration 012.
+INSERT OR IGNORE INTO query_log (id, query_text, source, results_count, is_demo, created_at) VALUES
+  ('q-demo-cks-01', 'surf therapy charity UK youth', 'ClaudeBot', 3, 1, datetime('now', '-2 hours')),
+  ('q-demo-cks-02', 'mental health charity for teenagers', 'GPTBot',   5, 1, datetime('now', '-1 day')),
+  ('q-demo-cks-03', 'small charity brighton young people', 'Google-Extended', 2, 1, datetime('now', '-3 days')),
+  ('q-demo-cks-04', 'ocean therapy kids anxiety', 'ClaudeBot', 2, 1, datetime('now', '-4 days')),
+  ('q-demo-cks-05', 'city kids surfing uk', 'PerplexityBot', 1, 1, datetime('now', '-6 days')),
+  ('q-demo-cks-06', 'underprivileged youth outdoor programmes england', 'ClaudeBot', 3, 1, datetime('now', '-8 days'));
 
 -- 3. Match each query to CKS (plus a few spread repeats so the counts match the mockup)
 -- Repeat each query multiple times to simulate real volume. Use different query_log IDs per repeat.

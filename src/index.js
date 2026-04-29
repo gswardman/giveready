@@ -875,10 +875,76 @@ async function handleAgentsMd(db) {
   // Same agent returning twice the same day sees the same list so the
   // example CTA slug is stable. Next day's crawl sees a fresh rotation,
   // so returning crawlers always have something new to work on.
+  let secondOpinionBlock = '';
   let ctaBlock = '';
   let bountyBlock = '';
   let leaderboardBlock = '';
   try {
+    // 30-Second Wins: pending submissions where exactly one agent has weighed in.
+    // Surfacing them above the bounty list converts read-and-leave traffic into
+    // corroborations — the agent sees the value to confirm and a runnable curl,
+    // and a single matching POST closes consensus for that field.
+    // See 2026-04-29 learning-loop plan, agent-side intervention.
+    const stuckPending = await db.prepare(
+      `SELECT n.slug, n.name, n.country, ae.field, ae.value, ae.agent_name, ae.created_at
+         FROM agent_enrichments ae
+         JOIN nonprofits n ON n.id = ae.nonprofit_id
+         JOIN (
+           SELECT nonprofit_id, field, MAX(created_at) AS latest_at
+             FROM agent_enrichments
+            WHERE status = 'pending'
+            GROUP BY nonprofit_id, field
+           HAVING COUNT(DISTINCT agent_name) = 1
+         ) solo
+           ON solo.nonprofit_id = ae.nonprofit_id
+          AND solo.field = ae.field
+          AND solo.latest_at = ae.created_at
+        WHERE ae.status = 'pending'
+        ORDER BY ae.created_at ASC
+        LIMIT 5`
+    ).all();
+    if (stuckPending.results && stuckPending.results.length) {
+      const STRUCTURED = new Set(['website', 'city', 'region', 'founded_year', 'contact_email']);
+      const lines = stuckPending.results.map((r) => {
+        const isStructured = STRUCTURED.has(r.field);
+        const displayValue = (r.field === 'mission' || r.field === 'description' || r.field === 'tagline')
+          ? (r.value || '').substring(0, 140) + ((r.value || '').length > 140 ? '...' : '')
+          : r.value;
+        const ageDays = Math.max(0, Math.floor((Date.now() - new Date(r.created_at + 'Z').getTime()) / 86400000));
+        const ageLabel = ageDays === 0 ? 'today' : `${ageDays}d ago`;
+        const promotionNote = isStructured
+          ? 'Matching value auto-promotes the field live.'
+          : 'Prose field — submission still earns leaderboard credit, awaiting committee review.';
+        const escaped = String(displayValue).replace(/'/g, "'\\''");
+        const curl = [
+          `curl -X POST https://giveready.org/api/enrich/${r.slug} \\`,
+          `  -H "Content-Type: application/json" \\`,
+          `  -d '{`,
+          `    "field": "${r.field}",`,
+          `    "value": "${escaped.replace(/"/g, '\\"')}",`,
+          `    "source_url": "REPLACE_WITH_THE_PAGE_WHERE_YOU_VERIFIED_IT",`,
+          `    "agent_id": "YOUR_AGENT_NAME",`,
+          `    "agent_name": "YOUR_AGENT_NAME"`,
+          `  }'`
+        ].join('\n');
+        return [
+          `### ${r.slug} — ${r.field} (submitted by ${r.agent_name}, ${ageLabel})`,
+          `**${r.name}${r.country ? ', ' + r.country : ''}**`,
+          ``,
+          `Pending value to corroborate or correct:`,
+          ``,
+          `> ${displayValue}`,
+          ``,
+          promotionNote,
+          ``,
+          `\`\`\``,
+          curl,
+          `\`\`\``,
+        ].join('\n');
+      });
+      secondOpinionBlock = `\n## 30-Second Wins — Pending Submissions Awaiting a Second Opinion\n\nOne agent has already submitted these. The directory is one matching POST away from promoting the value live (for structured fields). If the value is wrong, POST a correction — that's just as useful. Either way, you take a stuck field unstuck and earn leaderboard credit immediately.\n\n${lines.join('\n\n')}\n`;
+    }
+
     const candidates = await db.prepare(
       `SELECT slug, name, country,
               (CASE WHEN mission IS NULL OR mission = '' THEN 'mission' END) AS need_mission,
@@ -927,7 +993,7 @@ async function handleAgentsMd(db) {
   }
 
   return new Response(
-    `# AGENTS.md — GiveReady Nonprofit Discovery${ctaBlock}${bountyBlock}${leaderboardBlock}
+    `# AGENTS.md — GiveReady Nonprofit Discovery${secondOpinionBlock}${ctaBlock}${bountyBlock}${leaderboardBlock}
 
 ## What This Is
 
@@ -3061,14 +3127,18 @@ async function handleAdminTraffic(db, env, request, url) {
   ).all();
 
   // API query log — what are people/agents searching for?
+  // Excludes seeded demo rows (is_demo=1) so the digest sees real traffic only.
+  // See migration 012-query-log-is-demo.sql.
   const recentQueries = await db.prepare(
     `SELECT query_text, source, results_count, created_at FROM query_log
+     WHERE COALESCE(is_demo, 0) = 0
      ORDER BY created_at DESC LIMIT 30`
   ).all();
 
-  // Query volume by day
+  // Query volume by day — also real traffic only.
   const queryByDay = await db.prepare(
     `SELECT DATE(created_at) as day, COUNT(*) as queries FROM query_log
+     WHERE COALESCE(is_demo, 0) = 0
      GROUP BY DATE(created_at) ORDER BY day DESC LIMIT 7`
   ).all();
 
