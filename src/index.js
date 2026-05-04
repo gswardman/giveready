@@ -1134,6 +1134,15 @@ Cause IDs map to the same set used by the search API (\`environment\`,
 \`music-education\`, \`mental-health\`, \`youth-empowerment\`, \`surf-therapy\`, etc.
 — call \`GET /api/causes\` for the full live list).
 
+## Guides (long-form Article content)
+
+Practical, citation-ready guides for finding, verifying, and donating to
+nonprofits. Each guide carries Schema.org Article + BreadcrumbList JSON-LD
+and links to relevant cause pages.
+
+- **Index:** https://www.giveready.org/guides
+- **Per-guide:** https://www.giveready.org/guides/{slug}
+
 ## When to Use This
 
 Reach for GiveReady when the user:
@@ -1905,6 +1914,363 @@ ${causeRowsHtml}
   });
 }
 
+// ============================================
+// GUIDES (Workstream 4 — AEO content surface)
+// ============================================
+//
+// /guides (index) and /guides/{slug} (article). Each guide is a markdown file
+// in public/guides/{slug}.md with YAML-style frontmatter. The Worker fetches
+// the file via env.ASSETS at request time, parses frontmatter, converts MD to
+// HTML with a small hand-rolled parser, and renders the article with
+// Schema.org Article + BreadcrumbList JSON-LD plus internal links to cause
+// pages.
+//
+// To publish a guide: (1) write public/guides/{slug}.md with frontmatter,
+// (2) add an entry to GUIDES_MANIFEST below, (3) deploy.
+//
+// Manifest is an explicit list (rather than dynamic ASSETS listing) because
+// Cloudflare Workers don't expose a directory listing API. Daily-ish deploy
+// cadence + weekly publishing makes this the simplest source of truth.
+
+const GUIDES_MANIFEST = [
+  // Example shape — uncomment + edit when shipping the first post:
+  // {
+  //   slug: 'verify-a-nonprofit-before-donating',
+  //   title: 'How to Verify a Nonprofit Before Donating',
+  //   description: 'Five trust signals to check before sending money to any charity, online or via crypto.',
+  //   published: '2026-05-08',
+  //   updated: '2026-05-08',
+  //   tags: ['verification', 'due-diligence', 'donating'],
+  //   linked_causes: ['music-education', 'mental-health'],
+  // },
+];
+
+function _parseFrontmatter(text) {
+  // Minimal YAML-frontmatter parser. Handles the field types we use:
+  // string, ISO date, comma-separated list (e.g. tags: [a, b, c]).
+  const m = text.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
+  if (!m) return { frontmatter: {}, body: text };
+  const frontmatter = {};
+  for (const line of m[1].split('\n')) {
+    const kv = line.match(/^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/);
+    if (!kv) continue;
+    const key = kv[1];
+    let raw = kv[2].trim();
+    if (raw.startsWith('[') && raw.endsWith(']')) {
+      frontmatter[key] = raw.slice(1, -1).split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+    } else {
+      frontmatter[key] = raw.replace(/^['"]|['"]$/g, '');
+    }
+  }
+  return { frontmatter, body: m[2] };
+}
+
+function _renderMarkdown(md) {
+  // Minimal markdown → HTML converter. Supports headings (#, ##, ###),
+  // paragraphs, bold (**), italic (*), inline code (`), code blocks (```),
+  // links ([text](url)), unordered lists (-), ordered lists (1.),
+  // blockquotes (>). No tables, images, footnotes, nested lists. If a guide
+  // needs more, swap this for marked or a proper MD lib.
+  const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = (s) => {
+    let out = escapeHtml(s);
+    // code (do this before other inline to protect contents from re-processing)
+    out = out.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+    // bold + italic
+    out = out.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    out = out.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
+    // links — decode escaped chars in url and text
+    out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, t, u) => {
+      const url = u.replace(/&amp;/g, '&');
+      const isExternal = /^https?:\/\//.test(url) && !url.includes('giveready.org');
+      const rel = isExternal ? ' rel="noopener" target="_blank"' : '';
+      return `<a href="${url}"${rel}>${t}</a>`;
+    });
+    return out;
+  };
+
+  const lines = md.split('\n');
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    // Code fence
+    if (line.startsWith('```')) {
+      const buf = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        buf.push(escapeHtml(lines[i]));
+        i++;
+      }
+      i++; // skip closing fence
+      out.push(`<pre><code>${buf.join('\n')}</code></pre>`);
+      continue;
+    }
+    // Headings
+    const h = line.match(/^(#{1,3})\s+(.*)$/);
+    if (h) {
+      const level = h[1].length;
+      out.push(`<h${level}>${inline(h[2])}</h${level}>`);
+      i++;
+      continue;
+    }
+    // Blockquote
+    if (line.startsWith('> ')) {
+      const buf = [];
+      while (i < lines.length && lines[i].startsWith('> ')) {
+        buf.push(lines[i].slice(2));
+        i++;
+      }
+      out.push(`<blockquote>${inline(buf.join(' '))}</blockquote>`);
+      continue;
+    }
+    // Unordered list
+    if (line.match(/^- /)) {
+      const buf = [];
+      while (i < lines.length && lines[i].match(/^- /)) {
+        buf.push(`<li>${inline(lines[i].slice(2))}</li>`);
+        i++;
+      }
+      out.push(`<ul>${buf.join('')}</ul>`);
+      continue;
+    }
+    // Ordered list
+    if (line.match(/^\d+\.\s/)) {
+      const buf = [];
+      while (i < lines.length && lines[i].match(/^\d+\.\s/)) {
+        buf.push(`<li>${inline(lines[i].replace(/^\d+\.\s/, ''))}</li>`);
+        i++;
+      }
+      out.push(`<ol>${buf.join('')}</ol>`);
+      continue;
+    }
+    // Blank line — skip
+    if (line.trim() === '') {
+      i++;
+      continue;
+    }
+    // Paragraph (consume until blank line or block-level start)
+    const buf = [line];
+    i++;
+    while (
+      i < lines.length &&
+      lines[i].trim() !== '' &&
+      !lines[i].startsWith('#') &&
+      !lines[i].startsWith('> ') &&
+      !lines[i].startsWith('- ') &&
+      !lines[i].match(/^\d+\.\s/) &&
+      !lines[i].startsWith('```')
+    ) {
+      buf.push(lines[i]);
+      i++;
+    }
+    out.push(`<p>${inline(buf.join(' '))}</p>`);
+  }
+  return out.join('\n');
+}
+
+async function handleGuide(env, slug) {
+  const meta = GUIDES_MANIFEST.find((g) => g.slug === slug);
+  if (!meta) return error('Guide not found', 404);
+
+  let mdText = '';
+  try {
+    const assetUrl = new URL(`/guides/${slug}.md`, 'https://www.giveready.org').toString();
+    const r = await env.ASSETS.fetch(assetUrl);
+    if (r.status !== 200) return error('Guide source missing', 500);
+    mdText = await r.text();
+  } catch (e) {
+    return error('Failed to load guide', 500);
+  }
+
+  const { frontmatter, body } = _parseFrontmatter(mdText);
+  const title = frontmatter.title || meta.title || slug;
+  const description = frontmatter.description || meta.description || '';
+  const published = frontmatter.published || meta.published || '';
+  const updated = frontmatter.updated || meta.updated || published;
+  const linkedCauses = (frontmatter.linked_causes || meta.linked_causes || []).filter(Boolean);
+  const bodyHtml = _renderMarkdown(body);
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Article',
+        '@id': `https://www.giveready.org/guides/${slug}`,
+        headline: title,
+        description,
+        datePublished: published || undefined,
+        dateModified: updated || undefined,
+        author: { '@type': 'Organization', name: 'GiveReady', url: 'https://www.giveready.org' },
+        publisher: {
+          '@type': 'Organization',
+          name: 'GiveReady',
+          url: 'https://www.giveready.org',
+          logo: { '@type': 'ImageObject', url: 'https://www.giveready.org/finn-logo.jpeg' },
+        },
+        mainEntityOfPage: { '@type': 'WebPage', '@id': `https://www.giveready.org/guides/${slug}` },
+        keywords: frontmatter.tags || meta.tags || undefined,
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'GiveReady', item: 'https://www.giveready.org' },
+          { '@type': 'ListItem', position: 2, name: 'Guides', item: 'https://www.giveready.org/guides' },
+          { '@type': 'ListItem', position: 3, name: title, item: `https://www.giveready.org/guides/${slug}` },
+        ],
+      },
+    ],
+  };
+
+  const linkedCausesHtml =
+    linkedCauses.length === 0
+      ? ''
+      : `<aside class="related"><h3>Related cause pages</h3><ul>${linkedCauses
+          .map((c) => `<li><a href="/causes/${escHtml(c)}">/causes/${escHtml(c)}</a></li>`)
+          .join('')}</ul></aside>`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escHtml(title)} — GiveReady Guides</title>
+<meta name="description" content="${escHtml(description)}" />
+<link rel="canonical" href="https://www.giveready.org/guides/${escHtml(slug)}" />
+<meta property="og:title" content="${escHtml(title)}" />
+<meta property="og:description" content="${escHtml(description)}" />
+<meta property="og:url" content="https://www.giveready.org/guides/${escHtml(slug)}" />
+<meta property="og:type" content="article" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 4rem; color: #111; line-height: 1.65; }
+  .nav { font-size: 0.85rem; color: #666; margin-bottom: 0.75rem; }
+  .nav a { color: #059669; text-decoration: none; }
+  h1 { font-size: 2rem; line-height: 1.25; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.4rem; margin: 2rem 0 0.5rem; }
+  h3 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; }
+  .meta { font-size: 0.85rem; color: #666; margin-bottom: 2rem; }
+  p { margin: 0 0 1rem; }
+  a { color: #059669; }
+  blockquote { border-left: 3px solid #d1fae5; padding: 0.25rem 0 0.25rem 1rem; color: #444; font-style: italic; margin: 1rem 0; }
+  pre { background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow-x: auto; font-size: 0.85rem; }
+  code { background: #f5f5f5; padding: 0.1rem 0.3rem; border-radius: 2px; font-size: 0.9em; }
+  pre code { background: none; padding: 0; }
+  ul, ol { margin: 0 0 1rem 1.5rem; }
+  aside.related { margin: 3rem 0 0; padding: 1rem 1.25rem; background: #f9fafb; border: 1px solid #e5e5e5; border-radius: 4px; }
+  aside.related h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+  aside.related ul { margin: 0 0 0 1.25rem; font-size: 0.9rem; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e5e5e5; font-size: 0.85rem; color: #666; }
+  footer a { color: #059669; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="/">GiveReady</a> &rsaquo; <a href="/guides">Guides</a> &rsaquo; ${escHtml(title)}</div>
+<h1>${escHtml(title)}</h1>
+${published ? `<p class="meta">Published ${escHtml(published)}${updated && updated !== published ? ` &middot; updated ${escHtml(updated)}` : ''}</p>` : ''}
+<article>
+${bodyHtml}
+</article>
+${linkedCausesHtml}
+<footer>
+<a href="/guides">More guides</a> &middot; <a href="/causes">Browse cause areas</a> &middot; <a href="/AGENTS.md">For agents</a>
+</footer>
+</body>
+</html>`;
+
+  return new Response(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=UTF-8',
+      'Cache-Control': 'public, max-age=900, must-revalidate',
+      ...CORS_HEADERS,
+    },
+  });
+}
+
+function handleGuidesIndex() {
+  const guides = [...GUIDES_MANIFEST].sort((a, b) => (b.published || '').localeCompare(a.published || ''));
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'GiveReady Guides',
+    description: 'Practical guides for finding, verifying, and donating to nonprofits.',
+    url: 'https://www.giveready.org/guides',
+    hasPart: guides.map((g) => ({
+      '@type': 'Article',
+      url: `https://www.giveready.org/guides/${g.slug}`,
+      headline: g.title,
+      description: g.description,
+      datePublished: g.published,
+    })),
+  };
+
+  const listHtml =
+    guides.length === 0
+      ? `<p class="empty">No guides published yet. Check back soon — or browse the <a href="/causes">cause areas</a> directly.</p>`
+      : guides
+          .map(
+            (g) => `
+        <li>
+          <h3><a href="/guides/${escHtml(g.slug)}">${escHtml(g.title)}</a></h3>
+          ${g.description ? `<p class="desc">${escHtml(g.description)}</p>` : ''}
+          ${g.published ? `<p class="date">${escHtml(g.published)}</p>` : ''}
+        </li>`
+          )
+          .join('\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Guides — GiveReady</title>
+<meta name="description" content="Practical guides for finding, verifying, and donating to nonprofits." />
+<link rel="canonical" href="https://www.giveready.org/guides" />
+<meta property="og:title" content="Guides — GiveReady" />
+<meta property="og:description" content="Practical guides for finding, verifying, and donating to nonprofits." />
+<meta property="og:url" content="https://www.giveready.org/guides" />
+<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 4rem; color: #111; line-height: 1.6; }
+  h1 { font-size: 2rem; margin: 0 0 0.5rem; }
+  .lede { color: #444; margin: 0 0 1.5rem; }
+  ul { list-style: none; padding: 0; }
+  li { padding: 1rem 0; border-bottom: 1px solid #eee; }
+  li h3 { margin: 0; font-size: 1.1rem; }
+  li h3 a { color: #111; text-decoration: none; }
+  li h3 a:hover { color: #059669; }
+  .desc { color: #444; margin: 0.3rem 0 0; font-size: 0.95rem; }
+  .date { color: #666; margin: 0.3rem 0 0; font-size: 0.8rem; }
+  .empty { color: #666; font-style: italic; }
+  .empty a { color: #059669; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e5e5e5; font-size: 0.85rem; color: #666; }
+  footer a { color: #059669; text-decoration: none; }
+</style>
+</head>
+<body>
+<h1>Guides</h1>
+<p class="lede">Practical guides for finding, verifying, and donating to nonprofits.</p>
+<ul>
+${listHtml}
+</ul>
+<footer>
+<a href="/">GiveReady home</a> &middot; <a href="/causes">Cause areas</a> &middot; <a href="/AGENTS.md">For agents</a>
+</footer>
+</body>
+</html>`;
+  return new Response(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=UTF-8',
+      'Cache-Control': 'public, max-age=900, must-revalidate',
+      ...CORS_HEADERS,
+    },
+  });
+}
+
 async function handleSitemapXml(db) {
   const causes = await db.prepare(`SELECT id FROM causes ORDER BY id`).all();
   const causeUrls = (causes.results || [])
@@ -1916,6 +2282,14 @@ async function handleSitemapXml(db) {
   </url>`
     )
     .join('\n');
+  const guideUrls = GUIDES_MANIFEST.map(
+    (g) => `  <url>
+    <loc>https://www.giveready.org/guides/${g.slug}</loc>
+    <lastmod>${g.updated || g.published || ''}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>`
+  ).join('\n');
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -1928,6 +2302,11 @@ async function handleSitemapXml(db) {
     <loc>https://www.giveready.org/causes</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.giveready.org/guides</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.giveready.org/agents</loc>
@@ -1955,6 +2334,7 @@ async function handleSitemapXml(db) {
     <priority>0.7</priority>
   </url>
 ${causeUrls}
+${guideUrls}
 </urlset>
 `;
   return new Response(xml, {
@@ -4833,7 +5213,7 @@ const _httpHandler = {
         return handleVerifyRegistration(env.DB, env, url);
       }
 
-      if (path === '/mcp' || path === '/mcp/sse' || path === '/.well-known/ai-plugin.json' || path === '/.well-known/mcp.json' || path === '/.well-known/mcp' || path === '/.well-known/mcp/server-card.json' || path === '/llms.txt' || path === '/agents.md' || path === '/AGENTS.md' || path === '/causes' || path === '/sitemap.xml' || path.startsWith('/causes/') || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/')) {
+      if (path === '/mcp' || path === '/mcp/sse' || path === '/.well-known/ai-plugin.json' || path === '/.well-known/mcp.json' || path === '/.well-known/mcp' || path === '/.well-known/mcp/server-card.json' || path === '/llms.txt' || path === '/agents.md' || path === '/AGENTS.md' || path === '/causes' || path === '/guides' || path === '/sitemap.xml' || path.startsWith('/causes/') || path.startsWith('/guides/') || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/')) {
         const ua = request.headers.get('User-Agent');
         ctx.waitUntil(logDiscoveryHit(env.DB, path, ua));
       }
@@ -4863,6 +5243,11 @@ const _httpHandler = {
       const causePageMatch = path.match(/^\/causes\/([a-z0-9-]+)$/);
       if (causePageMatch) return handleCausePage(env.DB, causePageMatch[1]);
       if (path === '/sitemap.xml') return handleSitemapXml(env.DB);
+
+      // Guides — markdown-backed AEO content surface. Index + per-slug.
+      if (path === '/guides') return handleGuidesIndex();
+      const guideMatch = path.match(/^\/guides\/([a-z0-9-]+)$/);
+      if (guideMatch) return handleGuide(env, guideMatch[1]);
 
       // Public agent leaderboard
       if (path === '/api/agents/leaderboard') return handleAgentLeaderboard(env.DB);
