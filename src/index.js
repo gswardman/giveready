@@ -1096,6 +1096,11 @@ Sitemap: https://www.giveready.org/sitemap.xml
   );
 }
 
+// IMPORTANT: handleLlmsTxt() is the source of truth for /llms.txt.
+// Do NOT add a static file at public/llms.txt — Cloudflare's asset routing
+// (wrangler.toml: not_found_handling = "none") matches static files BEFORE
+// the Worker runs, which would silently shadow this handler. Same pattern
+// applies to any other path with both a handler and a static file.
 function handleLlmsTxt() {
   return new Response(
     `# GiveReady — Nonprofit Discovery API for AI Agents
