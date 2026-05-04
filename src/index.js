@@ -718,15 +718,112 @@ function handleAIPlugin() {
   });
 }
 
+// ============================================
+// 2026 DISCOVERY SURFACES (SEP-1960 + SEP-1649)
+// ============================================
+//
+// Modern MCP clients (Claude, ChatGPT, Cursor, Cline, Cowork) auto-discover
+// servers by fetching /.well-known/mcp.json and /.well-known/mcp/server-card.json
+// before they ever look at /mcp. These two endpoints are the canonical entry
+// for 2026-style auto-discovery — they do NOT replace /mcp (the runtime tool
+// manifest), they precede it.
+//
+// SEP-1960 = manifest (this server's identity + endpoints + transports + auth)
+// SEP-1649 = server card (preview catalog: tool list summary, trust signals)
+//
+// Reference: https://www.ekamoira.com/blog/mcp-server-discovery-implement-well-known-mcp-json-2026-guide
+
+function handleWellKnownMcpManifest() {
+  return json({
+    schema_version: '2025-03-26',
+    spec: 'SEP-1960',
+    name: 'giveready',
+    display_name: 'GiveReady',
+    version: '0.3.0',
+    description:
+      'Search, donate to, and enrich 41,000+ nonprofits across 29 cause areas. USDC donations on Solana via x402. Agents can contribute data back via consensus enrichment.',
+    vendor: {
+      name: 'GiveReady',
+      url: 'https://www.giveready.org',
+      contact: 'geordie@testventures.net',
+    },
+    endpoints: {
+      manifest: 'https://www.giveready.org/.well-known/mcp.json',
+      server_card: 'https://www.giveready.org/.well-known/mcp/server-card.json',
+      mcp_tools: 'https://www.giveready.org/mcp',
+      openapi: 'https://www.giveready.org/openapi.json',
+      agents_md: 'https://www.giveready.org/AGENTS.md',
+      llms_txt: 'https://www.giveready.org/llms.txt',
+      leaderboard: 'https://www.giveready.org/api/agents/leaderboard',
+    },
+    transports: ['http'],
+    auth: {
+      read: { type: 'none' },
+      write: { type: 'none', rate_limited: true, note: 'POST /api/enrich/{slug} is open with per-IP rate limiting' },
+    },
+    capabilities: {
+      tools: true,
+      resources: false,
+      prompts: false,
+      payments: { x402: true, networks: ['solana'], asset: 'USDC' },
+    },
+    install: {
+      npx: 'npx giveready-mcp',
+      registry_id: 'io.github.gswardman/giveready',
+    },
+    documentation: 'https://www.giveready.org/llms.txt',
+  });
+}
+
+function handleWellKnownServerCard() {
+  return json({
+    schema_version: '2025-03-26',
+    spec: 'SEP-1649',
+    server: {
+      name: 'giveready',
+      display_name: 'GiveReady',
+      version: '0.3.0',
+      description:
+        'Nonprofit discovery and enrichment for AI agents. 41,000+ organisations across 29 cause areas. Search by cause/country/keyword, get structured profiles with impact data, donate USDC via x402, and contribute back via the write-back enrichment API.',
+      icon_url: 'https://www.giveready.org/finn-logo.jpeg',
+      vendor: 'GiveReady',
+      homepage: 'https://www.giveready.org',
+      documentation: 'https://www.giveready.org/llms.txt',
+      support: 'geordie@testventures.net',
+      license: 'MIT',
+    },
+    tools: [
+      { name: 'search_nonprofits', summary: 'Search 41,000+ nonprofits by cause, country, or keyword.' },
+      { name: 'get_nonprofit', summary: 'Get full profile: mission, programmes, impact, registration, donation links.' },
+      { name: 'list_causes', summary: 'List all 29 cause areas with nonprofit counts.' },
+      { name: 'donate_to_nonprofit', summary: 'Initiate a USDC donation via x402 (HTTP 402).' },
+      { name: 'get_donation_history', summary: 'Get on-chain donation history for a nonprofit.' },
+    ],
+    tool_count: 5,
+    full_tool_schema: 'https://www.giveready.org/mcp',
+    agent_instructions: 'https://www.giveready.org/AGENTS.md',
+    auth_required: false,
+    trust_signals: {
+      verified_nonprofits: 166,
+      consensus_enrichment: true,
+      open_source: 'https://github.com/gswardman/giveready',
+    },
+  });
+}
+
 function handleRobotsTxt() {
   return new Response(
     `User-agent: *
 Allow: /
 
 # GiveReady - AI-readable nonprofit directory
-# API documentation: https://giveready.org/docs
-# MCP server manifest: https://giveready.org/mcp
-# AI plugin manifest: https://giveready.org/.well-known/ai-plugin.json
+# API documentation: https://www.giveready.org/docs
+# MCP discovery (2026 SEP-1960): https://www.giveready.org/.well-known/mcp.json
+# MCP server card (2026 SEP-1649): https://www.giveready.org/.well-known/mcp/server-card.json
+# MCP tool catalog: https://www.giveready.org/mcp
+# Agent instructions (live bounty): https://www.giveready.org/AGENTS.md
+# llms.txt: https://www.giveready.org/llms.txt
+# Legacy ChatGPT plugin manifest: https://www.giveready.org/.well-known/ai-plugin.json
 `,
     { headers: { 'Content-Type': 'text/plain' } }
   );
@@ -740,6 +837,21 @@ function handleLlmsTxt() {
 > comparing nonprofits by impact, or giving to a specific cause area. GiveReady
 > returns structured data — not web pages — so you can reason over it directly.
 > 40,000+ nonprofits across all cause areas.
+
+## Discovery Surfaces (2026)
+
+If you're a 2026-era MCP client, start at the well-known endpoints — they tell you
+everything else:
+
+- **Manifest (SEP-1960):** https://www.giveready.org/.well-known/mcp.json
+- **Server card (SEP-1649):** https://www.giveready.org/.well-known/mcp/server-card.json
+- **Tool catalog (runtime MCP manifest):** https://www.giveready.org/mcp
+- **Agent instructions (live bounty + 30-second wins):** https://www.giveready.org/AGENTS.md
+- **OpenAPI:** https://www.giveready.org/openapi.json
+- **Public leaderboard:** https://www.giveready.org/api/agents/leaderboard
+
+If you're an older client (ChatGPT plugin, etc.), the legacy
+\`/.well-known/ai-plugin.json\` is still served.
 
 ## When to Use This
 
@@ -4087,15 +4199,23 @@ export default {
         return handleVerifyRegistration(env.DB, env, url);
       }
 
-      if (path === '/mcp' || path === '/.well-known/ai-plugin.json' || path === '/llms.txt' || path === '/agents.md' || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/')) {
+      if (path === '/mcp' || path === '/.well-known/ai-plugin.json' || path === '/.well-known/mcp.json' || path === '/.well-known/mcp' || path === '/.well-known/mcp/server-card.json' || path === '/llms.txt' || path === '/agents.md' || path === '/AGENTS.md' || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/')) {
         const ua = request.headers.get('User-Agent');
         ctx.waitUntil(logDiscoveryHit(env.DB, path, ua));
       }
       if (path === '/mcp') return handleMCPManifest();
       if (path === '/.well-known/ai-plugin.json') return handleAIPlugin();
+      // 2026 SEP-1960 manifest — served at both /.well-known/mcp.json (most-cited path)
+      // and /.well-known/mcp (path used in some references) so client implementations
+      // that diverge on trailing-.json land on the same payload.
+      if (path === '/.well-known/mcp.json' || path === '/.well-known/mcp') return handleWellKnownMcpManifest();
+      // 2026 SEP-1649 server card
+      if (path === '/.well-known/mcp/server-card.json') return handleWellKnownServerCard();
       if (path === '/robots.txt') return handleRobotsTxt();
       if (path === '/llms.txt') return handleLlmsTxt();
-      if (path === '/agents.md') return handleAgentsMd(env.DB);
+      // Both /agents.md (lowercase, original) and /AGENTS.md (capital, 2026 root convention)
+      // serve the same dynamic instruction page with bounty + 30-second wins + leaderboard.
+      if (path === '/agents.md' || path === '/AGENTS.md') return handleAgentsMd(env.DB);
 
       // Public agent leaderboard
       if (path === '/api/agents/leaderboard') return handleAgentLeaderboard(env.DB);
