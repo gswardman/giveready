@@ -2328,6 +2328,11 @@ async function handleSitemapXml(db) {
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://www.giveready.org/terms</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://www.giveready.org/agents</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -2373,195 +2378,17 @@ const OPERATOR_FOOTER_LINKS = `<a href="/about">About</a> · <a href="/privacy">
 
 const OPERATOR_FOOTER_BLOCK = `<div style="margin-top:10px;font-size:11px;color:var(--light,#999);line-height:1.6;">
 GiveReady is operated by <a href="https://testventures.net" style="color:inherit;text-decoration:underline;">TestVentures.net</a> (Geordie Wardman). Based in Switzerland.<br/>
-Contact: <a href="mailto:geordie@testventures.net" style="color:inherit;text-decoration:underline;">geordie@testventures.net</a> · <a href="/about" style="color:inherit;text-decoration:underline;">About</a> · <a href="/privacy" style="color:inherit;text-decoration:underline;">Privacy</a>
+Contact: <a href="mailto:geordie@testventures.net" style="color:inherit;text-decoration:underline;">geordie@testventures.net</a> · <a href="/about" style="color:inherit;text-decoration:underline;">About</a> · <a href="/terms" style="color:inherit;text-decoration:underline;">Terms</a> · <a href="/privacy" style="color:inherit;text-decoration:underline;">Privacy</a>
 </div>`;
 
 // Lightweight version for server-rendered content pages (causes, guides, leaderboard)
 const OPERATOR_FOOTER_PLAIN = `<div style="margin-top:0.75rem;font-size:0.8rem;color:#999;line-height:1.6;">
 Operated by <a href="https://testventures.net" style="color:#999;">TestVentures.net</a> (Geordie Wardman). Based in Switzerland.
-<a href="mailto:geordie@testventures.net" style="color:#999;">Contact</a> · <a href="/about" style="color:#999;">About</a> · <a href="/privacy" style="color:#999;">Privacy</a>
+<a href="mailto:geordie@testventures.net" style="color:#999;">Contact</a> · <a href="/about" style="color:#999;">About</a> · <a href="/terms" style="color:#999;">Terms</a> · <a href="/privacy" style="color:#999;">Privacy</a>
 </div>`;
 
-// ============================================
-// ABOUT PAGE
-// ============================================
-function handleAbout() {
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>About GiveReady</title>
-  <meta name="description" content="GiveReady is a free, open-source donation platform for nonprofits. Operated by TestVentures.net." />
-  <link rel="canonical" href="https://www.giveready.org/about" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #fff; color: #111; font-family: 'Inter', -apple-system, system-ui, sans-serif; font-size: 15px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
-    nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid #e5e5e5; height: 52px; padding: 0 24px; display: flex; align-items: center; gap: 10px; }
-    nav a { font-weight: 700; font-size: 15px; color: #111; text-decoration: none; letter-spacing: -0.02em; }
-    nav span { color: #999; font-size: 14px; }
-    .wrap { max-width: 640px; margin: 0 auto; padding: 48px 24px 64px; }
-    h1 { font-size: clamp(24px, 5vw, 36px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; margin-bottom: 24px; }
-    h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin-top: 32px; margin-bottom: 12px; }
-    p { margin-bottom: 16px; color: #444; }
-    a { color: #059669; }
-    .operator { margin-top: 40px; padding: 20px; background: #f9fafb; border: 1px solid #e5e5e5; border-radius: 8px; font-size: 14px; color: #444; line-height: 1.7; }
-    .operator strong { color: #111; }
-    footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid #e5e5e5; font-size: 12px; color: #999; }
-    footer a { color: #999; text-decoration: none; }
-    footer a:hover { color: #666; }
-  </style>
-</head>
-<body>
-<nav><a href="/">GiveReady</a> <span>&rsaquo; About</span></nav>
-<div class="wrap">
-<h1>About GiveReady</h1>
-
-<p>GiveReady is a free, open-source donation platform that makes nonprofits discoverable to both humans and AI agents. Over 41,000 nonprofits are indexed across 29 cause areas.</p>
-
-<p>The platform gives every listed charity a donation page at no cost, with zero platform fees. Donations go directly to the nonprofit's wallet. There is no intermediary and no cut taken by GiveReady.</p>
-
-<h2>Why it exists</h2>
-<p>GiveReady was built by Geordie Wardman after his son Finn died in 2023 at age 20. Finn was a freeride skier, a surfer, and someone who said yes to everything before figuring out the logistics. The <a href="https://www.finnwardman.com">Finn Wardman World Explorer Fund</a> was created in his memory.</p>
-
-<p>Small charities struggle to be found online. GiveReady solves this by making nonprofits discoverable through AI assistants (Claude, ChatGPT, and others) using open standards: MCP servers, llms.txt, and agents.md. When someone asks an AI "where can I donate to help young people?", listed charities show up.</p>
-
-<h2>How it works</h2>
-<p>Nonprofits are indexed from public charity registries and enriched by AI agents that research and verify missing data. The directory is open: any AI agent can read from it via the API, and any agent can contribute data back through the write-back API. Two independent agents must agree on a value before it goes live.</p>
-
-<p>Donations are handled via USDC on Solana. Charities that set up multi-signature wallets through Squads Protocol get trustee-level governance built into the infrastructure. Card payments are available through MoonPay for donors who prefer traditional methods.</p>
-
-<h2>Open source</h2>
-<p>The full source code is on <a href="https://github.com/gswardman/giveready">GitHub</a>. The API documentation is at <a href="https://docs.giveready.org">docs.giveready.org</a>.</p>
-
-<div class="operator">
-<strong>Operator</strong><br/>
-GiveReady is operated by <a href="https://testventures.net">TestVentures.net</a> (Geordie Wardman).<br/>
-Based in Switzerland.<br/>
-Contact: <a href="mailto:geordie@testventures.net">geordie@testventures.net</a>
-</div>
-
-<footer>
-<a href="/">Home</a> · <a href="/causes">Causes</a> · <a href="/guides">Guides</a> · <a href="/privacy">Privacy</a> · <a href="https://github.com/gswardman/giveready">GitHub</a>
-</footer>
-</div>
-</body>
-</html>`;
-  return new Response(html, {
-    status: 200,
-    headers: {
-      'Content-Type': 'text/html; charset=UTF-8',
-      'Cache-Control': 'public, max-age=3600, must-revalidate',
-      ...CORS_HEADERS,
-    },
-  });
-}
-
-// ============================================
-// PRIVACY POLICY PAGE
-// ============================================
-function handlePrivacy() {
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Privacy Policy — GiveReady</title>
-  <meta name="description" content="GiveReady privacy policy. What data we collect, how we use it, and your rights." />
-  <link rel="canonical" href="https://www.giveready.org/privacy" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #fff; color: #111; font-family: 'Inter', -apple-system, system-ui, sans-serif; font-size: 15px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
-    nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid #e5e5e5; height: 52px; padding: 0 24px; display: flex; align-items: center; gap: 10px; }
-    nav a { font-weight: 700; font-size: 15px; color: #111; text-decoration: none; letter-spacing: -0.02em; }
-    nav span { color: #999; font-size: 14px; }
-    .wrap { max-width: 640px; margin: 0 auto; padding: 48px 24px 64px; }
-    h1 { font-size: clamp(24px, 5vw, 36px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; margin-bottom: 8px; }
-    .updated { font-size: 13px; color: #999; margin-bottom: 32px; }
-    h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin-top: 32px; margin-bottom: 12px; }
-    p, li { margin-bottom: 12px; color: #444; }
-    ul { padding-left: 20px; margin-bottom: 16px; }
-    a { color: #059669; }
-    .operator { margin-top: 40px; padding: 20px; background: #f9fafb; border: 1px solid #e5e5e5; border-radius: 8px; font-size: 14px; color: #444; line-height: 1.7; }
-    .operator strong { color: #111; }
-    footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid #e5e5e5; font-size: 12px; color: #999; }
-    footer a { color: #999; text-decoration: none; }
-    footer a:hover { color: #666; }
-  </style>
-</head>
-<body>
-<nav><a href="/">GiveReady</a> <span>&rsaquo; Privacy Policy</span></nav>
-<div class="wrap">
-<h1>Privacy Policy</h1>
-<p class="updated">Last updated: 4 May 2026</p>
-
-<p>GiveReady is operated by TestVentures.net (Geordie Wardman), based in Switzerland. This policy explains what data we collect and how we handle it.</p>
-
-<h2>What we collect</h2>
-<p>GiveReady collects minimal data to operate the service:</p>
-<ul>
-<li><strong>Nonprofit profiles:</strong> Organisation name, mission, country, registration numbers, website, and wallet addresses. This data is sourced from public charity registries and enriched by AI agents.</li>
-<li><strong>Charity dashboard accounts:</strong> If a nonprofit claims their page, we store their email address for authentication. Login uses passwordless magic links; we do not store passwords.</li>
-<li><strong>API request logs:</strong> We log User-Agent strings and request timestamps for rate limiting and to track which AI agents use the directory. We do not log IP addresses in the application database.</li>
-<li><strong>Donation records:</strong> When a donation is made via USDC, the transaction hash and amount are recorded on-chain (Solana blockchain) and in our database. Card donations are processed entirely by MoonPay; GiveReady does not see or store card details.</li>
-<li><strong>Agent enrichment submissions:</strong> When AI agents submit data corrections, we log the agent identifier (self-reported User-Agent), the submitted value, and the source URL provided.</li>
-</ul>
-
-<h2>What we do not collect</h2>
-<ul>
-<li>We do not use cookies for tracking or advertising.</li>
-<li>We do not run third-party analytics scripts (no Google Analytics, no Facebook Pixel).</li>
-<li>We do not sell or share personal data with third parties.</li>
-<li>We do not store credit card or payment card details. Card processing is handled by MoonPay under their own privacy policy.</li>
-</ul>
-
-<h2>Blockchain transparency</h2>
-<p>Donations made via USDC are recorded on the Solana blockchain. Blockchain transactions are public by design. Wallet addresses and transaction amounts are visible to anyone. GiveReady does not control or moderate blockchain data.</p>
-
-<h2>Data retention</h2>
-<p>Nonprofit profile data is retained indefinitely as a public directory. Authentication sessions expire after 30 days. API logs are retained for operational monitoring and may be pruned periodically.</p>
-
-<h2>Your rights</h2>
-<p>If you are a nonprofit listed on GiveReady and want to update or remove your profile, contact us. If you have a dashboard account and want it deleted, contact us and we will remove it.</p>
-
-<h2>Third-party services</h2>
-<ul>
-<li><strong>Cloudflare:</strong> GiveReady runs on Cloudflare Workers and uses Cloudflare's CDN. Cloudflare may process request metadata under their own privacy policy.</li>
-<li><strong>MoonPay:</strong> Card donations are processed by MoonPay. Their privacy policy governs card transaction data.</li>
-<li><strong>Solana blockchain:</strong> USDC donations settle on Solana. Transaction data is publicly and permanently recorded.</li>
-</ul>
-
-<h2>Changes to this policy</h2>
-<p>We may update this policy as the service evolves. The "last updated" date at the top of this page reflects the most recent revision.</p>
-
-<div class="operator">
-<strong>Data controller</strong><br/>
-TestVentures.net (Geordie Wardman)<br/>
-Based in Switzerland<br/>
-Contact: <a href="mailto:geordie@testventures.net">geordie@testventures.net</a>
-</div>
-
-<footer>
-<a href="/">Home</a> · <a href="/about">About</a> · <a href="/causes">Causes</a> · <a href="/guides">Guides</a> · <a href="https://github.com/gswardman/giveready">GitHub</a>
-</footer>
-</div>
-</body>
-</html>`;
-  return new Response(html, {
-    status: 200,
-    headers: {
-      'Content-Type': 'text/html; charset=UTF-8',
-      'Cache-Control': 'public, max-age=3600, must-revalidate',
-      ...CORS_HEADERS,
-    },
-  });
-}
+// handleAbout and handlePrivacy removed — now served as static HTML
+// via clean-URL routing in TRUST_PAGES (see fetch handler).
 
 // ============================================
 // DONATE PAGE HTML (served inline to avoid Cloudflare asset routing issues)
@@ -5474,9 +5301,21 @@ const _httpHandler = {
       const guideMatch = path.match(/^\/guides\/([a-z0-9-]+)$/);
       if (guideMatch) return handleGuide(env, guideMatch[1]);
 
-      // Trust pages — operator identity (Google heuristic wants these)
-      if (path === '/about') return handleAbout();
-      if (path === '/privacy') return handlePrivacy();
+      // Trust pages — clean-URL routing to static HTML (Google heuristic wants these)
+      const TRUST_PAGES = { '/about': '/about.html', '/privacy': '/privacy.html', '/terms': '/terms.html' };
+      if (TRUST_PAGES[path] && request.method === 'GET') {
+        const assetUrl = new URL(TRUST_PAGES[path], request.url).toString();
+        const assetResp = await env.ASSETS.fetch(assetUrl);
+        const html = await assetResp.text();
+        return new Response(html, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/html; charset=UTF-8',
+            'Cache-Control': 'public, max-age=3600, must-revalidate',
+            ...CORS_HEADERS,
+          },
+        });
+      }
 
       // Public agent leaderboard
       if (path === '/api/agents/leaderboard') return handleAgentLeaderboard(env.DB);
