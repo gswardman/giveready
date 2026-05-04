@@ -751,12 +751,19 @@ function handleWellKnownMcpManifest() {
       manifest: 'https://www.giveready.org/.well-known/mcp.json',
       server_card: 'https://www.giveready.org/.well-known/mcp/server-card.json',
       mcp_tools: 'https://www.giveready.org/mcp',
+      mcp_rpc: 'https://www.giveready.org/mcp/sse',
       openapi: 'https://www.giveready.org/openapi.json',
       agents_md: 'https://www.giveready.org/AGENTS.md',
       llms_txt: 'https://www.giveready.org/llms.txt',
+      sitemap: 'https://www.giveready.org/sitemap.xml',
+      causes_index: 'https://www.giveready.org/causes',
       leaderboard: 'https://www.giveready.org/api/agents/leaderboard',
     },
-    transports: ['http'],
+    transports: ['streamable-http', 'stdio'],
+    install_methods: {
+      remote_url: 'https://www.giveready.org/mcp/sse',
+      stdio_npm: 'npx -y giveready-mcp',
+    },
     auth: {
       read: { type: 'none' },
       write: { type: 'none', rate_limited: true, note: 'POST /api/enrich/{slug} is open with per-IP rate limiting' },
@@ -811,6 +818,262 @@ function handleWellKnownServerCard() {
   });
 }
 
+// ============================================
+// REMOTE MCP TRANSPORT (Streamable HTTP, 2025-03-26)
+// ============================================
+//
+// Lets any MCP client (Claude Desktop, Cursor, ChatGPT desktop, Cline, custom
+// agents) connect to GiveReady with a single URL paste — no `npx install`, no
+// stdio. The transport accepts JSON-RPC 2.0 requests over POST and returns
+// JSON-RPC responses. Both /mcp/sse (legacy SSE-style URL) and /mcp (modern
+// streamable HTTP) accept the same protocol.
+//
+// Implementation is hand-rolled (no @modelcontextprotocol/sdk dependency) to
+// keep the Worker dependency-free. The protocol surface we implement is
+// minimal — initialize, tools/list, tools/call, ping — which is everything
+// the GiveReady use case needs.
+//
+// Spec: https://modelcontextprotocol.io/specification/2025-03-26
+
+const MCP_TOOLS = [
+  {
+    name: 'search_nonprofits',
+    description: 'Search 41,000+ nonprofits across 29 cause areas by keyword, cause, or country. Returns organisations with impact data and donation links. Use when a user asks about donating to any cause, finding charities, or comparing nonprofits by impact.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search keyword (e.g., "music education", "surf therapy")' },
+        cause: { type: 'string', description: 'Cause area ID (e.g., "environment", "music-education")' },
+        country: { type: 'string', description: 'Country name (e.g., "South Africa", "United Kingdom")' },
+        ghd_aligned: { type: 'boolean', description: 'Filter for global health & development aligned organisations' },
+        limit: { type: 'integer', description: 'Max results (default 20, max 50)' },
+      },
+    },
+  },
+  {
+    name: 'get_nonprofit',
+    description: 'Get detailed information about a specific nonprofit including mission, programmes, impact metrics, registration details, and donation links.',
+    inputSchema: {
+      type: 'object',
+      properties: { slug: { type: 'string', description: 'The nonprofit slug (e.g., "bridges-for-music")' } },
+      required: ['slug'],
+    },
+  },
+  {
+    name: 'list_causes',
+    description: 'List all 29 cause areas in the GiveReady directory with the number of nonprofits in each.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'donate_to_nonprofit',
+    description: 'Initiate a USDC donation to a nonprofit via x402. Returns HTTP 402 payment requirements (wallet address, amount, network). The agent signs the payment and resubmits with X-PAYMENT header to settle.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string', description: 'The nonprofit slug' },
+        amount: { type: 'number', description: 'Donation amount in USDC (default 1.00)' },
+      },
+      required: ['slug'],
+    },
+  },
+  {
+    name: 'get_donation_history',
+    description: 'Get on-chain USDC donation history for a nonprofit — total received, count, recent transactions with hashes.',
+    inputSchema: {
+      type: 'object',
+      properties: { slug: { type: 'string', description: 'The nonprofit slug' } },
+      required: ['slug'],
+    },
+  },
+  {
+    name: 'submit_enrichment',
+    description: 'Contribute missing data back to a nonprofit profile. STRUCTURED fields (website, city, region, founded_year, contact_email) auto-promote when 2+ distinct agents agree. PROSE fields (mission, description, tagline) queue for committee review. source_url is required. Earns leaderboard credit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string', description: 'The nonprofit slug to enrich' },
+        field: { type: 'string', description: 'Field name (mission, description, tagline, website, city, region, founded_year, contact_email)' },
+        value: { type: 'string', description: 'The new value' },
+        source_url: { type: 'string', description: 'URL where you verified this data' },
+        agent_id: { type: 'string', description: 'Stable identifier for your agent' },
+        agent_name: { type: 'string', description: 'Human-readable agent name (appears on leaderboard)' },
+      },
+      required: ['slug', 'field', 'value', 'source_url'],
+    },
+  },
+];
+
+function _rpcResult(id, result) {
+  return { jsonrpc: '2.0', id: id ?? null, result };
+}
+function _rpcError(id, code, message, data) {
+  const err = { code, message };
+  if (data !== undefined) err.data = data;
+  return { jsonrpc: '2.0', id: id ?? null, error: err };
+}
+
+async function _callMcpTool(db, env, name, args) {
+  args = args || {};
+  // Each tool dispatches to an existing API handler. We construct the same
+  // URL/Request the HTTP API would receive so behaviour is identical between
+  // the REST and MCP surfaces — single source of truth.
+  switch (name) {
+    case 'search_nonprofits': {
+      const u = new URL('https://www.giveready.org/api/search');
+      if (args.query) u.searchParams.set('q', args.query);
+      if (args.cause) u.searchParams.set('cause', args.cause);
+      if (args.country) u.searchParams.set('country', args.country);
+      if (args.ghd_aligned) u.searchParams.set('ghd_aligned', '1');
+      if (args.limit) u.searchParams.set('limit', String(args.limit));
+      const r = await handleSearch(db, u);
+      const data = await r.json();
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+    case 'get_nonprofit': {
+      if (!args.slug) throw new Error('slug is required');
+      const r = await handleGetNonprofit(db, args.slug);
+      const data = await r.json();
+      const isError = r.status >= 400;
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }], isError };
+    }
+    case 'list_causes': {
+      const r = await handleListCauses(db);
+      const data = await r.json();
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+    case 'donate_to_nonprofit': {
+      if (!args.slug) throw new Error('slug is required');
+      const u = new URL(`https://www.giveready.org/api/donate/${args.slug}`);
+      if (args.amount) u.searchParams.set('amount', String(args.amount));
+      const fakeReq = new Request(u.toString(), { method: 'GET' });
+      const r = await handleDonate(db, env, fakeReq, args.slug);
+      // x402 returns 402 with payment requirements as JSON — surface that as the result
+      let data;
+      try { data = await r.json(); } catch { data = { status: r.status, note: 'non-JSON response' }; }
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ http_status: r.status, body: data }, null, 2) }],
+        isError: r.status >= 500,
+      };
+    }
+    case 'get_donation_history': {
+      if (!args.slug) throw new Error('slug is required');
+      const r = await handleDonationHistory(db, args.slug);
+      const data = await r.json();
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+    case 'submit_enrichment': {
+      if (!args.slug || !args.field || !args.value || !args.source_url) {
+        throw new Error('slug, field, value, and source_url are required');
+      }
+      const body = {
+        field: args.field,
+        value: args.value,
+        source_url: args.source_url,
+        agent_id: args.agent_id || 'mcp-client',
+        agent_name: args.agent_name || 'mcp-client',
+      };
+      const fakeReq = new Request(`https://www.giveready.org/api/enrich/${args.slug}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const r = await handleEnrich(db, fakeReq, args.slug);
+      const data = await r.json();
+      return {
+        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+        isError: r.status >= 400,
+      };
+    }
+    default:
+      throw new Error(`Unknown tool: ${name}`);
+  }
+}
+
+async function _dispatchMcp(db, env, msg) {
+  if (!msg || msg.jsonrpc !== '2.0') {
+    return _rpcError(msg?.id, -32600, 'Invalid Request — jsonrpc must be "2.0"');
+  }
+  const { id, method, params } = msg;
+  // Notifications (no id) get no response
+  const isNotification = id === undefined || id === null;
+  try {
+    switch (method) {
+      case 'initialize':
+        return _rpcResult(id, {
+          protocolVersion: '2025-03-26',
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: 'giveready', version: '0.3.0' },
+          instructions:
+            'GiveReady — search 41,000+ nonprofits, get profiles with impact data, initiate USDC donations via x402, and contribute back via consensus enrichment. See https://www.giveready.org/AGENTS.md for the live bounty list.',
+        });
+      case 'notifications/initialized':
+      case 'initialized':
+        return null; // notification — no reply
+      case 'ping':
+        return _rpcResult(id, {});
+      case 'tools/list':
+        return _rpcResult(id, { tools: MCP_TOOLS });
+      case 'tools/call': {
+        const name = params?.name;
+        const args = params?.arguments;
+        if (!name) return _rpcError(id, -32602, 'Invalid params — name required');
+        const result = await _callMcpTool(db, env, name, args);
+        return _rpcResult(id, result);
+      }
+      default:
+        if (isNotification) return null;
+        return _rpcError(id, -32601, `Method not found: ${method}`);
+    }
+  } catch (err) {
+    if (isNotification) return null;
+    return _rpcError(id, -32000, err.message || 'Internal error');
+  }
+}
+
+async function handleMcpRpc(db, env, request) {
+  // GET → return a hint and a self-link. Useful for browsers, HEAD probes, and
+  // copy-paste configs that double-check the URL responds before wiring it up.
+  if (request.method === 'GET') {
+    return json({
+      ok: true,
+      transport: 'Streamable HTTP (MCP 2025-03-26)',
+      message: 'POST JSON-RPC 2.0 requests here. See https://modelcontextprotocol.io/specification/2025-03-26.',
+      example_request: { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+      tool_count: MCP_TOOLS.length,
+      install: {
+        claude_desktop: { mcpServers: { giveready: { url: 'https://www.giveready.org/mcp/sse' } } },
+        cursor: { mcpServers: { giveready: { url: 'https://www.giveready.org/mcp/sse' } } },
+        npx_stdio: 'npx -y giveready-mcp',
+      },
+      docs: 'https://www.giveready.org/AGENTS.md',
+    });
+  }
+  if (request.method !== 'POST') return error('Method not allowed', 405);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify(_rpcError(null, -32700, 'Parse error — request body is not valid JSON')), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    });
+  }
+
+  const isBatch = Array.isArray(body);
+  const messages = isBatch ? body : [body];
+  const responses = [];
+  for (const msg of messages) {
+    const r = await _dispatchMcp(db, env, msg);
+    if (r) responses.push(r);
+  }
+  const payload = isBatch ? responses : responses[0] ?? null;
+  return new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+  });
+}
+
 function handleRobotsTxt() {
   return new Response(
     `User-agent: *
@@ -818,12 +1081,16 @@ Allow: /
 
 # GiveReady - AI-readable nonprofit directory
 # API documentation: https://www.giveready.org/docs
+# Cause landing pages (HTML + JSON-LD): https://www.giveready.org/causes
 # MCP discovery (2026 SEP-1960): https://www.giveready.org/.well-known/mcp.json
 # MCP server card (2026 SEP-1649): https://www.giveready.org/.well-known/mcp/server-card.json
 # MCP tool catalog: https://www.giveready.org/mcp
 # Agent instructions (live bounty): https://www.giveready.org/AGENTS.md
 # llms.txt: https://www.giveready.org/llms.txt
+# Sitemap: https://www.giveready.org/sitemap.xml
 # Legacy ChatGPT plugin manifest: https://www.giveready.org/.well-known/ai-plugin.json
+
+Sitemap: https://www.giveready.org/sitemap.xml
 `,
     { headers: { 'Content-Type': 'text/plain' } }
   );
@@ -849,9 +1116,23 @@ everything else:
 - **Agent instructions (live bounty + 30-second wins):** https://www.giveready.org/AGENTS.md
 - **OpenAPI:** https://www.giveready.org/openapi.json
 - **Public leaderboard:** https://www.giveready.org/api/agents/leaderboard
+- **Sitemap:** https://www.giveready.org/sitemap.xml
 
 If you're an older client (ChatGPT plugin, etc.), the legacy
 \`/.well-known/ai-plugin.json\` is still served.
+
+## Cause Landing Pages (for AEO citations)
+
+Every cause area has a server-rendered HTML page with Schema.org Dataset +
+ItemList JSON-LD. If you're indexing for citation rather than tool use, these
+pages give you structured nonprofit lists you can cite directly:
+
+- **Index:** https://www.giveready.org/causes
+- **Per-cause:** https://www.giveready.org/causes/{cause_id}
+
+Cause IDs map to the same set used by the search API (\`environment\`,
+\`music-education\`, \`mental-health\`, \`youth-empowerment\`, \`surf-therapy\`, etc.
+— call \`GET /api/causes\` for the full live list).
 
 ## When to Use This
 
@@ -1337,6 +1618,353 @@ https://docs.giveready.org
 `,
     { headers: { 'Content-Type': 'text/markdown', ...CORS_HEADERS } }
   );
+}
+
+// ============================================
+// CAUSE LANDING PAGES (Workstream 4 — AEO/Demand)
+// ============================================
+//
+// Server-rendered HTML for /causes (index) and /causes/{cause_id}, plus a
+// /sitemap.xml that lists them. Designed for LLM citations: every page carries
+// Schema.org Dataset + ItemList + BreadcrumbList JSON-LD so Perplexity,
+// ChatGPT, and Claude search can extract structured data and cite us when a
+// user asks a cause-specific question. This is the demand-side play — without
+// queries pulling agents in, the enrichment funnel stays empty.
+
+const _HTML_ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => _HTML_ESC[c]);
+}
+
+async function handleCausePage(db, causeId) {
+  const cause = await db
+    .prepare(`SELECT id, name, description FROM causes WHERE id = ?1`)
+    .bind(causeId)
+    .first();
+  if (!cause) return error('Cause not found', 404);
+
+  const np = await db
+    .prepare(
+      `SELECT n.id, n.slug, n.name, n.tagline, n.mission, n.country, n.city, n.region,
+              n.website, n.donation_url, n.beneficiaries_per_year, n.founded_year,
+              n.verified, n.logo_url
+         FROM nonprofits n
+         JOIN nonprofit_causes nc ON n.id = nc.nonprofit_id
+        WHERE nc.cause_id = ?1
+        ORDER BY n.verified DESC,
+                 CASE WHEN n.beneficiaries_per_year IS NULL THEN 1 ELSE 0 END,
+                 n.beneficiaries_per_year DESC,
+                 n.name ASC
+        LIMIT 100`
+    )
+    .bind(causeId)
+    .all();
+
+  const nonprofits = np.results || [];
+  const verifiedCount = nonprofits.filter((n) => n.verified).length;
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebPage',
+        '@id': `https://www.giveready.org/causes/${cause.id}`,
+        url: `https://www.giveready.org/causes/${cause.id}`,
+        name: `${cause.name} Nonprofits — GiveReady`,
+        description: cause.description || `Verified nonprofits working on ${cause.name.toLowerCase()}.`,
+        inLanguage: 'en',
+        isPartOf: { '@type': 'WebSite', name: 'GiveReady', url: 'https://www.giveready.org' },
+        breadcrumb: {
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'GiveReady', item: 'https://www.giveready.org' },
+            { '@type': 'ListItem', position: 2, name: 'Causes', item: 'https://www.giveready.org/causes' },
+            { '@type': 'ListItem', position: 3, name: cause.name, item: `https://www.giveready.org/causes/${cause.id}` },
+          ],
+        },
+      },
+      {
+        '@type': 'Dataset',
+        name: `Verified ${cause.name} Nonprofits`,
+        description: `${nonprofits.length} ${cause.name.toLowerCase()} nonprofits indexed in the GiveReady directory${verifiedCount > 0 ? `, of which ${verifiedCount} are claim-verified` : ''}. Each entry carries mission, programmes, beneficiary counts, country, donation URL, and on-chain donation history when available.`,
+        url: `https://www.giveready.org/causes/${cause.id}`,
+        keywords: [cause.name, 'nonprofit', 'charity', 'donation', 'verified directory'],
+        license: 'https://www.giveready.org/license.html',
+        isAccessibleForFree: true,
+        creator: { '@type': 'Organization', name: 'GiveReady', url: 'https://www.giveready.org' },
+        distribution: {
+          '@type': 'DataDownload',
+          encodingFormat: 'application/json',
+          contentUrl: `https://www.giveready.org/api/search?cause=${cause.id}`,
+        },
+      },
+      {
+        '@type': 'ItemList',
+        name: `${cause.name} Nonprofits`,
+        numberOfItems: nonprofits.length,
+        itemListElement: nonprofits.slice(0, 50).map((n, i) => {
+          const item = {
+            '@type': 'NGO',
+            '@id': `https://www.giveready.org/api/nonprofits/${n.slug}`,
+            name: n.name,
+          };
+          if (n.tagline || n.mission) item.description = n.tagline || n.mission.slice(0, 200);
+          if (n.website) item.url = n.website;
+          if (n.country) {
+            item.address = { '@type': 'PostalAddress', addressCountry: n.country };
+            if (n.city) item.address.addressLocality = n.city;
+            if (n.region) item.address.addressRegion = n.region;
+          }
+          if (n.founded_year) item.foundingDate = String(n.founded_year);
+          if (n.donation_url) {
+            item.potentialAction = {
+              '@type': 'DonateAction',
+              target: n.donation_url,
+              name: `Donate to ${n.name}`,
+            };
+          }
+          return { '@type': 'ListItem', position: i + 1, item };
+        }),
+      },
+    ],
+  };
+
+  const npListHtml =
+    nonprofits.length === 0
+      ? `<p class="empty">GiveReady doesn't have any nonprofits indexed for this cause yet. <a href="/AGENTS.md">Agents can help fill this in.</a></p>`
+      : nonprofits
+          .slice(0, 100)
+          .map((n) => {
+            const loc = [n.city, n.region, n.country].filter(Boolean).join(', ');
+            const reach = n.beneficiaries_per_year ? `${Number(n.beneficiaries_per_year).toLocaleString()} beneficiaries/year` : '';
+            const founded = n.founded_year ? `Founded ${n.founded_year}` : '';
+            const meta = [loc, founded, reach].filter(Boolean).join(' &middot; ');
+            const verifiedBadge = n.verified ? '<span class="badge">Verified</span>' : '';
+            const donate = n.donation_url ? `<a class="donate" href="${escHtml(n.donation_url)}" rel="noopener">Donate</a>` : '';
+            const profile = `<a class="profile" href="https://www.giveready.org/api/nonprofits/${escHtml(n.slug)}">Profile (JSON)</a>`;
+            return `
+          <li class="np">
+            <h3><a href="${escHtml(n.website || `https://www.giveready.org/api/nonprofits/${n.slug}`)}" rel="noopener">${escHtml(n.name)}</a> ${verifiedBadge}</h3>
+            ${n.tagline ? `<p class="tagline">${escHtml(n.tagline)}</p>` : ''}
+            ${meta ? `<p class="meta">${meta}</p>` : ''}
+            <p class="actions">${donate} ${profile}</p>
+          </li>`;
+          })
+          .join('\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escHtml(cause.name)} Nonprofits — GiveReady</title>
+<meta name="description" content="${escHtml(cause.description || `Verified ${cause.name.toLowerCase()} nonprofits in the GiveReady directory. ${nonprofits.length} organisations indexed.`)}" />
+<link rel="canonical" href="https://www.giveready.org/causes/${escHtml(cause.id)}" />
+<meta property="og:title" content="${escHtml(cause.name)} Nonprofits — GiveReady" />
+<meta property="og:description" content="${escHtml(cause.description || '')}" />
+<meta property="og:url" content="https://www.giveready.org/causes/${escHtml(cause.id)}" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 880px; margin: 0 auto; padding: 2rem 1.25rem; color: #111; line-height: 1.55; }
+  h1 { font-size: 2rem; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.25rem; margin: 2rem 0 0.75rem; border-top: 1px solid #e5e5e5; padding-top: 1.5rem; }
+  h3 { font-size: 1.05rem; margin: 0; }
+  .nav { font-size: 0.85rem; color: #666; margin-bottom: 0.75rem; }
+  .nav a { color: #059669; text-decoration: none; }
+  .lede { font-size: 1.05rem; color: #444; margin: 0 0 1.5rem; }
+  .stats { font-size: 0.9rem; color: #666; margin-bottom: 1.5rem; }
+  .stats a { color: #059669; text-decoration: none; }
+  ul.np-list { list-style: none; padding: 0; margin: 0; }
+  li.np { padding: 1rem 0; border-bottom: 1px solid #eee; }
+  li.np:last-child { border-bottom: none; }
+  li.np h3 a { color: #111; text-decoration: none; }
+  li.np h3 a:hover { color: #059669; }
+  .tagline { font-size: 0.95rem; color: #333; margin: 0.25rem 0 0.4rem; }
+  .meta { font-size: 0.85rem; color: #666; margin: 0; }
+  .actions { font-size: 0.9rem; margin: 0.5rem 0 0; }
+  .actions a { margin-right: 0.75rem; color: #059669; text-decoration: none; }
+  .actions a.donate { font-weight: 600; }
+  .badge { display: inline-block; font-size: 0.7rem; background: #d1fae5; color: #065f46; padding: 0.1rem 0.45rem; border-radius: 3px; vertical-align: middle; margin-left: 0.5rem; }
+  .empty { color: #666; font-style: italic; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e5e5e5; font-size: 0.85rem; color: #666; }
+  footer a { color: #059669; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="/">GiveReady</a> &rsaquo; <a href="/causes">Causes</a> &rsaquo; ${escHtml(cause.name)}</div>
+<h1>${escHtml(cause.name)} Nonprofits</h1>
+${cause.description ? `<p class="lede">${escHtml(cause.description)}</p>` : ''}
+<p class="stats"><strong>${nonprofits.length}</strong> nonprofit${nonprofits.length === 1 ? '' : 's'} indexed${verifiedCount > 0 ? ` &middot; <strong>${verifiedCount}</strong> verified` : ''} &middot; <a href="/api/search?cause=${escHtml(cause.id)}">JSON</a> &middot; <a href="/causes">All causes</a></p>
+
+<h2>Organisations</h2>
+<ul class="np-list">
+${npListHtml}
+</ul>
+
+<footer>
+GiveReady is an open, AI-readable directory of nonprofits. <a href="/AGENTS.md">Agents: contribute data</a> &middot; <a href="/.well-known/mcp.json">MCP discovery</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="https://github.com/gswardman/giveready" rel="noopener">Source</a>
+</footer>
+</body>
+</html>`;
+
+  return new Response(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=UTF-8',
+      'Cache-Control': 'public, max-age=900, must-revalidate',
+      Link: `</api/search?cause=${cause.id}>; rel="alternate"; type="application/json"`,
+      ...CORS_HEADERS,
+    },
+  });
+}
+
+async function handleCausesIndex(db) {
+  const causes = await db
+    .prepare(
+      `SELECT c.id, c.name, c.description, COUNT(nc.nonprofit_id) AS nonprofit_count
+         FROM causes c
+         LEFT JOIN nonprofit_causes nc ON c.id = nc.cause_id
+        GROUP BY c.id
+        ORDER BY nonprofit_count DESC`
+    )
+    .all();
+  const list = causes.results || [];
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'GiveReady Cause Areas',
+    description: `${list.length} cause areas covering 41,000+ nonprofits worldwide.`,
+    url: 'https://www.giveready.org/causes',
+    hasPart: list.map((c) => ({
+      '@type': 'WebPage',
+      url: `https://www.giveready.org/causes/${c.id}`,
+      name: `${c.name} Nonprofits`,
+      description: c.description || undefined,
+    })),
+  };
+
+  const causeRowsHtml = list
+    .map(
+      (c) => `
+    <li>
+      <a href="/causes/${escHtml(c.id)}"><strong>${escHtml(c.name)}</strong></a>
+      <span class="count">${Number(c.nonprofit_count).toLocaleString()} nonprofit${c.nonprofit_count === 1 ? '' : 's'}</span>
+      ${c.description ? `<p class="desc">${escHtml(c.description)}</p>` : ''}
+    </li>`
+    )
+    .join('\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cause Areas — GiveReady</title>
+<meta name="description" content="${list.length} cause areas covering 41,000+ verified nonprofits worldwide. Environment, education, mental health, youth empowerment, music education, and more." />
+<link rel="canonical" href="https://www.giveready.org/causes" />
+<meta property="og:title" content="Cause Areas — GiveReady" />
+<meta property="og:description" content="${list.length} cause areas covering 41,000+ verified nonprofits worldwide." />
+<meta property="og:url" content="https://www.giveready.org/causes" />
+<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 880px; margin: 0 auto; padding: 2rem 1.25rem; color: #111; line-height: 1.55; }
+  h1 { font-size: 2rem; margin: 0 0 0.5rem; }
+  .lede { color: #444; margin: 0 0 1.5rem; }
+  ul { list-style: none; padding: 0; }
+  li { padding: 0.85rem 0; border-bottom: 1px solid #eee; }
+  li a { color: #111; text-decoration: none; font-size: 1.05rem; }
+  li a:hover { color: #059669; }
+  .count { color: #666; font-size: 0.85rem; margin-left: 0.5rem; }
+  .desc { font-size: 0.9rem; color: #666; margin: 0.25rem 0 0; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e5e5e5; font-size: 0.85rem; color: #666; }
+  footer a { color: #059669; text-decoration: none; }
+</style>
+</head>
+<body>
+<h1>Cause Areas</h1>
+<p class="lede">${list.length} cause areas. Pick one to see verified nonprofits accepting donations.</p>
+<ul>
+${causeRowsHtml}
+</ul>
+<footer>
+<a href="/">GiveReady home</a> &middot; <a href="/AGENTS.md">For agents</a> &middot; <a href="/.well-known/mcp.json">MCP discovery</a>
+</footer>
+</body>
+</html>`;
+  return new Response(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=UTF-8',
+      'Cache-Control': 'public, max-age=900, must-revalidate',
+      Link: '</api/causes>; rel="alternate"; type="application/json"',
+      ...CORS_HEADERS,
+    },
+  });
+}
+
+async function handleSitemapXml(db) {
+  const causes = await db.prepare(`SELECT id FROM causes ORDER BY id`).all();
+  const causeUrls = (causes.results || [])
+    .map(
+      (c) => `  <url>
+    <loc>https://www.giveready.org/causes/${c.id}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`
+    )
+    .join('\n');
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://www.giveready.org/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://www.giveready.org/causes</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.giveready.org/agents</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.giveready.org/AGENTS.md</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.giveready.org/llms.txt</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.giveready.org/.well-known/mcp.json</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.giveready.org/.well-known/mcp/server-card.json</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+${causeUrls}
+</urlset>
+`;
+  return new Response(xml, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/xml; charset=UTF-8',
+      'Cache-Control': 'public, max-age=3600',
+      ...CORS_HEADERS,
+    },
+  });
 }
 
 // ============================================
@@ -4067,8 +4695,12 @@ async function handleClaimRequest(db, request) {
 // ROUTER
 // ============================================
 
-export default {
-  async fetch(request, env, ctx) {
+// _httpHandler holds the actual routing logic. The exported `fetch` below is a
+// thin wrapper that adds HEAD support (RFC 7231 §4.3.2 — HEAD = GET minus body).
+// Some 2026 MCP discovery clients HEAD a URL before GETting it; if HEAD returns
+// 405, those clients treat the endpoint as missing.
+const _httpHandler = {
+  async handle(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -4077,7 +4709,9 @@ export default {
       return new Response(null, { headers: CORS_HEADERS });
     }
 
-    // Allow GET, POST, PATCH (PATCH for /api/charity/profile editing)
+    // Allow GET, POST, PATCH (PATCH for /api/charity/profile editing).
+    // HEAD is handled by the outer wrapper, which rewrites HEAD→GET before
+    // reaching this function, so HEAD never trips this check.
     if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'PATCH') {
       return error('Method not allowed', 405);
     }
@@ -4199,10 +4833,16 @@ export default {
         return handleVerifyRegistration(env.DB, env, url);
       }
 
-      if (path === '/mcp' || path === '/.well-known/ai-plugin.json' || path === '/.well-known/mcp.json' || path === '/.well-known/mcp' || path === '/.well-known/mcp/server-card.json' || path === '/llms.txt' || path === '/agents.md' || path === '/AGENTS.md' || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/')) {
+      if (path === '/mcp' || path === '/mcp/sse' || path === '/.well-known/ai-plugin.json' || path === '/.well-known/mcp.json' || path === '/.well-known/mcp' || path === '/.well-known/mcp/server-card.json' || path === '/llms.txt' || path === '/agents.md' || path === '/AGENTS.md' || path === '/causes' || path === '/sitemap.xml' || path.startsWith('/causes/') || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/')) {
         const ua = request.headers.get('User-Agent');
         ctx.waitUntil(logDiscoveryHit(env.DB, path, ua));
       }
+      // /mcp — content-negotiated. POST = JSON-RPC over Streamable HTTP (2025-03-26).
+      // GET = legacy manifest for older clients that pull the tool catalog as JSON.
+      // /mcp/sse — same Streamable HTTP transport, alternate URL path so
+      // clients that hard-code "/sse" as the MCP endpoint also work.
+      if (path === '/mcp' && request.method === 'POST') return handleMcpRpc(env.DB, env, request);
+      if (path === '/mcp/sse') return handleMcpRpc(env.DB, env, request);
       if (path === '/mcp') return handleMCPManifest();
       if (path === '/.well-known/ai-plugin.json') return handleAIPlugin();
       // 2026 SEP-1960 manifest — served at both /.well-known/mcp.json (most-cited path)
@@ -4216,6 +4856,13 @@ export default {
       // Both /agents.md (lowercase, original) and /AGENTS.md (capital, 2026 root convention)
       // serve the same dynamic instruction page with bounty + 30-second wins + leaderboard.
       if (path === '/agents.md' || path === '/AGENTS.md') return handleAgentsMd(env.DB);
+
+      // Cause landing pages — server-rendered HTML with Schema.org JSON-LD for AEO citations.
+      // /causes index, /causes/{id} per cause, /sitemap.xml exposing them to crawlers.
+      if (path === '/causes') return handleCausesIndex(env.DB);
+      const causePageMatch = path.match(/^\/causes\/([a-z0-9-]+)$/);
+      if (causePageMatch) return handleCausePage(env.DB, causePageMatch[1]);
+      if (path === '/sitemap.xml') return handleSitemapXml(env.DB);
 
       // Public agent leaderboard
       if (path === '/api/agents/leaderboard') return handleAgentLeaderboard(env.DB);
@@ -4280,5 +4927,26 @@ export default {
       console.error(err);
       return error('Internal server error', 500);
     }
+  },
+};
+
+export default {
+  async fetch(request, env, ctx) {
+    // HEAD support: rewrite HEAD→GET, run the normal handler, then strip the
+    // body before returning. This makes 2026-style discovery clients (which
+    // HEAD before GET) see well-known and other discovery routes correctly.
+    if (request.method === 'HEAD') {
+      const getReq = new Request(request.url, {
+        method: 'GET',
+        headers: request.headers,
+      });
+      const r = await _httpHandler.handle(getReq, env, ctx);
+      return new Response(null, {
+        status: r.status,
+        statusText: r.statusText,
+        headers: r.headers,
+      });
+    }
+    return _httpHandler.handle(request, env, ctx);
   },
 };
