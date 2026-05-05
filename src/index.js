@@ -2583,26 +2583,30 @@ async function handleSitemapXml(db) {
   </url>`
   ).join('\n');
 
-  // Indexable nonprofits — verified=1 OR description has 200+ trimmed chars.
-  // The thin-content threshold matches the renderer's noindex rule, so the
-  // sitemap and the meta robots tag agree.
+  // Sitemap = verified only.
+  // The 200-char description threshold turned out to be too loose: the
+  // every.org bulk import shipped IRS-style descriptions over that length, so
+  // ~3,200 unverified pages landed in the sitemap on the first deploy
+  // (2026-05-05). That's exactly the SpamBrain thin-content risk we wanted to
+  // avoid. Tightened to verified=1 only — pages flip into the sitemap when
+  // Geordie verifies them. The /nonprofits/<slug> renderer still uses the
+  // 200-char rule for its meta robots tag, which is fine: noindex on a page
+  // that isn't in the sitemap costs nothing and protects against direct hits
+  // from old links surfacing thin pages.
   const npRows = await db
     .prepare(
-      `SELECT slug, updated_at, verified,
-              LENGTH(TRIM(COALESCE(description, ''))) AS desc_len
-         FROM nonprofits
-        WHERE verified = 1 OR LENGTH(TRIM(COALESCE(description, ''))) >= 200
-        ORDER BY verified DESC, slug ASC`
+      `SELECT slug, updated_at FROM nonprofits
+        WHERE verified = 1
+        ORDER BY slug ASC`
     )
     .all();
   const nonprofitUrls = (npRows.results || [])
     .map((n) => {
       const lastmod = (n.updated_at || '').slice(0, 10);
-      const priority = n.verified ? '0.8' : n.desc_len >= 400 ? '0.6' : '0.5';
       return `  <url>
     <loc>https://www.giveready.org/nonprofits/${n.slug}</loc>${lastmod ? `\n    <lastmod>${lastmod}</lastmod>` : ''}
     <changefreq>monthly</changefreq>
-    <priority>${priority}</priority>
+    <priority>0.8</priority>
   </url>`;
     })
     .join('\n');
