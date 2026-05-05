@@ -1650,6 +1650,274 @@ function escHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => _HTML_ESC[c]);
 }
 
+// Safe serialiser for inline JSON-LD <script type="application/ld+json"> blocks.
+// JSON.stringify alone does NOT escape the literal "</script>" sequence; an
+// attacker controlling any included string field (e.g. prose) could break out
+// of the script tag with </script><script>...</script>. Escape `</` as `<\/`
+// inside string contexts. Also escape U+2028 / U+2029 which are valid in JSON
+// but break older JS parsers if anyone reuses the string in a JS context.
+// CSO finding HIGH-1 (2026-05-05).
+function jsonLdSafe(value) {
+  return JSON.stringify(value)
+    .replace(/<\//g, '<\\/')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+// /nonprofits/<slug> — server-rendered HTML page for an individual nonprofit.
+// Until 2026-05-05 we only had /api/nonprofits/<slug> (JSON), and cause pages
+// linked there. Claude-SearchBot indexed JSON instead of a rich page — near-
+// zero surfaceability in Claude search results.
+//
+// Indexability rules:
+//   - verified = 1                        → index, NonprofitOrganization schema
+//   - verified = 0, description >=200ch   → index, weak Organization schema
+//   - verified = 0, thin/empty description → NOINDEX,follow (sitemap excluded)
+//
+// noindex,follow lets Claude-SearchBot still walk to /AGENTS.md from these
+// pages but keeps thin profiles out of search results until the description
+// is curated. As Geordie edits descriptions in /admin/nonprofits/<slug>/edit
+// (or agents enrich via the existing /api/enrich path), pages flip to
+// indexable automatically.
+async function handleNonprofitPage(db, slug) {
+  const np = await db
+    .prepare(
+      `SELECT id, slug, name, tagline, mission, description, website, donation_url,
+              country, city, region, founded_year, beneficiaries_per_year,
+              annual_budget_usd, team_size, contact_email, logo_url, verified
+         FROM nonprofits WHERE slug = ?1`
+    )
+    .bind(slug)
+    .first();
+  if (!np) return error('Nonprofit not found', 404);
+
+  const causes = await db
+    .prepare(
+      `SELECT c.id, c.name FROM causes c
+         JOIN nonprofit_causes nc ON c.id = nc.cause_id
+        WHERE nc.nonprofit_id = ?1`
+    )
+    .bind(np.id)
+    .all();
+  const causeList = causes.results || [];
+
+  const programs = await db
+    .prepare(
+      `SELECT name, description, beneficiaries_per_year, location
+         FROM programs WHERE nonprofit_id = ?1 LIMIT 10`
+    )
+    .bind(np.id)
+    .all();
+  const programList = programs.results || [];
+
+  const donations = await db
+    .prepare(
+      `SELECT COUNT(*) AS count, COALESCE(SUM(amount_usdc), 0) AS total
+         FROM donations WHERE nonprofit_id = ?1 AND status = 'settled'`
+    )
+    .bind(np.id)
+    .first();
+
+  const isVerified = !!np.verified;
+  const desc = (np.description || '').trim();
+  // Thin-content threshold: 200 chars. Descriptions shorter than that are
+  // typically IRS-style stubs from the every.org bulk import. Tunable.
+  const hasMeaningfulDescription = desc.length >= 200;
+  const isIndexable = isVerified || hasMeaningfulDescription;
+
+  const descHtml = desc
+    ? `<p class="prose">${escHtml(desc)}</p>`
+    : `<p class="prose-stub"><em>This profile is awaiting a description.</em> If you work with ${escHtml(np.name)}, <a href="/onboard">claim this listing</a>. AI agents: see <a href="/AGENTS.md?from=np&amp;slug=${escHtml(np.slug)}">/AGENTS.md</a> for the enrichment protocol.</p>`;
+
+  const loc = [np.city, np.region, np.country].filter(Boolean).join(', ');
+
+  // Schema type by verification state.
+  // - Verified: full NonprofitOrganization with mission, donate action, etc.
+  // - Unverified-but-prosed: weaker Organization, no claims we can't back.
+  const schemaType = isVerified ? 'NonprofitOrganization' : 'Organization';
+  const baseEntity = {
+    '@type': schemaType,
+    '@id': `https://www.giveready.org/nonprofits/${np.slug}`,
+    url: `https://www.giveready.org/nonprofits/${np.slug}`,
+    name: np.name,
+    ...(np.tagline ? { slogan: np.tagline } : {}),
+    ...(desc ? { description: desc } : {}),
+    ...(np.website ? { sameAs: [np.website] } : {}),
+    ...(np.logo_url ? { logo: np.logo_url } : {}),
+    ...(np.founded_year ? { foundingDate: String(np.founded_year) } : {}),
+    ...(np.country
+      ? {
+          address: {
+            '@type': 'PostalAddress',
+            addressCountry: np.country,
+            ...(np.city ? { addressLocality: np.city } : {}),
+            ...(np.region ? { addressRegion: np.region } : {}),
+          },
+        }
+      : {}),
+    ...(np.contact_email ? { email: np.contact_email } : {}),
+    isPartOf: { '@type': 'WebSite', name: 'GiveReady', url: 'https://www.giveready.org' },
+  };
+  // Verified-only claims — mission, donate action, audience, knowsAbout.
+  // Putting these on unverified orgs would assert facts we haven't checked.
+  if (isVerified) {
+    if (np.mission) baseEntity.mission = np.mission;
+    if (np.beneficiaries_per_year) {
+      baseEntity.audience = {
+        '@type': 'PeopleAudience',
+        audienceType: `${np.beneficiaries_per_year} beneficiaries per year`,
+      };
+    }
+    if (causeList.length > 0) {
+      baseEntity.knowsAbout = causeList.map((c) => c.name);
+    }
+    if (np.donation_url) {
+      baseEntity.potentialAction = {
+        '@type': 'DonateAction',
+        target: np.donation_url,
+        name: `Donate to ${np.name}`,
+      };
+    }
+  }
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      baseEntity,
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'GiveReady', item: 'https://www.giveready.org' },
+          { '@type': 'ListItem', position: 2, name: 'Nonprofits', item: 'https://www.giveready.org/causes' },
+          { '@type': 'ListItem', position: 3, name: np.name, item: `https://www.giveready.org/nonprofits/${np.slug}` },
+        ],
+      },
+    ],
+  };
+
+  const causeChips = causeList
+    .map((c) => `<a class="chip" href="/causes/${escHtml(c.id)}">${escHtml(c.name)}</a>`)
+    .join(' ');
+
+  const programsHtml =
+    programList.length === 0
+      ? ''
+      : `<h2>Programmes</h2>
+<ul class="programs">
+${programList
+  .map(
+    (p) => `  <li>
+    <strong>${escHtml(p.name)}</strong>
+    ${p.location ? `<span class="prog-meta">${escHtml(p.location)}</span>` : ''}
+    ${p.beneficiaries_per_year ? `<span class="prog-meta">${Number(p.beneficiaries_per_year).toLocaleString()} beneficiaries/year</span>` : ''}
+    ${p.description ? `<p>${escHtml(p.description)}</p>` : ''}
+  </li>`
+  )
+  .join('\n')}
+</ul>`;
+
+  const verifiedBadge = isVerified ? '<span class="badge">Verified</span>' : '';
+  const donationsLine = donations && donations.count > 0
+    ? `<p class="donations"><strong>${donations.count}</strong> on-chain donation${donations.count === 1 ? '' : 's'} totalling <strong>${Number(donations.total).toFixed(2)} USDC</strong> · <a href="/api/donations/${escHtml(np.slug)}">history (JSON)</a></p>`
+    : '';
+
+  const metaDescription = desc
+    ? desc.slice(0, 160)
+    : np.tagline || (np.mission ? np.mission.slice(0, 160) : `${np.name} — nonprofit profile on GiveReady.`);
+
+  // Robots directive — see indexability rules in the function header.
+  const robotsTag = isIndexable
+    ? '<meta name="robots" content="index,follow" />'
+    : '<meta name="robots" content="noindex,follow" />';
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escHtml(np.name)} — GiveReady</title>
+<meta name="description" content="${escHtml(metaDescription)}" />
+${robotsTag}
+<link rel="canonical" href="https://www.giveready.org/nonprofits/${escHtml(np.slug)}" />
+<meta property="og:title" content="${escHtml(np.name)} — GiveReady" />
+<meta property="og:description" content="${escHtml(metaDescription)}" />
+<meta property="og:url" content="https://www.giveready.org/nonprofits/${escHtml(np.slug)}" />
+<meta property="og:type" content="website" />
+${np.logo_url ? `<meta property="og:image" content="${escHtml(np.logo_url)}" />` : ''}
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">${jsonLdSafe(jsonLd)}</script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 760px; margin: 0 auto; padding: 2rem 1.25rem; color: #111; line-height: 1.6; }
+  h1 { font-size: 2rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 1.2rem; margin: 2rem 0 0.75rem; border-top: 1px solid #e5e5e5; padding-top: 1.5rem; }
+  .nav { font-size: 0.85rem; color: #666; margin-bottom: 0.75rem; }
+  .nav a { color: #059669; text-decoration: none; }
+  .tagline { font-size: 1.1rem; color: #444; margin: 0.25rem 0 1rem; }
+  .meta { font-size: 0.85rem; color: #666; margin: 0 0 1.5rem; }
+  .chips { margin: 0.5rem 0 1.5rem; }
+  .chip { display: inline-block; font-size: 0.8rem; background: #f3f4f6; color: #111; padding: 0.2rem 0.6rem; border-radius: 12px; margin: 0 0.4rem 0.4rem 0; text-decoration: none; }
+  .chip:hover { background: #d1fae5; color: #065f46; }
+  .prose { font-size: 1.02rem; }
+  .prose-meta, .prose-stub { font-size: 0.85rem; color: #666; font-style: normal; }
+  .prose-stub { background: #fefce8; border-left: 3px solid #eab308; padding: 0.75rem 1rem; }
+  .badge { display: inline-block; font-size: 0.75rem; background: #d1fae5; color: #065f46; padding: 0.15rem 0.5rem; border-radius: 3px; vertical-align: middle; margin-left: 0.5rem; }
+  .actions { margin: 1.25rem 0 1.5rem; }
+  .actions a { display: inline-block; margin-right: 0.75rem; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-weight: 500; }
+  .actions a.donate { background: #059669; color: #fff; }
+  .actions a.website { background: #f3f4f6; color: #111; }
+  .donations { font-size: 0.9rem; background: #f9fafb; padding: 0.75rem 1rem; border-radius: 6px; }
+  .donations a { color: #059669; }
+  ul.programs { list-style: none; padding: 0; }
+  ul.programs li { padding: 0.75rem 0; border-bottom: 1px solid #eee; }
+  .prog-meta { display: inline-block; font-size: 0.8rem; color: #666; margin-left: 0.5rem; }
+  .agent-callout { margin-top: 2rem; padding: 1rem; background: #f0fdf4; border-radius: 6px; font-size: 0.9rem; }
+  .agent-callout a { color: #059669; }
+  footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #e5e5e5; font-size: 0.85rem; color: #666; }
+  footer a { color: #059669; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="/">GiveReady</a> &rsaquo; <a href="/causes">Nonprofits</a> &rsaquo; ${escHtml(np.name)}</div>
+<h1>${escHtml(np.name)} ${verifiedBadge}</h1>
+${np.tagline ? `<p class="tagline">${escHtml(np.tagline)}</p>` : ''}
+${loc || np.founded_year ? `<p class="meta">${[loc, np.founded_year ? `Founded ${np.founded_year}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
+${causeChips ? `<div class="chips">${causeChips}</div>` : ''}
+
+${descHtml}
+
+${isVerified && np.mission ? `<h2>Mission</h2>\n<p>${escHtml(np.mission)}</p>` : ''}
+
+<div class="actions">
+${np.donation_url ? `<a class="donate" href="${escHtml(np.donation_url)}" rel="noopener">Donate</a>` : ''}
+${np.website ? `<a class="website" href="${escHtml(np.website)}" rel="noopener">Visit website</a>` : ''}
+</div>
+
+${donationsLine}
+
+${isVerified ? programsHtml : ''}
+
+<div class="agent-callout">
+  <strong>Are you an AI agent?</strong> ${hasMeaningfulDescription ? 'You can submit corrections to this description, or improve other fields.' : 'This profile is awaiting a description.'} See <a href="/AGENTS.md?from=np&amp;slug=${escHtml(np.slug)}">/AGENTS.md</a> for the enrichment protocol, or call the <a href="/.well-known/mcp.json">MCP server</a> directly. Profile JSON: <a href="/api/nonprofits/${escHtml(np.slug)}">/api/nonprofits/${escHtml(np.slug)}</a>.
+</div>
+
+<footer>
+GiveReady is an open, AI-readable directory of nonprofits. <a href="/AGENTS.md">Agents: contribute data</a> &middot; <a href="/.well-known/mcp.json">MCP discovery</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="https://github.com/gswardman/giveready" rel="noopener">Source</a>
+${OPERATOR_FOOTER_PLAIN}
+</footer>
+</body>
+</html>`;
+
+  return new Response(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=UTF-8',
+      'Cache-Control': 'public, max-age=900, must-revalidate',
+      Link: `</api/nonprofits/${np.slug}>; rel="alternate"; type="application/json"`,
+      ...CORS_HEADERS,
+    },
+  });
+}
+
 async function handleCausePage(db, causeId) {
   const cause = await db
     .prepare(`SELECT id, name, description FROM causes WHERE id = ?1`)
@@ -1719,7 +1987,8 @@ async function handleCausePage(db, causeId) {
         itemListElement: nonprofits.slice(0, 50).map((n, i) => {
           const item = {
             '@type': 'NGO',
-            '@id': `https://www.giveready.org/api/nonprofits/${n.slug}`,
+            '@id': `https://www.giveready.org/nonprofits/${n.slug}`,
+            url: `https://www.giveready.org/nonprofits/${n.slug}`,
             name: n.name,
           };
           if (n.tagline || n.mission) item.description = n.tagline || n.mission.slice(0, 200);
@@ -1755,10 +2024,11 @@ async function handleCausePage(db, causeId) {
             const meta = [loc, founded, reach].filter(Boolean).join(' &middot; ');
             const verifiedBadge = n.verified ? '<span class="badge">Verified</span>' : '';
             const donate = n.donation_url ? `<a class="donate" href="${escHtml(n.donation_url)}" rel="noopener">Donate</a>` : '';
-            const profile = `<a class="profile" href="https://www.giveready.org/api/nonprofits/${escHtml(n.slug)}">Profile (JSON)</a>`;
+            const profile = `<a class="profile" href="/nonprofits/${escHtml(n.slug)}">Profile</a>`;
             return `
           <li class="np">
-            <h3><a href="${escHtml(n.website || `https://www.giveready.org/api/nonprofits/${n.slug}`)}" rel="noopener">${escHtml(n.name)}</a> ${verifiedBadge}</h3>
+            <h3><a href="/nonprofits/${escHtml(n.slug)}">${escHtml(n.name)}</a> ${verifiedBadge}</h3>
+            ${n.website ? `<p class="ext"><a href="${escHtml(n.website)}" rel="noopener">${escHtml(n.website)}</a></p>` : ''}
             ${n.tagline ? `<p class="tagline">${escHtml(n.tagline)}</p>` : ''}
             ${meta ? `<p class="meta">${meta}</p>` : ''}
             <p class="actions">${donate} ${profile}</p>
@@ -1779,7 +2049,7 @@ async function handleCausePage(db, causeId) {
 <meta property="og:url" content="https://www.giveready.org/causes/${escHtml(cause.id)}" />
 <meta property="og:type" content="website" />
 <meta name="twitter:card" content="summary" />
-<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+<script type="application/ld+json">${jsonLdSafe(jsonLd)}</script>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 880px; margin: 0 auto; padding: 2rem 1.25rem; color: #111; line-height: 1.55; }
   h1 { font-size: 2rem; margin: 0 0 0.5rem; }
@@ -1883,7 +2153,7 @@ async function handleCausesIndex(db) {
 <meta property="og:title" content="Cause Areas — GiveReady" />
 <meta property="og:description" content="${list.length} cause areas covering 41,000+ verified nonprofits worldwide." />
 <meta property="og:url" content="https://www.giveready.org/causes" />
-<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+<script type="application/ld+json">${jsonLdSafe(jsonLd)}</script>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 880px; margin: 0 auto; padding: 2rem 1.25rem; color: #111; line-height: 1.55; }
   h1 { font-size: 2rem; margin: 0 0 0.5rem; }
@@ -2149,7 +2419,7 @@ async function handleGuide(env, slug) {
 <meta property="og:url" content="https://www.giveready.org/guides/${escHtml(slug)}" />
 <meta property="og:type" content="article" />
 <meta name="twitter:card" content="summary" />
-<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+<script type="application/ld+json">${jsonLdSafe(jsonLd)}</script>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 4rem; color: #111; line-height: 1.65; }
   .nav { font-size: 0.85rem; color: #666; margin-bottom: 0.75rem; }
@@ -2240,7 +2510,7 @@ function handleGuidesIndex() {
 <meta property="og:title" content="Guides — GiveReady" />
 <meta property="og:description" content="Practical guides for finding, verifying, and donating to nonprofits." />
 <meta property="og:url" content="https://www.giveready.org/guides" />
-<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+<script type="application/ld+json">${jsonLdSafe(jsonLd)}</script>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 4rem; color: #111; line-height: 1.6; }
   h1 { font-size: 2rem; margin: 0 0 0.5rem; }
@@ -2280,6 +2550,18 @@ ${OPERATOR_FOOTER_PLAIN}
   });
 }
 
+// /sitemap.xml — single urlset. Per the 2026-05-05 eng review, only INDEXABLE
+// pages are in the sitemap: verified=1 OR has-current-prose. Empty profiles
+// stay out of the sitemap and render with noindex,follow until they're
+// enriched through the agent funnel. As the funnel produces prose, the
+// sitemap grows organically without redeploy.
+//
+// Why not sharded: today's footprint is ~166 verified + 0 prosed = ~200
+// entries. We don't approach the 50k-URL sitemap protocol limit. Sharding
+// added complexity and changed the format Googlebot has been pulling for
+// weeks; eng review flagged this as the least-reversible piece in social
+// terms (Googlebot would re-walk on format change). Keep it simple until we
+// actually need shards.
 async function handleSitemapXml(db) {
   const causes = await db.prepare(`SELECT id FROM causes ORDER BY id`).all();
   const causeUrls = (causes.results || [])
@@ -2291,6 +2573,7 @@ async function handleSitemapXml(db) {
   </url>`
     )
     .join('\n');
+
   const guideUrls = GUIDES_MANIFEST.map(
     (g) => `  <url>
     <loc>https://www.giveready.org/guides/${g.slug}</loc>
@@ -2299,6 +2582,30 @@ async function handleSitemapXml(db) {
     <priority>0.6</priority>
   </url>`
   ).join('\n');
+
+  // Indexable nonprofits — verified=1 OR description has 200+ trimmed chars.
+  // The thin-content threshold matches the renderer's noindex rule, so the
+  // sitemap and the meta robots tag agree.
+  const npRows = await db
+    .prepare(
+      `SELECT slug, updated_at, verified,
+              LENGTH(TRIM(COALESCE(description, ''))) AS desc_len
+         FROM nonprofits
+        WHERE verified = 1 OR LENGTH(TRIM(COALESCE(description, ''))) >= 200
+        ORDER BY verified DESC, slug ASC`
+    )
+    .all();
+  const nonprofitUrls = (npRows.results || [])
+    .map((n) => {
+      const lastmod = (n.updated_at || '').slice(0, 10);
+      const priority = n.verified ? '0.8' : n.desc_len >= 400 ? '0.6' : '0.5';
+      return `  <url>
+    <loc>https://www.giveready.org/nonprofits/${n.slug}</loc>${lastmod ? `\n    <lastmod>${lastmod}</lastmod>` : ''}
+    <changefreq>monthly</changefreq>
+    <priority>${priority}</priority>
+  </url>`;
+    })
+    .join('\n');
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -2359,6 +2666,7 @@ async function handleSitemapXml(db) {
   </url>
 ${causeUrls}
 ${guideUrls}
+${nonprofitUrls}
 </urlset>
 `;
   return new Response(xml, {
@@ -3716,6 +4024,84 @@ async function handleAdminReject(db, env, request, slug) {
     success: true,
     slug,
     deleted: true,
+  });
+}
+
+// ============================================
+// DESCRIPTION ADMIN — manual editor for the existing nonprofits.description
+// column. Token-gated GET/POST at /admin/nonprofits/<slug>/edit. POST writes
+// directly to nonprofits.description; the public /nonprofits/<slug> page
+// renders that column and flips from noindex to indexable when description
+// reaches 200+ chars (or when verified=1, regardless of length).
+// ============================================
+async function handleAdminDescriptionEdit(db, env, request, slug) {
+  const authCheck = checkAdminAuth(env, request);
+  if (authCheck) return authCheck;
+
+  const np = await db
+    .prepare(`SELECT id, name, slug, verified, description FROM nonprofits WHERE slug = ?1`)
+    .bind(slug)
+    .first();
+  if (!np) return error('Nonprofit not found', 404);
+
+  if (request.method === 'POST') {
+    const form = await request.formData();
+    const newDesc = (form.get('description') || '').toString().trim();
+    if (newDesc.length < 20) return error('Description must be at least 20 characters', 400);
+    if (newDesc.length > 4000) return error('Description must be at most 4000 characters', 400);
+
+    await db
+      .prepare(`UPDATE nonprofits SET description = ?1, updated_at = datetime('now') WHERE id = ?2`)
+      .bind(newDesc, np.id)
+      .run();
+
+    const tok = encodeURIComponent(new URL(request.url).searchParams.get('token') || '');
+    return new Response(null, { status: 303, headers: { Location: `/admin/nonprofits/${slug}/edit?token=${tok}&saved=1` } });
+  }
+
+  // GET — render the editor.
+  const url = new URL(request.url);
+  const saved = url.searchParams.get('saved') === '1';
+  const currentDesc = (np.description || '').trim();
+  const charCount = currentDesc.length;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex,nofollow" />
+<meta name="referrer" content="no-referrer" />
+<title>Edit description — ${escHtml(np.name)} — GiveReady admin</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; max-width: 760px; margin: 0 auto; padding: 2rem 1.25rem; color: #111; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin: 0 0 0.5rem; }
+  .nav { font-size: 0.85rem; color: #666; margin-bottom: 1rem; }
+  .saved { background: #d1fae5; color: #065f46; padding: 0.5rem 0.75rem; border-radius: 4px; margin-bottom: 1rem; font-size: 0.9rem; }
+  textarea { width: 100%; min-height: 220px; font-family: inherit; font-size: 1rem; padding: 0.75rem; box-sizing: border-box; }
+  button { padding: 0.5rem 1.25rem; font-size: 1rem; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; }
+  .meta { font-size: 0.85rem; color: #666; }
+  .badge { display: inline-block; font-size: 0.7rem; background: #d1fae5; color: #065f46; padding: 0.1rem 0.45rem; border-radius: 3px; margin-left: 0.5rem; }
+  .indexable { color: #065f46; font-weight: 600; }
+  .noindex { color: #92400e; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="nav"><a href="/nonprofits/${escHtml(slug)}">View public page</a></div>
+<h1>${escHtml(np.name)} ${np.verified ? '<span class="badge">Verified</span>' : ''}</h1>
+<p class="meta">Slug: <code>${escHtml(slug)}</code></p>
+${saved ? '<div class="saved">Saved.</div>' : ''}
+<form method="POST">
+  <p>Write a clear paragraph: what does this nonprofit do, who do they serve, why does it matter. Avoid IRS-style boilerplate. <strong>200+ chars</strong> flips the page from noindex to indexable (verified=1 pages always indexable).</p>
+  <textarea name="description" maxlength="4000" placeholder="A few sentences. Distinctive. 20–4000 characters.">${escHtml(currentDesc)}</textarea>
+  <p><button type="submit">Save</button></p>
+</form>
+<p class="meta">Current length: ${charCount} chars · Page is currently <span class="${(np.verified || charCount >= 200) ? 'indexable' : 'noindex'}">${(np.verified || charCount >= 200) ? 'INDEXABLE' : 'NOINDEX,FOLLOW'}</span></p>
+</body>
+</html>`;
+  return new Response(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=UTF-8', 'X-Robots-Tag': 'noindex,nofollow' },
   });
 }
 
@@ -5265,7 +5651,7 @@ const _httpHandler = {
         return handleVerifyRegistration(env.DB, env, url);
       }
 
-      if (path === '/mcp' || path === '/mcp/sse' || path === '/.well-known/ai-plugin.json' || path === '/.well-known/mcp.json' || path === '/.well-known/mcp' || path === '/.well-known/mcp/server-card.json' || path === '/llms.txt' || path === '/agents.md' || path === '/AGENTS.md' || path === '/causes' || path === '/guides' || path === '/sitemap.xml' || path.startsWith('/causes/') || path.startsWith('/guides/') || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/')) {
+      if (path === '/mcp' || path === '/mcp/sse' || path === '/.well-known/ai-plugin.json' || path === '/.well-known/mcp.json' || path === '/.well-known/mcp' || path === '/.well-known/mcp/server-card.json' || path === '/llms.txt' || path === '/agents.md' || path === '/AGENTS.md' || path === '/causes' || path === '/guides' || path === '/sitemap.xml' || path.startsWith('/causes/') || path.startsWith('/guides/') || path.startsWith('/nonprofits/') || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/')) {
         const ua = request.headers.get('User-Agent');
         ctx.waitUntil(logDiscoveryHit(env.DB, path, ua));
       }
@@ -5295,6 +5681,19 @@ const _httpHandler = {
       const causePageMatch = path.match(/^\/causes\/([a-z0-9-]+)$/);
       if (causePageMatch) return handleCausePage(env.DB, causePageMatch[1]);
       if (path === '/sitemap.xml') return handleSitemapXml(env.DB);
+
+      // Nonprofit HTML pages — server-rendered with Schema.org NonprofitOrganization
+      // for verified=1, weak Organization for unverified-but-prosed.
+      // Slugs like 3-ds-aftercare-inc, finn-wardman-world-explorer-fund.
+      const nonprofitPageMatch = path.match(/^\/nonprofits\/([a-z0-9-]+)$/);
+      if (nonprofitPageMatch) return handleNonprofitPage(env.DB, nonprofitPageMatch[1]);
+
+      // Admin: description editor (Saturday's 166-pass).
+      // GET renders the form; POST writes nonprofits.description directly.
+      const adminDescEditMatch = path.match(/^\/admin\/nonprofits\/([a-z0-9-]+)\/edit$/);
+      if (adminDescEditMatch) {
+        return handleAdminDescriptionEdit(env.DB, env, request, adminDescEditMatch[1]);
+      }
 
       // Guides — markdown-backed AEO content surface. Index + per-slug.
       if (path === '/guides') return handleGuidesIndex();
