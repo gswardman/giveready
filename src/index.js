@@ -2691,17 +2691,17 @@ ${nonprofitUrls}
 // ============================================
 // SHARED OPERATOR FOOTER (Google trust signal)
 // ============================================
-const OPERATOR_FOOTER_LINKS = `<a href="/about">About</a> · <a href="/privacy">Privacy</a> · <a href="mailto:geordie@testventures.net">Contact</a>`;
+const OPERATOR_FOOTER_LINKS = `<a href="https://docs.giveready.org/introduction">About</a> · <a href="/privacy">Privacy</a> · <a href="mailto:geordie@testventures.net">Contact</a>`;
 
 const OPERATOR_FOOTER_BLOCK = `<div style="margin-top:10px;font-size:11px;color:var(--light,#999);line-height:1.6;">
 GiveReady is operated by <a href="https://testventures.net" style="color:inherit;text-decoration:underline;">TestVentures.net</a> (Geordie Wardman). Based in Switzerland.<br/>
-Contact: <a href="mailto:geordie@testventures.net" style="color:inherit;text-decoration:underline;">geordie@testventures.net</a> · <a href="/about" style="color:inherit;text-decoration:underline;">About</a> · <a href="/terms" style="color:inherit;text-decoration:underline;">Terms</a> · <a href="/privacy" style="color:inherit;text-decoration:underline;">Privacy</a>
+Contact: <a href="mailto:geordie@testventures.net" style="color:inherit;text-decoration:underline;">geordie@testventures.net</a> · <a href="https://docs.giveready.org/introduction" style="color:inherit;text-decoration:underline;">About</a> · <a href="/terms" style="color:inherit;text-decoration:underline;">Terms</a> · <a href="/privacy" style="color:inherit;text-decoration:underline;">Privacy</a>
 </div>`;
 
 // Lightweight version for server-rendered content pages (causes, guides, leaderboard)
 const OPERATOR_FOOTER_PLAIN = `<div style="margin-top:0.75rem;font-size:0.8rem;color:#999;line-height:1.6;">
 Operated by <a href="https://testventures.net" style="color:#999;">TestVentures.net</a> (Geordie Wardman). Based in Switzerland.
-<a href="mailto:geordie@testventures.net" style="color:#999;">Contact</a> · <a href="/about" style="color:#999;">About</a> · <a href="/terms" style="color:#999;">Terms</a> · <a href="/privacy" style="color:#999;">Privacy</a>
+<a href="mailto:geordie@testventures.net" style="color:#999;">Contact</a> · <a href="https://docs.giveready.org/introduction" style="color:#999;">About</a> · <a href="/terms" style="color:#999;">Terms</a> · <a href="/privacy" style="color:#999;">Privacy</a>
 </div>`;
 
 // handleAbout and handlePrivacy removed — now served as static HTML
@@ -2974,7 +2974,7 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
   <div style="margin-top:8px;font-size:10px;text-transform:uppercase;letter-spacing:0.14em;color:var(--light);">MADE WITH <span class="beating-heart" style="font-size:12px;">&#10084;&#65039;</span> <a href="https://www.finnwardman.com" style="color:var(--light);text-decoration:none;">IN MEMORY OF FINN</a></div>
   <div style="margin-top:10px;font-size:10px;color:var(--light);line-height:1.6;">
     Operated by <a href="https://testventures.net" style="color:var(--light);text-decoration:underline;">TestVentures.net</a> (Geordie Wardman). Based in Switzerland.<br/>
-    <a href="/about" style="color:var(--light);text-decoration:underline;">About</a> · <a href="/privacy" style="color:var(--light);text-decoration:underline;">Privacy</a> · <a href="mailto:geordie@testventures.net" style="color:var(--light);text-decoration:underline;">Contact</a>
+    <a href="https://docs.giveready.org/introduction" style="color:var(--light);text-decoration:underline;">About</a> · <a href="/privacy" style="color:var(--light);text-decoration:underline;">Privacy</a> · <a href="mailto:geordie@testventures.net" style="color:var(--light);text-decoration:underline;">Contact</a>
   </div>
 </footer>
 
@@ -3460,7 +3460,7 @@ const GET_STARTED_HTML = `<!DOCTYPE html>
 
 <footer>
   <div class="footer-main">GiveReady is open-source, free, and built in memory of <a href="https://www.finnwardman.com">Finn Wardman</a>.</div>
-  <div class="footer-links">Built by <a href="https://testventures.net">TestVentures.net</a> &middot; <a href="/about">About</a> &middot; <a href="/privacy">Privacy</a> &middot; <a href="mailto:geordie@testventures.net">Contact</a></div>
+  <div class="footer-links">Built by <a href="https://testventures.net">TestVentures.net</a> &middot; <a href="https://docs.giveready.org/introduction">About</a> &middot; <a href="/privacy">Privacy</a> &middot; <a href="mailto:geordie@testventures.net">Contact</a></div>
 </footer>
 
 </body>
@@ -3767,7 +3767,7 @@ function verifyResultHTML(title, message, success) {
       <p>${message}</p>
     </div>
   </div>
-  <footer>Open-source infrastructure for charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. <a href="/about">About</a> · <a href="/privacy">Privacy</a></footer>
+  <footer>Open-source infrastructure for charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. <a href="https://docs.giveready.org/introduction">About</a> · <a href="/privacy">Privacy</a></footer>
 </body>
 </html>`;
 }
@@ -5069,7 +5069,7 @@ function handleAgentLeaderboardHTML() {
   <footer>
     Data via <a href="/api/agents/leaderboard">/api/agents/leaderboard</a>. Contribute via
     <a href="/agents.md">agents.md</a>. Rules: 2+ agents agreeing on the same value for an empty field auto-promotes live. Existing values are never overwritten.
-    <div style="margin-top:0.5rem;font-size:0.75rem;color:#666;">Operated by <a href="https://testventures.net" style="color:#666;">TestVentures.net</a> · <a href="/about" style="color:#666;">About</a> · <a href="/privacy" style="color:#666;">Privacy</a></div>
+    <div style="margin-top:0.5rem;font-size:0.75rem;color:#666;">Operated by <a href="https://testventures.net" style="color:#666;">TestVentures.net</a> · <a href="https://docs.giveready.org/introduction" style="color:#666;">About</a> · <a href="/privacy" style="color:#666;">Privacy</a></div>
   </footer>
 </div>
 <script>
