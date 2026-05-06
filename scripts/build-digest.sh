@@ -172,31 +172,57 @@ $FUNNEL_LEFT_AGENTS
 
 $READ_AND_LEFT
 
-## Next Step
+## Learning Loop
 
 EOF
 
-# Next-step auto-suggestion based on what the data showed.
+# Learning Loop section: cron writes the scaffold, the daily Claude scheduled
+# task overwrites this section with hand-curated hypotheses grounded in today's
+# data. The shell cannot generate real hypotheses (that requires synthesising
+# numbers into testable claims), but it can do three honest things:
+#   1. Extract yesterday's #1 hypothesis title for the carryover line.
+#   2. Pick the dominant cron-detectable signal and frame it as one hypothesis.
+#   3. Label the section so it is clear the richer pass replaces this content.
+# See 2026-05-06 learning-loop H1 follow-up.
+
+# Carryover: pull yesterday's first hypothesis title from the existing file
+# (which we have not overwritten yet — $OUT still holds yesterday's content).
+CARRYOVER_LINE='> Carryover — first run, no prior hypothesis to check.'
+if [ -f "$OUT" ]; then
+  YESTERDAY_H1=$(grep -m1 -E '^[[:space:]]*1\. \*\*' "$OUT" 2>/dev/null | sed -E 's/^[[:space:]]*1\. \*\*([^*]+)\*\*.*/\1/' || echo "")
+  if [ -n "$YESTERDAY_H1" ]; then
+    CARRYOVER_LINE="> Carryover — \"$YESTERDAY_H1\": auto-detected by cron, awaiting Claude evaluation pass."
+  else
+    # Yesterday's file existed but was in pre-Learning-Loop format (no numbered hypothesis).
+    CARRYOVER_LINE='> Carryover — yesterday in legacy "Next Step" format, no structured hypothesis to check.'
+  fi
+fi
+
+echo "$CARRYOVER_LINE" >> "$TMP"
+cat >> "$TMP" <<'EOF'
+
+_Auto-generated scaffold based on cron-detectable signal only. The daily Claude scheduled task replaces this section with hand-curated hypotheses grounded in today's funnel and traffic numbers._
+
+EOF
+
+# One auto-hypothesis from the dominant signal, ranked by which condition
+# matches first. Each branch ends in the same hypothesis shape (Signal / Test /
+# Impact-Effort / Gates) so Claude's overwrite has a stable template to extend.
 if [ "$FIRST_SEEN_COUNT" -gt 0 ]; then
-  cat >> "$TMP" <<'EOF'
-A new named crawler landed today. Check the digest's first-seen list and decide
-whether to post on X / LinkedIn about it, or tune the CTA copy. Script halts
-here so you can write the decision.
+  cat >> "$TMP" <<EOF
+1. **New named crawler appeared today (${FIRST_SEEN_COUNT})** — Signal: see Named Crawlers — First Seen Today section above. Test: post on X / LinkedIn naming the crawler to surface GiveReady to its operator, or tune the /AGENTS.md CTA to name-check it. Impact/Effort: M/L. Gates: none.
 EOF
-elif [ "$READ_LEFT_COUNT" -gt 3 ]; then
-  cat >> "$TMP" <<'EOF'
-Multiple named crawlers visited today without submitting. Consider A/B testing
-the agents.md CTA — change the default field from "website" to a prose field,
-or shorten the pre-submit rules section.
+elif [ "$READ_LEFT_COUNT" -gt 3 ] && [ "$FUNNEL_SUBMITTED_COUNT" = "0" ]; then
+  cat >> "$TMP" <<EOF
+1. **Named crawlers read but never submit (${READ_LEFT_COUNT} read-and-left, 0 submitted)** — Signal: see Funnel Conversion section above. Test: review the first 200 chars of /AGENTS.md for action clarity, or A/B the default field in the example curl. Impact/Effort: H/L. Gates: none.
 EOF
 elif [ "$EN_TOTAL" = "0" ]; then
   cat >> "$TMP" <<'EOF'
-No enrichments have landed yet. Promote the MCP server in more directories
-(Smithery needs HTTP transport) and consider manual seed submissions.
+1. **Cold start — no submissions lifetime** — Signal: total_enrichments = 0. Test: promote the MCP server in more directories (Smithery needs HTTP transport), seed manual submissions, or contact a known agent operator directly. Impact/Effort: H/M. Gates: none.
 EOF
 else
   cat >> "$TMP" <<'EOF'
-Quiet day. Keep the bounty rotation running and check tomorrow.
+1. **Quiet day — no new cron-detectable signal** — Signal: no first-seen crawlers, read-and-left within normal bounds, no zero-state alarm. Test: continue the current bounty rotation, check tomorrow. Impact/Effort: L/L. Gates: none.
 EOF
 fi
 
