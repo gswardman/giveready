@@ -91,6 +91,25 @@ READ_AND_LEFT=$(echo "$FUNNEL24" | jq -r '
   map("  - \(.user_agent) hit \(.route) \(.hits)x, last \(.last_hit) — no submission") | .[]' 2>/dev/null || echo "  - (none)")
 READ_LEFT_COUNT=$(echo "$FUNNEL24" | jq -r '(.read_and_left // []) | length')
 
+# Funnel conversion: per-UA aggregated hits vs submissions. The funnel endpoint
+# returns rows grouped by (user_agent, route); aggregate to UA-level here so the
+# digest shows which named crawlers read-and-wrote vs read-and-left, with the
+# total hit volume per UA. See 2026-05-06 learning-loop H1.
+FUNNEL_LEFT_AGENTS=$(echo "$FUNNEL24" | jq -r '
+  (.read_and_left // []) |
+  group_by(.user_agent) |
+  map({ua: .[0].user_agent, hits: (map(.hits) | add)}) |
+  sort_by(-.hits) | .[0:5] |
+  map("  - \(.ua) — \(.hits) hits, 0 submissions") | .[]' 2>/dev/null || echo "  - (none)")
+FUNNEL_LEFT_AGENTS_COUNT=$(echo "$FUNNEL24" | jq -r '(.read_and_left // []) | group_by(.user_agent) | length' 2>/dev/null || echo 0)
+FUNNEL_SUBMITTED_AGENTS=$(echo "$FUNNEL24" | jq -r '
+  (.read_and_submitted // []) |
+  group_by(.user_agent) |
+  map({ua: .[0].user_agent, hits: (map(.hits) | add)}) |
+  sort_by(-.hits) | .[0:5] |
+  map("  - \(.ua) — \(.hits) hits, submitted in window") | .[]' 2>/dev/null || echo "  - (none)")
+FUNNEL_SUBMITTED_COUNT=$(echo "$FUNNEL24" | jq -r '(.read_and_submitted // []) | group_by(.user_agent) | length' 2>/dev/null || echo 0)
+
 FIRST_SEEN_COUNT=$(echo "$FIRSTSEEN24" | jq -r '(.first_time_named_crawlers // []) | length')
 FIRST_SEEN_LINES=$(echo "$FIRSTSEEN24" | jq -r '
   .first_time_named_crawlers // [] |
@@ -141,6 +160,13 @@ $RECENT_ACT
 ## Named Crawlers — First Seen Today ($FIRST_SEEN_COUNT)
 
 $FIRST_SEEN_LINES
+
+## Funnel Conversion (named crawlers, last 24h)
+
+- Read-and-submitted: $FUNNEL_SUBMITTED_COUNT distinct UA(s)
+$FUNNEL_SUBMITTED_AGENTS
+- Read-and-left: $FUNNEL_LEFT_AGENTS_COUNT distinct UA(s)
+$FUNNEL_LEFT_AGENTS
 
 ## Read and Left — Named Crawlers That Did Not Submit ($READ_LEFT_COUNT)
 
