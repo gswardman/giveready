@@ -4505,25 +4505,68 @@ async function handleNeedsEnrichment(db, url) {
   });
 }
 
+// Log every POST to /api/enrich/{slug}, regardless of outcome, so the daily
+// digest can show "tried-and-bounced" as a distinct funnel stage. Failures
+// here must NEVER break the user-facing response — wrap the insert in
+// try/catch and swallow.
+async function logEnrichmentAttempt(db, attempt) {
+  try {
+    await db.prepare(
+      `INSERT INTO enrichment_attempts
+         (id, slug, user_agent, ip, referrer, status_code, error_class, fields_count, payload_bytes)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
+    ).bind(
+      crypto.randomUUID(),
+      attempt.slug || null,
+      attempt.ua || null,
+      attempt.ip || null,
+      attempt.referrer || null,
+      attempt.status_code | 0,
+      attempt.error_class || 'unknown',
+      attempt.fields_count | 0,
+      attempt.payload_bytes | 0
+    ).run();
+  } catch (_e) {
+    // Funnel logging must not be load-bearing. Swallow.
+  }
+}
+
 async function handleEnrich(db, request, slug) {
+  const ua = request.headers.get('User-Agent') || null;
+  const ip = request.headers.get('CF-Connecting-IP') || null;
+  const referrer = request.headers.get('Referer') || null;
+
+  // Read raw body once so we can both parse it AND measure size, without
+  // double-consuming the Request stream.
+  let bodyText = '';
+  try {
+    bodyText = await request.text();
+  } catch (_e) {
+    await logEnrichmentAttempt(db, { slug, ua, ip, referrer, status_code: 400, error_class: 'body_unreadable', fields_count: 0, payload_bytes: 0 });
+    return error('Invalid JSON body', 400);
+  }
+  const payloadBytes = bodyText ? new TextEncoder().encode(bodyText).length : 0;
+
   // Look up the nonprofit
   const nonprofit = await db.prepare(
     `SELECT id, slug, name FROM nonprofits WHERE slug = ?1`
   ).bind(slug).first();
 
   if (!nonprofit) {
+    await logEnrichmentAttempt(db, { slug, ua, ip, referrer, status_code: 404, error_class: 'nonprofit_not_found', fields_count: 0, payload_bytes: payloadBytes });
     return error('Nonprofit not found', 404);
   }
 
   // Parse the submission
   let body;
   try {
-    body = await request.json();
+    body = bodyText ? JSON.parse(bodyText) : {};
   } catch (e) {
+    await logEnrichmentAttempt(db, { slug, ua, ip, referrer, status_code: 400, error_class: 'invalid_json', fields_count: 0, payload_bytes: payloadBytes });
     return error('Invalid JSON body', 400);
   }
 
-  const agentId = body.agent_id || request.headers.get('User-Agent') || 'unknown';
+  const agentId = body.agent_id || ua || 'unknown';
   const agentName = body.agent_name || agentId.substring(0, 100);
   const submissions = [];
 
@@ -4534,6 +4577,7 @@ async function handleEnrich(db, request, slug) {
   }
 
   if (fields.length === 0) {
+    await logEnrichmentAttempt(db, { slug, ua, ip, referrer, status_code: 400, error_class: 'no_fields', fields_count: 0, payload_bytes: payloadBytes });
     return error('No enrichment data provided. Send { "fields": [{ "field": "description", "value": "...", "source_url": "..." }] }', 400);
   }
 
@@ -4621,6 +4665,22 @@ async function handleEnrich(db, request, slug) {
   const hasConsensus = submissions.some(s => s.confidence >= 2);
   const anyApplied = submissions.some(s => s.applied);
   const anyProse = submissions.some(s => s.field_type === 'prose');
+
+  // submissions.length is fields actually accepted (after validity filter);
+  // fields.length is what the agent sent. Log both signals via fields_count =
+  // accepted count, payload_bytes = raw body size — these together tell us
+  // how much was sent vs how much landed.
+  await logEnrichmentAttempt(db, {
+    slug,
+    ua,
+    ip,
+    referrer,
+    status_code: 201,
+    error_class: anyApplied ? 'ok_applied' : (submissions.length > 0 ? 'ok_pending' : 'no_valid_fields'),
+    fields_count: submissions.length,
+    payload_bytes: payloadBytes,
+  });
+
   return json({
     message: anyApplied
       ? `Consensus reached. ${submissions.filter(s => s.applied).length} field(s) promoted live on ${nonprofit.name}.`
@@ -4744,6 +4804,55 @@ async function handleAdminTraffic(db, env, request, url) {
     `SELECT COUNT(*) as total FROM agent_enrichments WHERE created_at > ${since}`
   ).first();
 
+  // Funnel observability — every POST to /api/enrich/{slug} is logged to
+  // enrichment_attempts regardless of outcome. Lets the digest distinguish
+  // "agent never tried" from "agent tried and 400'd".
+  // Wrapped in try/catch so the admin endpoint still returns if the table
+  // has not been migrated yet.
+  let attemptsInPeriod = 0;
+  let attemptsByStatus = [];
+  let attemptsByError = [];
+  let attemptsByUa = [];
+  let recentAttempts = [];
+  try {
+    const attemptsTotal = await db.prepare(
+      `SELECT COUNT(*) as total FROM enrichment_attempts WHERE created_at > ${since}`
+    ).first();
+    attemptsInPeriod = attemptsTotal ? attemptsTotal.total : 0;
+
+    const byStatus = await db.prepare(
+      `SELECT status_code, COUNT(*) as count FROM enrichment_attempts
+       WHERE created_at > ${since}
+       GROUP BY status_code ORDER BY count DESC`
+    ).all();
+    attemptsByStatus = byStatus.results || [];
+
+    const byError = await db.prepare(
+      `SELECT error_class, COUNT(*) as count FROM enrichment_attempts
+       WHERE created_at > ${since}
+       GROUP BY error_class ORDER BY count DESC`
+    ).all();
+    attemptsByError = byError.results || [];
+
+    const byUa = await db.prepare(
+      `SELECT user_agent, COUNT(*) as count FROM enrichment_attempts
+       WHERE created_at > ${since} AND user_agent IS NOT NULL
+       GROUP BY user_agent ORDER BY count DESC LIMIT 10`
+    ).all();
+    attemptsByUa = byUa.results || [];
+
+    const recentRows = await db.prepare(
+      `SELECT slug, user_agent, status_code, error_class, fields_count, created_at
+         FROM enrichment_attempts
+        WHERE created_at > ${since}
+        ORDER BY created_at DESC LIMIT 20`
+    ).all();
+    recentAttempts = recentRows.results || [];
+  } catch (_e) {
+    // Migration 013 not applied yet — return zeros and let the deploy script
+    // surface the missing table on the next run.
+  }
+
   return json({
     period: `last ${hours} hours`,
     noise_filtered: !includeNoise,
@@ -4758,6 +4867,7 @@ async function handleAdminTraffic(db, env, request, url) {
       discovery_hits_in_period_raw: totalDiscoveryRecentRaw.total,
       discovery_hits_in_period_agents_only: totalDiscoveryRecentFiltered.total,
       enrichments_in_period: enrichmentRecent.total,
+      attempts_in_period: attemptsInPeriod,
     },
     discovery_by_route: discoveryByRoute.results,
     discovery_by_user_agent: discoveryByAgent.results,
@@ -4765,6 +4875,10 @@ async function handleAdminTraffic(db, env, request, url) {
     recent_discovery_hits: recentDiscovery.results,
     recent_queries: recentQueries.results,
     queries_by_day: queryByDay.results,
+    attempts_by_status: attemptsByStatus,
+    attempts_by_error_class: attemptsByError,
+    attempts_by_user_agent: attemptsByUa,
+    recent_attempts: recentAttempts,
   });
 }
 
