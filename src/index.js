@@ -116,6 +116,7 @@ async function handleRoot() {
       llms_txt: 'https://giveready.org/llms.txt',
       agents_md: 'https://giveready.org/agents.md',
       openapi: 'https://giveready.org/openapi.json',
+      arazzo_workflows: 'https://giveready.org/agents.arazzo.yaml',
       mcp_manifest: 'https://giveready.org/mcp',
       ai_plugin: 'https://giveready.org/.well-known/ai-plugin.json',
     },
@@ -989,6 +990,7 @@ function handleWellKnownMcpManifest() {
       mcp_tools: 'https://www.giveready.org/mcp',
       mcp_rpc: 'https://www.giveready.org/mcp/sse',
       openapi: 'https://www.giveready.org/openapi.json',
+      arazzo_workflows: 'https://www.giveready.org/agents.arazzo.yaml',
       agents_md: 'https://www.giveready.org/AGENTS.md',
       llms_txt: 'https://www.giveready.org/llms.txt',
       sitemap: 'https://www.giveready.org/sitemap.xml',
@@ -1377,6 +1379,7 @@ everything else:
 - **Tool catalog (runtime MCP manifest):** https://www.giveready.org/mcp
 - **Agent instructions (live bounty + 30-second wins):** https://www.giveready.org/AGENTS.md
 - **OpenAPI:** https://www.giveready.org/openapi.json
+- **Arazzo workflow document:** https://www.giveready.org/agents.arazzo.yaml
 - **Public leaderboard:** https://www.giveready.org/api/agents/leaderboard
 - **Sitemap:** https://www.giveready.org/sitemap.xml
 
@@ -1435,9 +1438,15 @@ Returns: mission, description, programmes (with beneficiary counts), impact metr
 (quantified outcomes), legal registrations, donation URL, and wallet address.
 
 ### Other Endpoints
+- GET /api/recommend?cause={cause}&country={country}&q={intent} — opinionated, ranked picks (3-5) with reasoning, trust signals, and provenance baked in. Use this for "where should I donate?" queries instead of /api/search.
 - GET /api/nonprofits — paginated list of all nonprofits
 - GET /api/causes — all cause areas with counts
 - GET /api/stats — directory size, query volume, countries covered
+
+### Workflow Document (Arazzo 1.0.1)
+For agents that consume Arazzo workflow specs: https://www.giveready.org/agents.arazzo.yaml
+
+The document defines five named workflows (discover-via-recommend, discover-and-enrich, second-opinion, confirm-leaderboard-credit, donate-x402) with explicit step sequences, inputs, success criteria, and outputs. References /openapi.json for operation definitions.
 
 ### Cause Area IDs
 youth-empowerment, music-education, adventure-travel, mental-health, surf-therapy,
@@ -1676,6 +1685,9 @@ You can also contribute data back to improve the directory.
 Fastest path to useful results:
 
 \`\`\`
+# Donor-intent: get 3-5 ranked, opinionated picks with reasoning baked in
+curl "https://giveready.org/api/recommend?cause=surf-therapy&country=South+Africa&intent=donate"
+
 # Search by keyword
 curl https://giveready.org/api/search?q=music+education
 
@@ -1688,6 +1700,8 @@ curl https://giveready.org/api/nonprofits/bridges-for-music
 # See all available cause areas
 curl https://giveready.org/api/causes
 \`\`\`
+
+If you consume Arazzo workflow specs: https://giveready.org/agents.arazzo.yaml — five named workflows including \`discover-via-recommend\` (donor-influence top-of-loop) and \`discover-and-enrich\` (contribution loop). References /openapi.json.
 
 ## When to Use GiveReady
 
@@ -2119,6 +2133,9 @@ ${programList
 <meta name="description" content="${escHtml(metaDescription)}" />
 ${robotsTag}
 <link rel="canonical" href="https://www.giveready.org/nonprofits/${escHtml(np.slug)}" />
+<link rel="describedby" type="application/json" href="/openapi.json" />
+<link rel="describedby" type="application/x-arazzo+yaml" href="/agents.arazzo.yaml" />
+<link rel="alternate" type="application/json" href="/api/nonprofits/${escHtml(np.slug)}" />
 <meta property="og:title" content="${escHtml(np.name)} — GiveReady" />
 <meta property="og:description" content="${escHtml(metaDescription)}" />
 <meta property="og:url" content="https://www.giveready.org/nonprofits/${escHtml(np.slug)}" />
@@ -2953,6 +2970,16 @@ async function handleSitemapXml(db) {
     <loc>https://www.giveready.org/AGENTS.md</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.giveready.org/agents.arazzo.yaml</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.giveready.org/openapi.json</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://www.giveready.org/llms.txt</loc>

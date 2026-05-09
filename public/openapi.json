@@ -15,6 +15,10 @@
       "description": "Production"
     }
   ],
+  "externalDocs": {
+    "description": "Arazzo 1.0.1 workflow document — five named workflows (discover-via-recommend, discover-and-enrich, second-opinion, confirm-leaderboard-credit, donate-x402). For agents that consume Arazzo workflow specs.",
+    "url": "https://www.giveready.org/agents.arazzo.yaml"
+  },
   "paths": {
     "/api/search": {
       "get": {
