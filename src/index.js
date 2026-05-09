@@ -244,6 +244,242 @@ async function handleSearch(db, url) {
   });
 }
 
+// =====================================================================
+// /api/recommend — donor-influence surface
+//
+// Search asks the agent to do too much judgment work; recommend encodes
+// GiveReady's view of relevance, trust, verification, donation readiness,
+// and source provenance. Returns 3-5 ranked picks with reasoning baked in.
+//
+// Phase 1 (now): ranking is dominated by editorial curation in the
+// recommendation_curation table (operator writes the rows). Phase 2:
+// agents draft, operator approves. Phase 3: two-agent consensus. The
+// editorial weight steps down as the curated set scales — see design
+// spec at giveready/docs/api-recommend-design-spec.md.
+//
+// IMPORTANT: every response includes ranking_signals and
+// editorial_disclosure so consumers can see what drove the rank. This
+// keeps the directory's "open + transparent" wedge intact even when
+// the recommendation set is operator-curated.
+// =====================================================================
+
+// Restrained-language linter. Reject anything that sounds like a ranking
+// claim we don't have an evaluation framework for. Used by the admin
+// upsert path and the import-starter-curation script.
+const BANNED_RECOMMENDATION_PHRASES = [
+  /\bbest\b/i,
+  /\btop\s*-?\s*rated\b/i,
+  /\btop\b\s+(charity|nonprofit|organisation|organization|pick)/i,
+  /\bhighest\b/i,
+  /\bmost[\s-](effective|impactful|trusted|efficient|reliable)\b/i,
+  /\b#\s*1\b/,
+  /\bnumber\s*one\b/i,
+];
+
+function lintRecommendationText(value) {
+  if (typeof value !== 'string') return null;
+  for (const pat of BANNED_RECOMMENDATION_PHRASES) {
+    if (pat.test(value)) {
+      return `banned phrase matched ${pat}: "${value}"`;
+    }
+  }
+  return null;
+}
+
+function lintRecommendationRow(row) {
+  const errors = [];
+  const fields = ['why_recommended', 'best_next_action'];
+  for (const f of fields) {
+    const e = lintRecommendationText(row[f]);
+    if (e) errors.push(`${f}: ${e}`);
+  }
+  for (const arrField of ['recommended_for', 'trust_signals']) {
+    const arr = Array.isArray(row[arrField]) ? row[arrField] : [];
+    for (const item of arr) {
+      const e = lintRecommendationText(item);
+      if (e) errors.push(`${arrField} item: ${e}`);
+    }
+  }
+  return errors;
+}
+
+async function handleRecommend(db, url, request) {
+  const cause = url.searchParams.get('cause');
+  const country = url.searchParams.get('country');
+  const q = url.searchParams.get('q');
+  const intent = url.searchParams.get('intent') || 'discover';
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '3'), 1), 5);
+
+  // At least one selector required — the endpoint must be opinionated.
+  if (!cause && !country && !q) {
+    return error('At least one of cause, country, or q is required', 400);
+  }
+
+  // Pull candidate rows: curation joined to nonprofits, filtered by selectors.
+  let sql = `
+    SELECT
+      rc.slug,
+      rc.recommended_for,
+      rc.why_recommended,
+      rc.best_next_action,
+      rc.trust_signals,
+      rc.donation_available,
+      rc.donation_methods,
+      rc.editorial_curated,
+      n.name, n.country, n.city, n.region, n.website, n.donation_url,
+      n.verified, n.beneficiaries_per_year, n.logo_url
+    FROM recommendation_curation rc
+    JOIN nonprofits n ON n.slug = rc.slug
+    WHERE 1=1
+  `;
+  const params = [];
+  if (country) {
+    sql += ` AND LOWER(n.country) = LOWER(?${params.length + 1})`;
+    params.push(country);
+  }
+  if (cause) {
+    sql += ` AND n.id IN (SELECT nonprofit_id FROM nonprofit_causes WHERE cause_id = ?${params.length + 1})`;
+    params.push(cause);
+  }
+  if (q) {
+    // Recommended_for is JSON-string; LIKE works for substring matching.
+    sql += ` AND (
+      LOWER(rc.recommended_for) LIKE ?${params.length + 1}
+      OR LOWER(rc.why_recommended) LIKE ?${params.length + 1}
+      OR LOWER(n.name) LIKE ?${params.length + 1}
+      OR LOWER(n.tagline) LIKE ?${params.length + 1}
+    )`;
+    params.push(`%${q.toLowerCase()}%`);
+  }
+  sql += ` LIMIT 50`; // pull a candidate pool, rank in JS
+
+  let rows;
+  try {
+    rows = (await db.prepare(sql).bind(...params).all()).results || [];
+  } catch (e) {
+    rows = [];
+  }
+
+  // Score each candidate. Weights documented in the design spec.
+  const scored = rows.map((r) => {
+    let score = 0;
+    const signalsUsed = [];
+
+    if (r.editorial_curated) { score += 50; signalsUsed.push('editorial_curation_for_starter_set'); }
+    if (r.verified) { score += 30; signalsUsed.push('verified_status'); }
+    if (r.donation_available) { score += 20; signalsUsed.push('donation_wallet_present'); }
+
+    // Mission match strength: cheap proxy via name/q substring hit.
+    if (q) {
+      const ql = q.toLowerCase();
+      const hay = [r.name, r.recommended_for, r.why_recommended].join(' ').toLowerCase();
+      if (hay.includes(ql)) { score += 15; signalsUsed.push('mission_match_strength'); }
+    }
+
+    return { ...r, _score: score, _signals: signalsUsed };
+  });
+  scored.sort((a, b) => b._score - a._score);
+
+  const top = scored.slice(0, limit);
+
+  // Format response.
+  const recommendations = top.map((r, i) => {
+    let recommended_for = [];
+    let trust_signals = [];
+    let donation_methods = [];
+    try { recommended_for = JSON.parse(r.recommended_for) || []; } catch (_) {}
+    try { trust_signals = JSON.parse(r.trust_signals) || []; } catch (_) {}
+    try { donation_methods = JSON.parse(r.donation_methods || '[]') || []; } catch (_) {}
+
+    return {
+      rank: i + 1,
+      name: r.name,
+      slug: r.slug,
+      country: r.country,
+      city: r.city,
+      region: r.region,
+      verified: !!r.verified,
+      editorial_curated: !!r.editorial_curated,
+      recommended_for,
+      why_recommended: r.why_recommended,
+      trust_signals,
+      best_next_action: r.best_next_action,
+      donation_available: !!r.donation_available,
+      donation_methods,
+      profile_url: `https://www.giveready.org/nonprofits/${r.slug}`,
+      api_url: `https://www.giveready.org/api/nonprofits/${r.slug}`,
+      donate_url: r.donation_available ? `https://www.giveready.org/api/donate/${r.slug}` : null,
+      ranking_signals_applied: r._signals,
+    };
+  });
+
+  const allSignalsUsed = Array.from(new Set(top.flatMap((r) => r._signals)));
+
+  let body;
+  if (recommendations.length === 0) {
+    // Search-redirect fallback. Honest about why.
+    const searchUrl = new URL('https://www.giveready.org/api/search');
+    if (cause) searchUrl.searchParams.set('cause', cause);
+    if (country) searchUrl.searchParams.set('country', country);
+    if (q) searchUrl.searchParams.set('q', q);
+    body = {
+      query: { cause, country, q, intent, limit },
+      ranking_signals: [],
+      editorial_disclosure:
+        'No operator-curated recommendations exist for this query yet. Falling back to /api/search results — the agent should rank these itself.',
+      count: 0,
+      recommendations: [],
+      fallback: {
+        type: 'search_redirect',
+        url: searchUrl.toString(),
+        message:
+          'No operator-curated recommendations for this query. Use /api/search and rank with your own judgement.',
+      },
+      no_recommendations_reason: 'starter_set_does_not_cover_this_query',
+    };
+  } else {
+    body = {
+      query: { cause, country, q, intent, limit },
+      ranking_signals: allSignalsUsed,
+      editorial_disclosure:
+        'This recommendation set is operator-curated for the GiveReady starter period (May 2026). Each profile is flagged with editorial_curated. Ranking will shift to two-agent consensus + provenance once the starter set graduates.',
+      count: recommendations.length,
+      recommendations,
+      fallback: null,
+      no_recommendations_reason: null,
+    };
+  }
+
+  // Telemetry — fire-and-forget. Don't block the response on a logging failure.
+  try {
+    const ua = request?.headers?.get?.('user-agent') || '';
+    const ip = request?.headers?.get?.('cf-connecting-ip') || '';
+    const referrer = request?.headers?.get?.('referer') || '';
+    db.prepare(
+      `INSERT INTO recommendation_attempts
+       (id, query_cause, query_country, query_q, query_intent, query_limit,
+        user_agent, ip, referrer, response_count, top_slug, fallback_used, ranking_signals)
+       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)`
+    ).bind(
+      crypto.randomUUID(),
+      cause || null,
+      country || null,
+      q || null,
+      intent,
+      limit,
+      ua,
+      ip,
+      referrer,
+      recommendations.length,
+      recommendations[0]?.slug || null,
+      recommendations.length === 0 ? 1 : 0,
+      JSON.stringify(allSignalsUsed),
+    ).run().catch(() => {});
+  } catch (_) {}
+
+  return json(body);
+}
+
 async function handleListNonprofits(db, url) {
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
   const offset = parseInt(url.searchParams.get('offset') || '0');
@@ -1079,6 +1315,27 @@ function handleRobotsTxt() {
     `User-agent: *
 Allow: /
 
+# Search/grounding crawlers — explicit allow.
+# Cloudflare's managed AI-bot block (Bots → AI bot management in dashboard)
+# prepends a 'User-agent: ClaudeBot Disallow: /' rule that some parsers
+# treat as a UA-prefix collision with Claude-SearchBot, causing the search
+# crawler to back off. These rules are the more-specific match and reverse
+# that side effect. Diagnosis: 00-Dashboard/claude-searchbot-drop-diagnosis.md
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: GPTBot-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
 # GiveReady - AI-readable nonprofit directory
 # API documentation: https://www.giveready.org/docs
 # Cause landing pages (HTML + JSON-LD): https://www.giveready.org/causes
@@ -1723,6 +1980,24 @@ async function handleNonprofitPage(db, slug) {
     .bind(np.id)
     .first();
 
+  // Per-field provenance — surface the trust signal Wikipedia-instinct
+  // critique flagged. For each applied enrichment, show who verified it,
+  // when, and the source. This is the "edit history" feature, exposed at
+  // the field level rather than the page level. Only show APPLIED status —
+  // pending and rejected stay backstage.
+  const provenance = await db
+    .prepare(
+      `SELECT field, value, source_url, agent_name, reviewed_at, created_at
+         FROM agent_enrichments
+        WHERE nonprofit_id = ?1
+          AND status = 'applied'
+        ORDER BY COALESCE(reviewed_at, created_at) DESC
+        LIMIT 20`
+    )
+    .bind(np.id)
+    .all();
+  const provenanceList = provenance.results || [];
+
   const isVerified = !!np.verified;
   const desc = (np.description || '').trim();
   // Thin-content threshold: 200 chars. Descriptions shorter than that are
@@ -1877,6 +2152,11 @@ ${np.logo_url ? `<meta property="og:image" content="${escHtml(np.logo_url)}" />`
   .prog-meta { display: inline-block; font-size: 0.8rem; color: #666; margin-left: 0.5rem; }
   .agent-callout { margin-top: 2rem; padding: 1rem; background: #f0fdf4; border-radius: 6px; font-size: 0.9rem; }
   .agent-callout a { color: #059669; }
+  ul.provenance { list-style: none; padding: 0; font-size: 0.85rem; color: #444; }
+  ul.provenance li { padding: 0.3rem 0; border-bottom: 1px dotted #e5e5e5; }
+  ul.provenance code { background: #f3f4f6; padding: 0.05rem 0.35rem; border-radius: 3px; font-size: 0.85em; }
+  ul.provenance a { color: #059669; }
+  .provenance-note { font-size: 0.8rem; color: #777; margin-top: 0.75rem; }
   footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #e5e5e5; font-size: 0.85rem; color: #666; }
   footer a { color: #059669; text-decoration: none; }
 </style>
@@ -1904,6 +2184,22 @@ ${isVerified ? programsHtml : ''}
 <div class="agent-callout">
   <strong>Are you an AI agent?</strong> ${hasMeaningfulDescription ? 'You can submit corrections to this description, or improve other fields.' : 'This profile is awaiting a description.'} See <a href="/AGENTS.md?from=np&amp;slug=${escHtml(np.slug)}">/AGENTS.md</a> for the enrichment protocol, or call the <a href="/.well-known/mcp.json">MCP server</a> directly. Profile JSON: <a href="/api/nonprofits/${escHtml(np.slug)}">/api/nonprofits/${escHtml(np.slug)}</a>.
 </div>
+
+${provenanceList.length > 0 ? `<h2>Field provenance</h2>
+<ul class="provenance">
+${provenanceList
+  .map((p) => {
+    const when = (p.reviewed_at || p.created_at || '').slice(0, 10);
+    const agent = escHtml(p.agent_name || 'unknown agent');
+    const field = escHtml(p.field);
+    const sourceLink = p.source_url
+      ? ` from <a href="${escHtml(p.source_url)}" rel="noopener nofollow">source</a>`
+      : '';
+    return `  <li><code>${field}</code> verified by ${agent} on ${escHtml(when)}${sourceLink}</li>`;
+  })
+  .join('\n')}
+</ul>
+<p class="provenance-note">Each applied field carries a contributor and source. Older entries reflect bulk-import provenance where available. <a href="/AGENTS.md">Agents can submit corrections.</a></p>` : ''}
 
 <footer>
 GiveReady is an open, AI-readable directory of nonprofits. <a href="/AGENTS.md">Agents: contribute data</a> &middot; <a href="/.well-known/mcp.json">MCP discovery</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="https://github.com/gswardman/giveready" rel="noopener">Source</a>
@@ -4920,6 +5216,160 @@ async function handleEnrichmentStats(db) {
 }
 
 // ============================================
+// ADMIN — ENRICHMENT REVIEW QUEUE
+// ============================================
+// Daily human-in-the-loop review path. Token-gated, so the CSO concern from
+// 2026-04-16 (self-reported agent_name spoofing) doesn't apply — the caller
+// is authenticated as the admin via the existing GIVEREADY_ADMIN_TOKEN.
+//
+// Three handlers:
+//   GET  /api/admin/enrichments/pending        — list pending submissions
+//   POST /api/admin/enrichments/{id}/apply     — apply this value to the nonprofit
+//   POST /api/admin/enrichments/{id}/reject    — reject with a reason
+//
+// Apply writes the value to the nonprofits table, marks the chosen enrichment
+// as 'applied', and rejects any other pending submissions for the same
+// (nonprofit, field) pair so the queue stays clean. Reject records the
+// rejection_reason so the next agent submitting on this field gets it back
+// in their response (existing self-learning loop).
+//
+// The bootstrap rationale: agent submissions are still rare. Applying via
+// admin makes the leaderboard show "applied" counts climb, which signals to
+// observing agents that the funnel rewards real submissions, which (in
+// theory) increases their willingness to spend a request on /api/enrich.
+
+async function handleAdminEnrichmentsPending(db, env, request, url) {
+  const authCheck = checkAdminAuth(env, request);
+  if (authCheck) return authCheck;
+
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 200);
+
+  const rows = await db.prepare(
+    `SELECT ae.id, ae.nonprofit_id, ae.nonprofit_slug, ae.field, ae.value,
+            ae.source_url, ae.agent_id, ae.agent_name, ae.confidence,
+            ae.created_at,
+            n.name AS nonprofit_name,
+            (SELECT COUNT(*) FROM agent_enrichments ae2
+             WHERE ae2.nonprofit_id = ae.nonprofit_id AND ae2.field = ae.field
+               AND ae2.status = 'pending') AS competing_pending
+       FROM agent_enrichments ae
+       LEFT JOIN nonprofits n ON n.id = ae.nonprofit_id
+      WHERE ae.status = 'pending'
+      ORDER BY ae.created_at DESC
+      LIMIT ?1`
+  ).bind(limit).all();
+
+  return json({
+    count: rows.results.length,
+    pending: rows.results,
+    review_endpoints: {
+      apply: 'POST /api/admin/enrichments/{id}/apply?token=...',
+      reject: 'POST /api/admin/enrichments/{id}/reject?token=... body: {"reason":"..."}',
+    },
+  });
+}
+
+async function handleAdminEnrichmentApply(db, env, request, id) {
+  const authCheck = checkAdminAuth(env, request);
+  if (authCheck) return authCheck;
+
+  const enrichment = await db.prepare(
+    `SELECT id, nonprofit_id, nonprofit_slug, field, value, status
+       FROM agent_enrichments WHERE id = ?1`
+  ).bind(id).first();
+
+  if (!enrichment) return error('Enrichment not found', 404);
+  if (enrichment.status !== 'pending') {
+    return error(`Enrichment already ${enrichment.status}`, 400);
+  }
+
+  // Update the nonprofit's actual field with the chosen value. This is the
+  // single SQL line that makes the enrichment "go live" on the public profile.
+  // Using string interpolation for the column name is safe here because the
+  // field is whitelisted by the original handleEnrich (ENRICHABLE_FIELDS) —
+  // we only re-validate the column comes from a trusted enum.
+  if (!ENRICHABLE_FIELDS.has(enrichment.field)) {
+    return error(`Field '${enrichment.field}' is not in the enrichable allowlist`, 400);
+  }
+
+  await db.prepare(
+    `UPDATE nonprofits SET ${enrichment.field} = ?1, updated_at = datetime('now')
+     WHERE id = ?2`
+  ).bind(enrichment.value, enrichment.nonprofit_id).run();
+
+  // Mark this enrichment applied.
+  await db.prepare(
+    `UPDATE agent_enrichments
+        SET status = 'applied', reviewed_at = datetime('now')
+      WHERE id = ?1`
+  ).bind(id).run();
+
+  // Reject competing pending submissions for the same (nonprofit, field) pair
+  // so the queue is clean. Record why, with the winning value, so the next
+  // agent that resubmits sees the canonical form.
+  const rejectionReason = `Admin selected a different value during manual review for '${enrichment.field}'. Aim for the winning canonical form when retrying.`;
+  await db.prepare(
+    `UPDATE agent_enrichments
+        SET status = 'rejected',
+            reviewed_at = datetime('now'),
+            rejection_reason = ?1,
+            winning_value = ?2
+      WHERE nonprofit_id = ?3 AND field = ?4 AND status = 'pending' AND id != ?5`
+  ).bind(rejectionReason, enrichment.value, enrichment.nonprofit_id, enrichment.field, id).run();
+
+  return json({
+    success: true,
+    enrichment_id: id,
+    nonprofit_slug: enrichment.nonprofit_slug,
+    field: enrichment.field,
+    applied_value: enrichment.value,
+    profile_url: `https://giveready.org/nonprofits/${enrichment.nonprofit_slug}`,
+  });
+}
+
+async function handleAdminEnrichmentReject(db, env, request, id) {
+  const authCheck = checkAdminAuth(env, request);
+  if (authCheck) return authCheck;
+
+  let body = {};
+  try {
+    const text = await request.text();
+    body = text ? JSON.parse(text) : {};
+  } catch (_e) {
+    return error('Invalid JSON body. Send {"reason": "..."} (optional "winning_value")', 400);
+  }
+  const reason = (body.reason || '').toString().trim() ||
+    'Admin rejected during manual review. No reason provided.';
+  const winningValue = body.winning_value ? String(body.winning_value).slice(0, 5000) : null;
+
+  const enrichment = await db.prepare(
+    `SELECT id, nonprofit_slug, field, status FROM agent_enrichments WHERE id = ?1`
+  ).bind(id).first();
+
+  if (!enrichment) return error('Enrichment not found', 404);
+  if (enrichment.status !== 'pending') {
+    return error(`Enrichment already ${enrichment.status}`, 400);
+  }
+
+  await db.prepare(
+    `UPDATE agent_enrichments
+        SET status = 'rejected',
+            reviewed_at = datetime('now'),
+            rejection_reason = ?1,
+            winning_value = ?2
+      WHERE id = ?3`
+  ).bind(reason, winningValue, id).run();
+
+  return json({
+    success: true,
+    enrichment_id: id,
+    nonprofit_slug: enrichment.nonprofit_slug,
+    field: enrichment.field,
+    rejection_reason: reason,
+  });
+}
+
+// ============================================
 // AGENT LEADERBOARD — public surface
 // ============================================
 
@@ -5661,6 +6111,7 @@ const _httpHandler = {
       // Routes
       if (path === '/' || path === '/api') return handleRoot();
       if (path === '/api/search') return handleSearch(env.DB, url);
+      if (path === '/api/recommend') return handleRecommend(env.DB, url, request);
       if (path === '/api/nonprofits') return handleListNonprofits(env.DB, url);
       if (path === '/api/causes') return handleListCauses(env.DB);
       if (path === '/api/stats') return handleStats(env.DB);
@@ -5686,6 +6137,20 @@ const _httpHandler = {
       const rejectMatch = path.match(/^\/api\/admin\/reject\/([a-z0-9-]+)$/);
       if (rejectMatch && request.method === 'POST') {
         return handleAdminReject(env.DB, env, request, rejectMatch[1]);
+      }
+
+      // Admin enrichment review queue (token-gated; daily human-in-the-loop).
+      // List, apply, or reject pending enrichments. Match UUID-shaped IDs.
+      if (path === '/api/admin/enrichments/pending') {
+        return handleAdminEnrichmentsPending(env.DB, env, request, url);
+      }
+      const enrichApplyMatch = path.match(/^\/api\/admin\/enrichments\/([0-9a-f-]{36})\/apply$/);
+      if (enrichApplyMatch && request.method === 'POST') {
+        return handleAdminEnrichmentApply(env.DB, env, request, enrichApplyMatch[1]);
+      }
+      const enrichRejectMatch = path.match(/^\/api\/admin\/enrichments\/([0-9a-f-]{36})\/reject$/);
+      if (enrichRejectMatch && request.method === 'POST') {
+        return handleAdminEnrichmentReject(env.DB, env, request, enrichRejectMatch[1]);
       }
 
       // Magic link claim endpoint
