@@ -3421,7 +3421,7 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     h += '</div>';
     h += '<div class="ai-power-user" id="ai-mcp-block">';
     h += '<button class="ai-power-user-toggle" onclick="document.getElementById(&apos;ai-mcp-block&apos;).classList.toggle(&apos;open&apos;)"><span class="chev">▾</span> Add GiveReady to your AI tool (MCP)</button>';
-    h += '<div class="ai-power-user-content">{\n  "mcpServers": {\n    "giveready": {\n      "command": "npx",\n      "args": ["giveready-mcp"]\n    }\n  }\n}</div>';
+    h += '<div class="ai-power-user-content"><pre>{\\n  "mcpServers": {\\n    "giveready": {\\n      "command": "npx",\\n      "args": ["giveready-mcp"]\\n    }\\n  }\\n}</pre></div>';
     h += '</div>';
     h += '<div class="ai-section-foot">Already have an AI? GiveReady is on the <a href="https://giveready.org/agents.md" target="_blank">official MCP registry</a>.</div>';
     h += '</div>';
