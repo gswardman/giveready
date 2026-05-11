@@ -5152,6 +5152,24 @@ async function handleAdminTraffic(db, env, request, url) {
      WHERE created_at > ${since} ${agentsOnlyFilter}`
   ).first();
 
+  // Split the allowlist into writing-capable agents vs passive search crawlers.
+  // This gives the digest an honest denominator for "agents that could enrich"
+  // separately from crawler noise (Amzn-SearchBot, Googlebot, etc.).
+  const writingAllowConds = KNOWN_WRITING_AGENT_PATTERNS
+    .map((entry) => `user_agent LIKE '%${entry.pattern.replace(/'/g, "''")}%'`)
+    .join(' OR ');
+  const crawlerAllowConds = KNOWN_CRAWLER_PATTERNS
+    .map((entry) => `user_agent LIKE '%${entry.pattern.replace(/'/g, "''")}%'`)
+    .join(' OR ');
+  const totalDiscoveryRecentWriting = await db.prepare(
+    `SELECT COUNT(*) as total FROM discovery_hits
+     WHERE created_at > ${since} AND (${writingAllowConds})`
+  ).first();
+  const totalDiscoveryRecentCrawlers = await db.prepare(
+    `SELECT COUNT(*) as total FROM discovery_hits
+     WHERE created_at > ${since} AND (${crawlerAllowConds})`
+  ).first();
+
   // Top 5 filtered-out noise UAs in the period, so we can still see what
   // infrastructure is polling us without it dominating the main numbers.
   const noiseBreakdown = await db.prepare(
@@ -5219,6 +5237,8 @@ async function handleAdminTraffic(db, env, request, url) {
     noise_filtered: !includeNoise,
     filter_mode: useBlocklist ? 'blocklist' : 'allowlist',
     known_agents: useBlocklist ? undefined : KNOWN_AGENT_PATTERNS.map((e) => e.name),
+    known_writing_agents: useBlocklist ? undefined : KNOWN_WRITING_AGENT_PATTERNS.map((e) => e.name),
+    known_search_crawlers: useBlocklist ? undefined : KNOWN_CRAWLER_PATTERNS.map((e) => e.name),
     noise_prefixes: useBlocklist ? AGENT_NOISE_PREFIXES : undefined,
     summary: {
       total_discovery_hits: totalDiscovery.total,
@@ -5227,6 +5247,8 @@ async function handleAdminTraffic(db, env, request, url) {
         : totalDiscoveryRecentFiltered.total,
       discovery_hits_in_period_raw: totalDiscoveryRecentRaw.total,
       discovery_hits_in_period_agents_only: totalDiscoveryRecentFiltered.total,
+      discovery_hits_in_period_writing_agents: totalDiscoveryRecentWriting.total,
+      discovery_hits_in_period_search_crawlers: totalDiscoveryRecentCrawlers.total,
       enrichments_in_period: enrichmentRecent.total,
       attempts_in_period: attemptsInPeriod,
     },
@@ -5492,27 +5514,33 @@ async function handleAgentLeaderboard(db) {
 // Default: allowlist (new, secure).
 const KNOWN_AGENT_PATTERNS = [
   // AI model crawlers (the agents we built GiveReady for)
-  { pattern: 'ClaudeBot', name: 'Anthropic Claude' },
-  { pattern: 'Claude-SearchBot', name: 'Anthropic Claude Search' },
-  { pattern: 'GPTBot', name: 'OpenAI GPT' },
-  { pattern: 'ChatGPT-User', name: 'OpenAI ChatGPT' },
-  { pattern: 'Google-Extended', name: 'Google AI' },
-  { pattern: 'PerplexityBot', name: 'Perplexity' },
-  { pattern: 'cohere-ai', name: 'Cohere' },
-  // Search engine crawlers (they read /llms.txt, /agents.md, /mcp too)
-  { pattern: 'Googlebot', name: 'Google Search' },
-  { pattern: 'bingbot', name: 'Microsoft Bing' },
-  { pattern: 'Applebot', name: 'Apple' },
-  { pattern: 'DuckDuckBot', name: 'DuckDuckGo' },
-  { pattern: 'YandexBot', name: 'Yandex' },
-  { pattern: 'Amzn-SearchBot', name: 'Amazon Search' },
-  { pattern: 'SemrushBot', name: 'SEMrush' },
+  // type='writing' = UA can plausibly POST /api/enrich (real AI agents / chatbot fetches).
+  // type='crawler' = passive search/index crawler. Reads /AGENTS.md, never writes.
+  // The admin traffic endpoint splits funnel counts by type so the denominator is honest.
+  { pattern: 'ClaudeBot', name: 'Anthropic Claude', type: 'writing' },
+  { pattern: 'Claude-SearchBot', name: 'Anthropic Claude Search', type: 'writing' },
+  { pattern: 'GPTBot', name: 'OpenAI GPT', type: 'writing' },
+  { pattern: 'ChatGPT-User', name: 'OpenAI ChatGPT', type: 'writing' },
+  { pattern: 'Google-Extended', name: 'Google AI', type: 'writing' },
+  { pattern: 'PerplexityBot', name: 'Perplexity', type: 'writing' },
+  { pattern: 'cohere-ai', name: 'Cohere', type: 'writing' },
+  // Search engine crawlers (they read /llms.txt, /agents.md, /mcp too — but don't write)
+  { pattern: 'Googlebot', name: 'Google Search', type: 'crawler' },
+  { pattern: 'bingbot', name: 'Microsoft Bing', type: 'crawler' },
+  { pattern: 'Applebot', name: 'Apple', type: 'crawler' },
+  { pattern: 'DuckDuckBot', name: 'DuckDuckGo', type: 'crawler' },
+  { pattern: 'YandexBot', name: 'Yandex', type: 'crawler' },
+  { pattern: 'Amzn-SearchBot', name: 'Amazon Search', type: 'crawler' },
+  { pattern: 'SemrushBot', name: 'SEMrush', type: 'crawler' },
   // MCP ecosystem crawlers
-  { pattern: 'MCPRegistry', name: 'MCP Registry' },
-  { pattern: 'Smithery', name: 'Smithery' },
-  { pattern: 'PulseMCP', name: 'PulseMCP' },
-  { pattern: 'GlamaMCP', name: 'Glama MCP' },
+  { pattern: 'MCPRegistry', name: 'MCP Registry', type: 'crawler' },
+  { pattern: 'Smithery', name: 'Smithery', type: 'crawler' },
+  { pattern: 'PulseMCP', name: 'PulseMCP', type: 'crawler' },
+  { pattern: 'GlamaMCP', name: 'Glama MCP', type: 'crawler' },
 ];
+
+const KNOWN_WRITING_AGENT_PATTERNS = KNOWN_AGENT_PATTERNS.filter((e) => e.type === 'writing');
+const KNOWN_CRAWLER_PATTERNS = KNOWN_AGENT_PATTERNS.filter((e) => e.type === 'crawler');
 
 // Legacy blocklist kept for feature flag rollback (AGENT_FILTER_MODE=blocklist).
 const AGENT_NOISE_PREFIXES = [
