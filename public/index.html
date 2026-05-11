@@ -141,6 +141,21 @@
     .card h3 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px; }
     .card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
 
+    /* TRY IT NOW (donor-side AI demo) */
+    .try-it-card { background: linear-gradient(135deg, var(--accent-dim), rgba(5,150,105,0.02)); border: 1px solid var(--accent-border); border-radius: var(--radius); padding: 28px 24px; max-width: 540px; margin: 28px auto 0; text-align: center; }
+    .try-it-charity { margin-bottom: 18px; }
+    .try-it-charity-name { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; letter-spacing: -0.01em; }
+    .try-it-charity-sub { font-size: 12px; color: var(--muted); }
+    .try-it-buttons { display: flex; gap: 10px; margin-bottom: 14px; justify-content: center; flex-wrap: wrap; }
+    .try-it-btn { flex: 1; min-width: 180px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; color: var(--text); text-decoration: none; font-family: var(--sans); transition: all 0.15s; }
+    .try-it-btn:hover { border-color: var(--accent); background: var(--surface); }
+    .try-it-btn-logo { width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; border-radius: 4px; font-size: 10px; color: white; }
+    .try-it-btn-logo.gpt { background: #10a37f; }
+    .try-it-btn-logo.claude { background: #d97757; }
+    .try-it-foot { font-size: 12px; color: var(--muted); }
+    .try-it-foot a { color: var(--accent); text-decoration: none; }
+    .try-it-foot a:hover { text-decoration: underline; }
+
     /* ZERO FEES */
     .fees-section { text-align: center; }
     .fees-section h2 { font-size: clamp(24px, 4.5vw, 32px); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 12px; }
@@ -310,6 +325,34 @@
         <div class="card-icon">&#9889;</div>
         <h3>Donate via AI</h3>
         <p>GiveReady supports x402 &mdash; the payment protocol that lets AI agents donate directly to your wallet on behalf of a donor. One prompt, one tap.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TRY IT NOW (donor-side AI demo) ===== -->
+<div class="section" id="try-it">
+  <div class="wrap" style="text-align: center;">
+    <span class="tag">Try it now</span>
+    <h2>Give via AI to a real charity in our directory.</h2>
+    <p class="lead" style="max-width: 540px; margin: 0 auto 8px;">No setup. No account on our side. Open one of these AI tools and you can ask about, compare, and give to nonprofits in chat. Demo charity below &mdash; the same flow works for every claimed page on GiveReady.</p>
+    <div class="try-it-card">
+      <div class="try-it-charity">
+        <div class="try-it-charity-name">Finn Wardman World Explorer Fund</div>
+        <div class="try-it-charity-sub">Adventure grants for young explorers &middot; Bermuda Community Foundation</div>
+      </div>
+      <div class="try-it-buttons">
+        <a class="try-it-btn" href="https://chatgpt.com/?q=I%20want%20to%20give%20to%20Finn%20Wardman%20World%20Explorer%20Fund%20via%20GiveReady%20%28https%3A%2F%2Fgiveready.org%2Fdonate%2Ffinn-wardman-world-explorer-fund%29." target="_blank" rel="noopener">
+          <span class="try-it-btn-logo gpt">G</span>
+          Open in ChatGPT
+        </a>
+        <a class="try-it-btn" href="https://claude.ai/new?q=I%20want%20to%20give%20to%20Finn%20Wardman%20World%20Explorer%20Fund%20via%20GiveReady%20%28https%3A%2F%2Fgiveready.org%2Fdonate%2Ffinn-wardman-world-explorer-fund%29." target="_blank" rel="noopener">
+          <span class="try-it-btn-logo claude">C</span>
+          Open in Claude
+        </a>
+      </div>
+      <div class="try-it-foot">
+        Or see the donate page directly: <a href="/donate/finn-wardman-world-explorer-fund">/donate/finn-wardman-world-explorer-fund</a>
       </div>
     </div>
   </div>

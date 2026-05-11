@@ -3128,6 +3128,26 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     .trust-strip { display: flex; justify-content: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
     .trust-item { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; color: var(--muted); }
     .trust-item svg { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
+    .ai-section { margin-bottom: 28px; padding: 20px; background: linear-gradient(135deg, var(--accent-dim), rgba(52,211,153,0.04)); border: 1px solid var(--accent-border); border-radius: var(--radius); }
+    .ai-section-label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); margin-bottom: 6px; }
+    .ai-section-label-badge { font-size: 9px; font-weight: 700; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); padding: 2px 7px; border-radius: 20px; letter-spacing: 0.05em; text-transform: uppercase; }
+    .ai-section-sub { font-size: 12px; color: var(--muted); line-height: 1.55; margin-bottom: 14px; }
+    .ai-buttons { display: flex; gap: 8px; margin-bottom: 4px; }
+    .ai-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; color: var(--text); text-decoration: none; font-family: var(--sans); cursor: pointer; transition: all 0.15s; }
+    .ai-btn:hover { border-color: var(--accent); background: var(--surface-hover); }
+    .ai-btn-logo { width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; border-radius: 4px; font-size: 10px; color: white; }
+    .ai-btn-logo.gpt { background: #10a37f; }
+    .ai-btn-logo.claude { background: #d97757; }
+    .ai-power-user { margin-top: 12px; }
+    .ai-power-user-toggle { background: transparent; border: none; color: var(--muted); font-size: 11px; font-weight: 500; cursor: pointer; font-family: var(--sans); padding: 4px 0; display: inline-flex; align-items: center; gap: 5px; }
+    .ai-power-user-toggle:hover { color: var(--text); }
+    .ai-power-user-toggle .chev { transition: transform 0.15s; display: inline-block; font-size: 10px; }
+    .ai-power-user.open .ai-power-user-toggle .chev { transform: rotate(180deg); }
+    .ai-power-user-content { display: none; margin-top: 10px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--mono); font-size: 11px; line-height: 1.5; color: var(--text); white-space: pre-wrap; word-break: break-all; overflow-x: auto; }
+    .ai-power-user.open .ai-power-user-content { display: block; }
+    .ai-section-foot { font-size: 11px; color: var(--light); margin-top: 10px; text-align: center; }
+    .ai-section-foot a { color: var(--accent); text-decoration: none; }
+    .ai-section-foot a:hover { text-decoration: underline; }
     .amount-section { margin-bottom: 24px; }
     .section-label { font-size: 12px; font-weight: 600; color: var(--light); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: block; }
     .amount-pills { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -3388,6 +3408,22 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
       h += '<div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Found via GiveReady</div>';
     }
     h += '<div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Verified</div>';
+    h += '</div>';
+
+    // Give via AI block — donor-side AI install + handoff. Renders for every charity, claimed or not.
+    var aiQ = encodeURIComponent('I want to give to ' + nonprofit.name + ' via GiveReady (https://giveready.org/donate/' + slug + ').');
+    h += '<div class="ai-section">';
+    h += '<div class="ai-section-label">Give via AI <span class="ai-section-label-badge">New</span></div>';
+    h += '<div class="ai-section-sub">Use your favourite AI to give to ' + esc(nonprofit.name) + ' — and find others doing similar work. Your AI gets context on this charity and can complete the donation in chat.</div>';
+    h += '<div class="ai-buttons">';
+    h += '<a class="ai-btn" href="https://chatgpt.com/?q=' + aiQ + '" target="_blank" rel="noopener"><span class="ai-btn-logo gpt">G</span>Open in ChatGPT</a>';
+    h += '<a class="ai-btn" href="https://claude.ai/new?q=' + aiQ + '" target="_blank" rel="noopener"><span class="ai-btn-logo claude">C</span>Open in Claude</a>';
+    h += '</div>';
+    h += '<div class="ai-power-user" id="ai-mcp-block">';
+    h += '<button class="ai-power-user-toggle" onclick="document.getElementById(\'ai-mcp-block\').classList.toggle(\'open\')"><span class="chev">▾</span> Add GiveReady to your AI tool (MCP)</button>';
+    h += '<div class="ai-power-user-content">{\n  "mcpServers": {\n    "giveready": {\n      "command": "npx",\n      "args": ["giveready-mcp"]\n    }\n  }\n}</div>';
+    h += '</div>';
+    h += '<div class="ai-section-foot">Already have an AI? GiveReady is on the <a href="https://giveready.org/agents.md" target="_blank">official MCP registry</a>.</div>';
     h += '</div>';
 
     // Preserve note across re-renders
