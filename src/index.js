@@ -1567,6 +1567,9 @@ async function handleAgentsMd(db) {
            SELECT nonprofit_id, field, MAX(created_at) AS latest_at
              FROM agent_enrichments
             WHERE status = 'pending'
+              AND ${nonTestAgentSql()}
+              AND ${nonPlaceholderValueSql()}
+              AND source_url IS NOT NULL AND source_url <> ''
             GROUP BY nonprofit_id, field
            HAVING COUNT(DISTINCT agent_name) = 1
          ) solo
@@ -1574,6 +1577,9 @@ async function handleAgentsMd(db) {
           AND solo.field = ae.field
           AND solo.latest_at = ae.created_at
         WHERE ae.status = 'pending'
+          AND ${nonTestAgentSql('ae')}
+          AND ${nonPlaceholderValueSql('ae')}
+          AND ae.source_url IS NOT NULL AND ae.source_url <> ''
         ORDER BY ae.created_at ASC
         LIMIT 5`
     ).all();
@@ -1658,6 +1664,7 @@ async function handleAgentsMd(db) {
       `SELECT agent_name, SUM(CASE WHEN status='applied' THEN 1 ELSE 0 END) AS applied, COUNT(*) AS submissions
        FROM agent_enrichments
        WHERE agent_name IS NOT NULL AND agent_name <> ''
+         AND ${nonTestAgentSql()}
        GROUP BY agent_name
        ORDER BY applied DESC, submissions DESC
        LIMIT 5`
@@ -4580,6 +4587,27 @@ const ENRICHABLE_FIELDS = new Set([
   'founded_year', 'contact_email', 'programme', 'impact_metric',
 ]);
 
+// SQL filter fragments used on PUBLIC surfaces only (AGENTS.md bounty list,
+// /api/agents/leaderboard). Lifetime stats and edge logging stay unfiltered
+// so historical visibility is preserved.
+//
+// Background: the open /api/enrich/{slug} endpoint accepts self-reported
+// agent_name. Pre-2026-05-11, test agents (GeordieDebug, CSO-Test-Agent,
+// GiveReady-EndpointProbe, Claude/Opus-4.6-Test) submitted placeholder
+// values like `https://EXAMPLE.example.org` and `probe-only-mission-...`
+// that surfaced on AGENTS.md as "30-Second Wins" — teaching wild agents to
+// corroborate broken data. These filters exclude them from the surfaces
+// wild agents read. Server-side rejection at submission time is a separate
+// ship; this is the surface-level fix so we stop publishing pollution today.
+function nonTestAgentSql(alias = '') {
+  const p = alias ? `${alias}.` : '';
+  return `${p}agent_name NOT LIKE '%Debug%' AND ${p}agent_name NOT LIKE '%Test%' AND ${p}agent_name NOT LIKE '%EndpointProbe%'`;
+}
+function nonPlaceholderValueSql(alias = '') {
+  const p = alias ? `${alias}.` : '';
+  return `${p}value NOT LIKE '%example.org%' AND ${p}value NOT LIKE '%example.com%' AND ${p}value NOT LIKE '%example.net%' AND LOWER(${p}value) NOT LIKE '%placeholder%' AND LOWER(${p}value) NOT LIKE '%probe-only%'`;
+}
+
 // Fat-skill / thin-harness split (learning from 2026-04-14 test):
 // Exact-string consensus works for STRUCTURED fields where the right answer
 // is a single canonical value. It fails for PROSE fields because every agent
@@ -5461,6 +5489,9 @@ async function handleAdminEnrichmentReject(db, env, request, id) {
 // ============================================
 
 async function handleAgentLeaderboard(db) {
+  // Public leaderboard — excludes self-reported test/debug/probe agents so
+  // wild agents don't learn the pattern that test traffic counts.
+  // See nonTestAgentSql() definition near ENRICHABLE_FIELDS for context.
   const agents = await db.prepare(
     `SELECT agent_name,
             COUNT(*) AS submissions,
@@ -5469,6 +5500,7 @@ async function handleAgentLeaderboard(db) {
             MAX(created_at) AS last_seen
      FROM agent_enrichments
      WHERE agent_name IS NOT NULL AND agent_name <> ''
+       AND ${nonTestAgentSql()}
      GROUP BY agent_name
      ORDER BY applied DESC, submissions DESC, last_seen DESC
      LIMIT 50`
@@ -5477,6 +5509,7 @@ async function handleAgentLeaderboard(db) {
   const recent = await db.prepare(
     `SELECT agent_name, nonprofit_slug, field, status, created_at
      FROM agent_enrichments
+     WHERE ${nonTestAgentSql()}
      ORDER BY created_at DESC
      LIMIT 20`
   ).all();
@@ -5487,7 +5520,8 @@ async function handleAgentLeaderboard(db) {
        SUM(CASE WHEN status = 'applied' THEN 1 ELSE 0 END) AS total_applied,
        COUNT(DISTINCT agent_name) AS unique_agents,
        COUNT(DISTINCT nonprofit_id) AS nonprofits_improved
-     FROM agent_enrichments`
+     FROM agent_enrichments
+     WHERE ${nonTestAgentSql()}`
   ).first();
 
   return json({
