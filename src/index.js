@@ -3138,6 +3138,7 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     .ai-btn-logo { width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; border-radius: 4px; font-size: 10px; color: white; }
     .ai-btn-logo.gpt { background: #10a37f; }
     .ai-btn-logo.claude { background: #d97757; }
+    .ai-btn-logo.gemini { background: linear-gradient(135deg, #4285f4, #a142f4); }
     .ai-power-user { margin-top: 12px; }
     .ai-power-user-toggle { background: transparent; border: none; color: var(--muted); font-size: 11px; font-weight: 500; cursor: pointer; font-family: var(--sans); padding: 4px 0; display: inline-flex; align-items: center; gap: 5px; }
     .ai-power-user-toggle:hover { color: var(--text); }
@@ -3416,8 +3417,9 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
     h += '<div class="ai-section-label">Give via AI <span class="ai-section-label-badge">New</span></div>';
     h += '<div class="ai-section-sub">Use your favourite AI to give to ' + esc(nonprofit.name) + ' — and find others doing similar work. Your AI gets context on this charity and can complete the donation in chat.</div>';
     h += '<div class="ai-buttons">';
-    h += '<a class="ai-btn" href="https://chatgpt.com/?q=' + aiQ + '" target="_blank" rel="noopener"><span class="ai-btn-logo gpt">G</span>Open in ChatGPT</a>';
+    h += '<a class="ai-btn" href="https://chatgpt.com/g/g-6a016ba2fee8819185a8f5490f9955ea-giveready?q=' + aiQ + '" target="_blank" rel="noopener"><span class="ai-btn-logo gpt">G</span>Open in ChatGPT</a>';
     h += '<a class="ai-btn" href="https://claude.ai/new?q=' + aiQ + '" target="_blank" rel="noopener"><span class="ai-btn-logo claude">C</span>Open in Claude</a>';
+    h += '<a class="ai-btn" href="https://gemini.google.com/app?q=' + aiQ + '" target="_blank" rel="noopener"><span class="ai-btn-logo gemini">✨</span>Open in Gemini</a>';
     h += '</div>';
     h += '<div class="ai-power-user" id="ai-mcp-block">';
     h += '<button class="ai-power-user-toggle" onclick="document.getElementById(&apos;ai-mcp-block&apos;).classList.toggle(&apos;open&apos;)"><span class="chev">▾</span> Add GiveReady to your AI tool (MCP)</button>';
