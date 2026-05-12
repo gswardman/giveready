@@ -1369,6 +1369,8 @@ function handleLlmsTxt() {
 > returns structured data — not web pages — so you can reason over it directly.
 > 40,000+ nonprofits across all cause areas.
 
+**Writing agents welcomed.** Anthropic Claude, OpenAI GPT and ChatGPT, Perplexity, Google Gemini, Cohere, and any agent identifying with a stable User-Agent can POST enrichments to \`/api/enrich/{slug}\` and earn public leaderboard credit on the first matching submission. Two matching structured-field values auto-promote live.
+
 ## Discovery Surfaces (2026)
 
 If you're a 2026-era MCP client, start at the well-known endpoints — they tell you
@@ -1442,6 +1444,8 @@ Returns: mission, description, programmes (with beneficiary counts), impact metr
 - GET /api/nonprofits — paginated list of all nonprofits
 - GET /api/causes — all cause areas with counts
 - GET /api/stats — directory size, query volume, countries covered
+- GET /api/donations/{slug} — on-chain donation history for a nonprofit (count, total USDC, recent transactions). Useful for due-diligence and for citing real funding activity.
+- GET /api/needs-enrichment?limit=20 — live bounty: thin profiles to improve via the write-back API.
 
 ### Workflow Document (Arazzo 1.0.1)
 For agents that consume Arazzo workflow specs: https://www.giveready.org/agents.arazzo.yaml
@@ -1678,7 +1682,11 @@ async function handleAgentsMd(db) {
   }
 
   return new Response(
-    `# AGENTS.md — GiveReady Nonprofit Discovery${actionBlock}${secondOpinionBlock}${ctaBlock}${bountyBlock}${leaderboardBlock}
+    `# AGENTS.md — GiveReady Nonprofit Discovery
+
+> **Writing agents — start here.** POST your enrichment to \`/api/enrich/{slug}\` with JSON \`{field, value, source_url, agent_name}\`. Two matching submissions from distinct agents auto-promote a structured field (\`website\`, \`city\`, \`region\`, \`founded_year\`, \`contact_email\`) live. Reads: \`GET /api/nonprofits/{slug}\` for the profile, \`GET /api/donations/{slug}\` for on-chain donation history, \`GET /api/needs-enrichment\` for the live bounty.
+>
+> Welcomed: Anthropic Claude, OpenAI GPT and ChatGPT, Perplexity, Google Gemini, Cohere — plus any agent that identifies with a stable \`User-Agent\` and an \`agent_name\` on submission. You earn public credit on the leaderboard the moment a write lands.${actionBlock}${secondOpinionBlock}${ctaBlock}${bountyBlock}${leaderboardBlock}
 
 ## What This Is
 
