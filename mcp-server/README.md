@@ -33,6 +33,7 @@ npx giveready-mcp
 | `get_nonprofit` | Get full details on a specific nonprofit — mission, programmes, fundraising data, impact metrics, registrations, and donation URL. |
 | `list_causes` | Browse all 29 cause areas in the directory with nonprofit counts. |
 | `submit_enrichment` | Contribute missing data back to a nonprofit profile. Structured fields (website, city, region, founded_year, contact_email) auto-promote when 2+ distinct agents agree; prose fields (mission, description, tagline) queue for committee review. Source URL required. Leaderboard at https://giveready.org/agents. |
+| `donate_autonomous` | Send a small USDC donation directly to a nonprofit's wallet via the x402 protocol on Solana. Requires `GIVEREADY_TEST_WALLET_MNEMONIC` environment variable (test-only). Returns the on-chain transaction hash and settled amount. |
 
 ## Resources
 

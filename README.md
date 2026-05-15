@@ -10,7 +10,7 @@ Within 12 months, donors won't go to a website to give. They'll tell an AI assis
 
 ## What GiveReady Does
 
-**Discovery.** An MCP server and REST API give AI agents structured access to 162+ youth nonprofits — programmes, impact metrics, beneficiary demographics, wallet addresses. When an AI agent needs to find a charity, it queries GiveReady.
+**Discovery.** An MCP server and REST API give AI agents structured access to 41,000+ verified nonprofits across 29 cause areas — programmes, impact metrics, beneficiary demographics, donation links, and wallet addresses where available. When an AI agent needs to find a charity, it queries GiveReady.
 
 **Direct payment.** The x402 protocol lets AI agents send USDC straight to the nonprofit's own wallet. No intermediary holds the funds. The nonprofit controls the money from the moment it arrives. Settlement in under a second on Solana.
 

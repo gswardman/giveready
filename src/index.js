@@ -1338,6 +1338,78 @@ Allow: /
 User-agent: Applebot
 Allow: /
 
+# User-driven writing agents — when a human asks an AI to fetch a URL on
+# their behalf, the assistant uses one of these UAs. They are NOT training
+# crawlers; Cloudflare's managed AI-bot block does NOT touch them. Naming
+# them explicitly is a positive discoverability signal: agent operators who
+# audit robots.txt before adding a domain to their tool's allowlist see a
+# welcome here.
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Gemini-Deep-Research
+Allow: /
+
+User-agent: Gemini-User
+Allow: /
+
+User-agent: Meta-ExternalFetcher
+Allow: /
+
+User-agent: Amazon-Q-User
+Allow: /
+
+# Training crawlers — explicit allow override for the Cloudflare managed
+# AI-bot block above. Intent: get GiveReady's directory into the training
+# corpora so that when a user later asks an AI "find me a charity for X,"
+# the model already has us in latent knowledge. Per RFC 9309 the longest
+# matching User-agent token wins; Google's parser merges blocks for the
+# same UA and an Allow ties or beats a Disallow when paths match. For
+# parsers that take "first match wins" the CF block still applies — to
+# remove the conflict entirely, disable the Cloudflare managed AI-bot
+# block in dashboard (Bots → AI bot management).
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+User-agent: Amazon-Q
+Allow: /
+
+User-agent: DuckAssistBot
+Allow: /
+
+User-agent: YouBot
+Allow: /
+
+User-agent: Diffbot
+Allow: /
+
 # GiveReady - AI-readable nonprofit directory
 # API documentation: https://www.giveready.org/docs
 # Cause landing pages (HTML + JSON-LD): https://www.giveready.org/causes
