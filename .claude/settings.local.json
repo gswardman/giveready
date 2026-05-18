@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wrangler deploy:*)",
+      "Bash(wrangler d1:*)",
+      "Bash(curl -sI \"https://giveready.org/donate/finn-wardman-world-explorer-fund\" | head -20)",
+      "Bash(curl -s \"https://giveready.org/donate/finn-wardman-world-explorer-fund\" | head -5)",
+      "Bash(curl -sv \"https://giveready.org/donate/finn-wardman-world-explorer-fund\" 2>&1 | head -30)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{redirect_url}\" \"https://giveready.org/donate/finn-wardman-world-explorer-fund\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://giveready.org/donate/finn-wardman-world-explorer-fund\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://giveready.org/donate/finn-wardman-world-explorer-fund\" && echo \"\" && curl -s -o /dev/null -w \"%{http_code}\" \"https://giveready.org/get-started\")",
+      "WebFetch(domain:www.getcitykidssurfing.com)",
+      "Bash(cat ~/.claude/skills/gstack.md 2>/dev/null || echo \"not found at root\" && echo \"---\" && ls ~/.claude/skills/gstack/*.md 2>/dev/null | head -10)",
+      "Bash(cd ~/TestVentures.net/giveready/mcp-server && ./mcp-publisher publish)",
+      "Bash(echo \"=== npm ===\" && npm view giveready-mcp version)",
+      "Bash(echo \"=== Glama ===\" && curl -s \"https://glama.ai/api/mcp/v1/servers/gswardman/giveready\" | head -c 300)",
+      "Bash(echo \"=== PulseMCP ===\" && curl -s \"https://www.pulsemcp.com/servers?q=giveready\" | grep -c \"GiveReady\")",
+      "Skill(cso)",
+      "Bash(curl -sS \"https://giveready.org/api/admin/traffic?token=3feScGJ2hjXA0utchEXI0CwFcYrmIsXWvF2Ha48g&hours=720&include_noise=true\" 2>/dev/null | python3 -c \"\nimport json, sys\nd = json.load\\(sys.stdin\\)\nfor k in d.keys\\(\\):\n    if 'agent' in k.lower\\(\\) or 'ua' in k.lower\\(\\) or 'user' in k.lower\\(\\):\n        print\\(k, type\\(d[k]\\).__name__\\)\n        if isinstance\\(d[k], list\\):\n            for item in d[k][:20]:\n                print\\('  ', item\\)\n\")",
+      "Bash(curl -s -X POST https://www.giveready.org/mcp/sse -H \"Content-Type: application/json\" -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-03-26\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"0.1\"}}}' 2>/dev/null | python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('MCP version:', d['result']['protocolVersion']\\); print\\('Server:', d['result']['serverInfo']['name']\\)\")",
+      "Bash(curl -s -X POST https://www.giveready.org/mcp/sse -H \"Content-Type: application/json\" -d '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}' 2>/dev/null | python3 -c \"import sys,json; tools=json.load\\(sys.stdin\\)['result']['tools']; print\\(f'tool_count={len\\(tools\\)}'\\); [print\\(f'  - {t[\\\\\"name\\\\\"]}'\\) for t in tools]\")",
+      "Bash(curl -s -X POST https://www.giveready.org/mcp/sse -H \"Content-Type: application/json\" -d '{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"search_nonprofits\",\"arguments\":{\"query\":\"surf therapy\"}}}' 2>/dev/null | python3 -c \"import sys,json; r=json.load\\(sys.stdin\\)['result']; content=json.loads\\(r['content'][0]['text']\\); print\\(f'results: {len\\(content[\\\\\"nonprofits\\\\\"]\\)}'\\); [print\\(f'  - {n[\\\\\"name\\\\\"]}'\\) for n in content['nonprofits'][:3]]\")",
+      "Bash(cd ~/TestVentures.net/giveready && ./deploy.sh \"ship /guides surface \\(handler + minimal markdown parser, no posts yet\\)\")",
+      "Bash(curl -s https://www.giveready.org/guides | grep -c \"No guides published yet\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" https://www.giveready.org/guides/nonexistent)",
+      "Bash(curl -s https://www.giveready.org/sitemap.xml | grep -c '<loc>https://www.giveready.org/guides')",
+      "Bash(curl -s https://www.giveready.org/llms.txt | grep -c \"Guides \\(long-form\")",
+      "Bash(curl -s https://www.giveready.org/llms.txt | grep -i \"guide\")"
+    ]
+  }
+}

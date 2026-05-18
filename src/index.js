@@ -5223,11 +5223,16 @@ async function handleAdminTraffic(db, env, request, url) {
      GROUP BY route ORDER BY hits DESC`
   ).all();
 
-  // Discovery hits by user-agent (identify actual agents)
+  // Discovery hits by user-agent (identify actual agents).
+  // first_seen / last_seen let the digest distinguish a one-shot crawl
+  // (GPTBot's 8,300 hits in a single 6h window) from sustained interest.
   const discoveryByAgent = await db.prepare(
-    `SELECT user_agent, COUNT(*) as hits FROM discovery_hits
-     WHERE created_at > ${since} AND user_agent IS NOT NULL${noiseFilter}
-     GROUP BY user_agent ORDER BY hits DESC LIMIT 30`
+    `SELECT user_agent, COUNT(*) as hits,
+            MIN(created_at) AS first_seen,
+            MAX(created_at) AS last_seen
+       FROM discovery_hits
+      WHERE created_at > ${since} AND user_agent IS NOT NULL${noiseFilter}
+      GROUP BY user_agent ORDER BY hits DESC LIMIT 30`
   ).all();
 
   // Recent discovery hits (last 20) — always filtered view so the digest
@@ -6548,8 +6553,39 @@ const _httpHandler = {
       const enrichMatch = path.match(/^\/api\/enrich\/([a-z0-9-]+)$/);
       if (enrichMatch && request.method === 'POST') {
         const rl = checkRateLimit(request, 'write');
-        if (rl) return rl;
+        if (rl) {
+          // Log the rate-limited attempt so the digest's "tried-and-bounced"
+          // funnel stage doesn't silently lose 429s.
+          await logEnrichmentAttempt(env.DB, {
+            slug: enrichMatch[1],
+            ua: request.headers.get('User-Agent') || null,
+            ip: request.headers.get('CF-Connecting-IP') || null,
+            referrer: request.headers.get('Referer') || null,
+            status_code: 429,
+            error_class: 'rate_limited',
+            fields_count: 0,
+            payload_bytes: 0,
+          });
+          return rl;
+        }
         return handleEnrich(env.DB, request, enrichMatch[1]);
+      }
+      // Method mismatch on a well-formed enrich path: log + 405.
+      // Catches HEAD/OPTIONS/GET probes from agents that test endpoints
+      // before POSTing. Without this, those probes look like /AGENTS.md
+      // reads with no follow-up attempt.
+      if (enrichMatch && request.method !== 'POST') {
+        await logEnrichmentAttempt(env.DB, {
+          slug: enrichMatch[1],
+          ua: request.headers.get('User-Agent') || null,
+          ip: request.headers.get('CF-Connecting-IP') || null,
+          referrer: request.headers.get('Referer') || null,
+          status_code: 405,
+          error_class: `wrong_method_${request.method.toLowerCase()}`,
+          fields_count: 0,
+          payload_bytes: 0,
+        });
+        return error('Method not allowed. POST only.', 405);
       }
 
       // x402 donate route — GET (returns 402) or POST (with X-PAYMENT settles)
@@ -6583,6 +6619,26 @@ const _httpHandler = {
       // Get started → redirect to onboard
       if (path === '/get-started') {
         return Response.redirect('https://giveready.org/onboard', 301);
+      }
+
+      // Before falling through to static assets / 404, capture any POST
+      // that LOOKS like an enrichment attempt but didn't match the strict
+      // route regex. Common misses: uppercase slug, trailing slash,
+      // /api/enrich without a slug, /api/enrichments (plural typo) used
+      // in some docs. Without this, those POSTs silently 404 and the
+      // digest mistakes them for "agent never tried".
+      if (request.method === 'POST' && /^\/api\/enrich(?:ments)?(?:\/|$)/i.test(path)) {
+        await logEnrichmentAttempt(env.DB, {
+          slug: path,                // store full path so we can see the miss shape
+          ua: request.headers.get('User-Agent') || null,
+          ip: request.headers.get('CF-Connecting-IP') || null,
+          referrer: request.headers.get('Referer') || null,
+          status_code: 404,
+          error_class: 'route_miss',
+          fields_count: 0,
+          payload_bytes: 0,
+        });
+        return error('Not found. Did you mean POST /api/enrich/{slug} with a lowercase hyphenated slug? See /AGENTS.md.', 404);
       }
 
       // No API route matched — try serving a static asset
