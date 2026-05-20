@@ -25,7 +25,10 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" https://www.giveready.org/guides/nonexistent)",
       "Bash(curl -s https://www.giveready.org/sitemap.xml | grep -c '<loc>https://www.giveready.org/guides')",
       "Bash(curl -s https://www.giveready.org/llms.txt | grep -c \"Guides \\(long-form\")",
-      "Bash(curl -s https://www.giveready.org/llms.txt | grep -i \"guide\")"
+      "Bash(curl -s https://www.giveready.org/llms.txt | grep -i \"guide\")",
+      "Bash(curl -s https://www.giveready.org/llms.txt | grep -cE '\\\\{slug\\\\}')",
+      "Bash(curl -s https://www.giveready.org/llms.txt | grep '{slug}')",
+      "Bash(curl -s -X POST https://www.giveready.org/api/enrich/finn-wardman-world-explorer-fund -H \"Content-Type: application/json\" -d '{\"field\":\"website\",\"value\":\"https://finnwardman.com\",\"source_url\":\"https://finnwardman.com\",\"agent_id\":\"deploy-verify-2026-05-19\",\"agent_name\":\"deploy-verify-2026-05-19\"}' 2>&1 | head -40)"
     ]
   }
 }

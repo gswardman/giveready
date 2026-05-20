@@ -5294,23 +5294,36 @@ async function handleAdminTraffic(db, env, request, url) {
      WHERE created_at > ${since} ${agentsOnlyFilter}`
   ).first();
 
-  // Split the allowlist into writing-capable agents vs passive search crawlers.
-  // This gives the digest an honest denominator for "agents that could enrich"
-  // separately from crawler noise (Amzn-SearchBot, Googlebot, etc.).
-  const writingAllowConds = KNOWN_WRITING_AGENT_PATTERNS
+  // Split the allowlist by who is actually at the keyboard.
+  // training_crawler  — offline ingestion, CANNOT submit (GPTBot, ClaudeBot, ...)
+  // interactive_agent — at inference, CAN submit (ChatGPT-User, Claude-User, ...)
+  // search_crawler    — classic web index, never submits (Googlebot, bingbot, ...)
+  // The interactive_agent count is the only honest denominator for "agents
+  // that could have enriched but did not."
+  const buildLikeOr = (patterns) => patterns
     .map((entry) => `user_agent LIKE '%${entry.pattern.replace(/'/g, "''")}%'`)
     .join(' OR ');
-  const crawlerAllowConds = KNOWN_CRAWLER_PATTERNS
-    .map((entry) => `user_agent LIKE '%${entry.pattern.replace(/'/g, "''")}%'`)
-    .join(' OR ');
-  const totalDiscoveryRecentWriting = await db.prepare(
+  const trainingAllowConds    = buildLikeOr(KNOWN_TRAINING_CRAWLER_PATTERNS);
+  const interactiveAllowConds = buildLikeOr(KNOWN_INTERACTIVE_AGENT_PATTERNS);
+  const searchAllowConds      = buildLikeOr(KNOWN_SEARCH_CRAWLER_PATTERNS);
+  const totalDiscoveryRecentTraining = await db.prepare(
     `SELECT COUNT(*) as total FROM discovery_hits
-     WHERE created_at > ${since} AND (${writingAllowConds})`
+     WHERE created_at > ${since} AND (${trainingAllowConds})`
+  ).first();
+  const totalDiscoveryRecentInteractive = await db.prepare(
+    `SELECT COUNT(*) as total FROM discovery_hits
+     WHERE created_at > ${since} AND (${interactiveAllowConds})`
   ).first();
   const totalDiscoveryRecentCrawlers = await db.prepare(
     `SELECT COUNT(*) as total FROM discovery_hits
-     WHERE created_at > ${since} AND (${crawlerAllowConds})`
+     WHERE created_at > ${since} AND (${searchAllowConds})`
   ).first();
+  // Backward-compat alias: writing = training + interactive. Kept so any
+  // caller still reading discovery_hits_in_period_writing_agents during the
+  // rollover sees a number, not null.
+  const totalDiscoveryRecentWriting = {
+    total: (totalDiscoveryRecentTraining.total || 0) + (totalDiscoveryRecentInteractive.total || 0),
+  };
 
   // Top 5 filtered-out noise UAs in the period, so we can still see what
   // infrastructure is polling us without it dominating the main numbers.
@@ -5379,8 +5392,11 @@ async function handleAdminTraffic(db, env, request, url) {
     noise_filtered: !includeNoise,
     filter_mode: useBlocklist ? 'blocklist' : 'allowlist',
     known_agents: useBlocklist ? undefined : KNOWN_AGENT_PATTERNS.map((e) => e.name),
+    known_training_crawlers: useBlocklist ? undefined : KNOWN_TRAINING_CRAWLER_PATTERNS.map((e) => e.name),
+    known_interactive_agents: useBlocklist ? undefined : KNOWN_INTERACTIVE_AGENT_PATTERNS.map((e) => e.name),
+    known_search_crawlers: useBlocklist ? undefined : KNOWN_SEARCH_CRAWLER_PATTERNS.map((e) => e.name),
+    // Deprecated alias — keep until digest prompt confirmed reading the new fields.
     known_writing_agents: useBlocklist ? undefined : KNOWN_WRITING_AGENT_PATTERNS.map((e) => e.name),
-    known_search_crawlers: useBlocklist ? undefined : KNOWN_CRAWLER_PATTERNS.map((e) => e.name),
     noise_prefixes: useBlocklist ? AGENT_NOISE_PREFIXES : undefined,
     summary: {
       total_discovery_hits: totalDiscovery.total,
@@ -5389,8 +5405,12 @@ async function handleAdminTraffic(db, env, request, url) {
         : totalDiscoveryRecentFiltered.total,
       discovery_hits_in_period_raw: totalDiscoveryRecentRaw.total,
       discovery_hits_in_period_agents_only: totalDiscoveryRecentFiltered.total,
-      discovery_hits_in_period_writing_agents: totalDiscoveryRecentWriting.total,
+      // New fields (2026-05-20) — the honest funnel split.
+      discovery_hits_in_period_training_crawlers: totalDiscoveryRecentTraining.total,
+      discovery_hits_in_period_interactive_agents: totalDiscoveryRecentInteractive.total,
       discovery_hits_in_period_search_crawlers: totalDiscoveryRecentCrawlers.total,
+      // Deprecated — union of training + interactive. Kept for rollover compatibility.
+      discovery_hits_in_period_writing_agents: totalDiscoveryRecentWriting.total,
       enrichments_in_period: enrichmentRecent.total,
       attempts_in_period: attemptsInPeriod,
     },
@@ -5661,39 +5681,70 @@ async function handleAgentLeaderboard(db) {
 // Feature flag: set AGENT_FILTER_MODE=blocklist in env to revert to old behavior.
 // Default: allowlist (new, secure).
 const KNOWN_AGENT_PATTERNS = [
-  // AI model crawlers (the agents we built GiveReady for)
-  // type='writing' = UA can plausibly POST /api/enrich (real AI agents / chatbot fetches).
-  // type='crawler' = passive search/index crawler. Reads /AGENTS.md, never writes.
-  // The admin traffic endpoint splits funnel counts by type so the denominator is honest.
-  { pattern: 'ClaudeBot', name: 'Anthropic Claude', type: 'writing' },
-  { pattern: 'Claude-SearchBot', name: 'Anthropic Claude Search', type: 'writing' },
-  { pattern: 'GPTBot', name: 'OpenAI GPT', type: 'writing' },
-  { pattern: 'ChatGPT-User', name: 'OpenAI ChatGPT', type: 'writing' },
-  { pattern: 'Google-Extended', name: 'Google AI', type: 'writing' },
-  { pattern: 'PerplexityBot', name: 'Perplexity', type: 'writing' },
-  { pattern: 'cohere-ai', name: 'Cohere', type: 'writing' },
+  // AI model traffic, split by who is actually at the keyboard.
+  //
+  // type='training_crawler' = offline ingestion for the next model snapshot.
+  //   Cannot POST /api/enrich because it is not at inference. Reads pages,
+  //   stores them, never calls back. GPTBot, ClaudeBot, Google-Extended, etc.
+  // type='interactive_agent' = at inference, on behalf of a user or another
+  //   agent. CAN curl /api/enrich. These are the UAs we built the funnel for.
+  //   ChatGPT-User, Claude-User, Perplexity-User, OAI-SearchBot, Claude-SearchBot.
+  // type='search_crawler' = classic web/search index crawler. Reads /AGENTS.md,
+  //   /llms.txt, /sitemap.xml. Never writes. Googlebot, bingbot, Applebot, etc.
+  //
+  // The split was added 2026-05-20 after the giveready-daily Hypothesis #1
+  // showed that 8,335 of 8,338 "writing-agent" hits over 7d were training
+  // crawlers (GPTBot+ClaudeBot) that physically cannot submit. The old
+  // 'writing' bucket conflated two populations with opposite conversion
+  // potential. The interactive_agent bucket is the only honest denominator
+  // for "agents that could have enriched but did not."
+  { pattern: 'GPTBot',             name: 'OpenAI GPT',                type: 'training_crawler' },
+  { pattern: 'ClaudeBot',          name: 'Anthropic Claude',          type: 'training_crawler' },
+  { pattern: 'Google-Extended',    name: 'Google AI',                 type: 'training_crawler' },
+  { pattern: 'PerplexityBot',      name: 'Perplexity',                type: 'training_crawler' },
+  { pattern: 'cohere-ai',          name: 'Cohere',                    type: 'training_crawler' },
+  { pattern: 'ChatGPT-User',       name: 'OpenAI ChatGPT (User)',     type: 'interactive_agent' },
+  { pattern: 'OAI-SearchBot',      name: 'OpenAI Search',             type: 'interactive_agent' },
+  { pattern: 'Claude-User',        name: 'Anthropic Claude (User)',   type: 'interactive_agent' },
+  { pattern: 'Claude-SearchBot',   name: 'Anthropic Claude Search',   type: 'interactive_agent' },
+  { pattern: 'Perplexity-User',    name: 'Perplexity (User)',         type: 'interactive_agent' },
   // Search engine crawlers (they read /llms.txt, /agents.md, /mcp too — but don't write)
-  { pattern: 'Googlebot', name: 'Google Search', type: 'crawler' },
-  { pattern: 'bingbot', name: 'Microsoft Bing', type: 'crawler' },
-  { pattern: 'Applebot', name: 'Apple', type: 'crawler' },
-  { pattern: 'DuckDuckBot', name: 'DuckDuckGo', type: 'crawler' },
-  { pattern: 'YandexBot', name: 'Yandex', type: 'crawler' },
+  { pattern: 'Googlebot',          name: 'Google Search',             type: 'search_crawler' },
+  { pattern: 'bingbot',            name: 'Microsoft Bing',            type: 'search_crawler' },
+  { pattern: 'Applebot',           name: 'Apple',                     type: 'search_crawler' },
+  { pattern: 'DuckDuckBot',        name: 'DuckDuckGo',                type: 'search_crawler' },
+  { pattern: 'YandexBot',          name: 'Yandex',                    type: 'search_crawler' },
   // Amzn-SearchBot removed 2026-05-14 per giveready-daily Hypothesis #2:
   // 99% of 24h discovery hits, zero submissions in 32d. Drowned the real
   // writing-agent funnel signal. Falls into noise_breakdown via
   // isKnownAgent → isNoiseAgent now. Re-add if Amazon ever ships a writing
   // agent that uses this UA, or if we want the search-crawler footprint
   // visible in the dashboard for SEO reasons.
-  { pattern: 'SemrushBot', name: 'SEMrush', type: 'crawler' },
+  { pattern: 'SemrushBot',         name: 'SEMrush',                   type: 'search_crawler' },
   // MCP ecosystem crawlers
-  { pattern: 'MCPRegistry', name: 'MCP Registry', type: 'crawler' },
-  { pattern: 'Smithery', name: 'Smithery', type: 'crawler' },
-  { pattern: 'PulseMCP', name: 'PulseMCP', type: 'crawler' },
-  { pattern: 'GlamaMCP', name: 'Glama MCP', type: 'crawler' },
+  { pattern: 'MCPRegistry',        name: 'MCP Registry',              type: 'search_crawler' },
+  { pattern: 'Smithery',           name: 'Smithery',                  type: 'search_crawler' },
+  { pattern: 'PulseMCP',           name: 'PulseMCP',                  type: 'search_crawler' },
+  { pattern: 'GlamaMCP',           name: 'Glama MCP',                 type: 'search_crawler' },
 ];
 
-const KNOWN_WRITING_AGENT_PATTERNS = KNOWN_AGENT_PATTERNS.filter((e) => e.type === 'writing');
-const KNOWN_CRAWLER_PATTERNS = KNOWN_AGENT_PATTERNS.filter((e) => e.type === 'crawler');
+const KNOWN_TRAINING_CRAWLER_PATTERNS  = KNOWN_AGENT_PATTERNS.filter((e) => e.type === 'training_crawler');
+const KNOWN_INTERACTIVE_AGENT_PATTERNS = KNOWN_AGENT_PATTERNS.filter((e) => e.type === 'interactive_agent');
+const KNOWN_SEARCH_CRAWLER_PATTERNS    = KNOWN_AGENT_PATTERNS.filter((e) => e.type === 'search_crawler');
+
+// Backward-compat aliases for callers that still read the old taxonomy.
+// The old 'writing' super-bucket conflated training + interactive — keep an
+// alias pointing at both so any cron still parsing discovery_hits_in_period_writing_agents
+// returns a number, not null, during the rollover.
+const KNOWN_WRITING_AGENT_PATTERNS = [...KNOWN_TRAINING_CRAWLER_PATTERNS, ...KNOWN_INTERACTIVE_AGENT_PATTERNS];
+const KNOWN_CRAWLER_PATTERNS = KNOWN_SEARCH_CRAWLER_PATTERNS;
+
+// Fast UA → type lookup for funnel tagging.
+function agentTypeFor(ua) {
+  if (!ua) return null;
+  const hit = KNOWN_AGENT_PATTERNS.find((entry) => ua.includes(entry.pattern));
+  return hit ? hit.type : null;
+}
 
 // Legacy blocklist kept for feature flag rollback (AGENT_FILTER_MODE=blocklist).
 const AGENT_NOISE_PREFIXES = [
@@ -5769,13 +5820,19 @@ async function handleAgentFunnel(db, url, env) {
   ).all();
   const submittedByAgent = new Set((submissions.results || []).map((s) => s.agent_id));
 
-  const rows = (hits.results || []).filter((h) => !isNoiseAgent(h.user_agent, env));
-  const readAndLeft = rows.filter((h) => !submittedByAgent.has(h.user_agent));
-  const readAndSubmitted = rows.filter((h) => submittedByAgent.has(h.user_agent));
+  // Tag every named row with its agent_type so callers can filter to
+  // interactive_agent only. Training crawlers and search crawlers also show
+  // up here but they can't submit by design — the digest moves them into a
+  // footnote rather than the conversion math.
+  const tagged = (hits.results || [])
+    .filter((h) => !isNoiseAgent(h.user_agent, env))
+    .map((h) => ({ ...h, agent_type: agentTypeFor(h.user_agent) }));
+  const readAndLeft = tagged.filter((h) => !submittedByAgent.has(h.user_agent));
+  const readAndSubmitted = tagged.filter((h) => submittedByAgent.has(h.user_agent));
 
   const useBlocklist = env && env.AGENT_FILTER_MODE === 'blocklist';
   return json({
-    message: `Named crawlers in the last ${hours}h — who read a discovery route and never submitted.`,
+    message: `Named crawlers in the last ${hours}h — who read a discovery route and never submitted. agent_type lets you filter to interactive_agent only.`,
     window_hours: hours,
     filter_mode: useBlocklist ? 'blocklist' : 'allowlist',
     read_and_left: readAndLeft,
