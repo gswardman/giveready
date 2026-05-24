@@ -115,6 +115,16 @@
     .phone-section .tag { margin-bottom: 8px; }
     .phone-section h2 { font-size: clamp(22px, 4vw, 28px); font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
     .phone-section p { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+
+    .learning-strip { padding: 28px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+    .learning-strip .wrap-inner { max-width: 760px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    .learning-strip .left { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 280px; }
+    .learning-strip .pill { font-size: 10px; font-weight: 700; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); padding: 4px 10px; border-radius: 20px; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+    .learning-strip .text { font-size: 14px; color: var(--text); line-height: 1.5; }
+    .learning-strip .text strong { font-weight: 700; }
+    .learning-strip .text .muted-inline { color: var(--muted); }
+    .learning-strip a.cta { font-size: 13px; font-weight: 700; color: var(--text); text-decoration: none; padding: 8px 14px; border: 1px solid var(--border-light); border-radius: 20px; transition: all 0.15s; white-space: nowrap; }
+    .learning-strip a.cta:hover { background: var(--bg); border-color: var(--text); }
     .phone-frame {
       max-width: 375px; margin: 0 auto;
       border: 2px solid var(--border); border-radius: 24px;
@@ -262,9 +272,20 @@
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-num">8,000+</span>
-        <span class="hero-meta-label">AI crawler hits/week</span>
+        <span class="hero-meta-label">AI crawler hits/month</span>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ===== WHAT WE'RE LEARNING ===== -->
+<div class="learning-strip">
+  <div class="wrap-inner">
+    <div class="left">
+      <span class="pill">What we're learning</span>
+      <div class="text">We publish frozen snapshots of how the project has evolved, hypothesis through pivot. <span class="muted-inline">Latest: 2026-05-24 pivot.</span></div>
+    </div>
+    <a href="/progress" class="cta">Read /progress &rarr;</a>
   </div>
 </div>
 

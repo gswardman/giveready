@@ -113,6 +113,16 @@
     .what-card .label.amber { color: var(--amber); }
     .what-card p { font-size: 14px; color: var(--text); line-height: 1.6; margin: 0; }
 
+    .snapshot-list { margin-top: 12px; }
+    .snapshot-item { display: block; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; color: var(--text); margin-bottom: 12px; transition: all 0.15s; }
+    .snapshot-item:hover { background: var(--surface-hover); border-color: var(--border-light); }
+    .snapshot-item:last-child { margin-bottom: 0; }
+    .snapshot-item .date { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: 0.04em; text-transform: uppercase; font-family: var(--mono); margin-bottom: 4px; }
+    .snapshot-item .date.slate { color: #475569; }
+    html.dark .snapshot-item .date.slate { color: #94a3b8; }
+    .snapshot-item .title { font-size: 16px; font-weight: 700; margin-bottom: 4px; letter-spacing: -0.01em; }
+    .snapshot-item .desc { font-size: 13px; color: var(--muted); line-height: 1.55; }
+
     footer { padding: 48px 24px 32px; text-align: center; }
     footer p { font-size: 12px; color: var(--light); line-height: 1.6; max-width: 520px; margin: 0 auto 6px; }
     footer a { color: var(--muted); text-decoration: none; }
@@ -141,8 +151,8 @@
 <div class="hero">
   <div class="wrap">
     <h1>Progress, in numbers.</h1>
-    <p>What we proposed in the Gates Foundation application, what the data has shown, and how the approach has evolved. No spin. The numbers are what they are.</p>
-    <div class="last-updated">Last updated: 2026-05-23</div>
+    <p>What we proposed in the Gates Foundation application, what the data has shown, and how the approach has evolved. No spin. The numbers are what they are. The snapshots below let any reviewer compare what we claimed against what we now claim, in our own words on both sides.</p>
+    <div class="last-updated">Last updated: 2026-05-24 &middot; 2 snapshots on file</div>
   </div>
 </div>
 
@@ -154,6 +164,25 @@
       <p>The Gates application proposed AI agents would autonomously enrich the nonprofit directory by writing data back through `/api/enrich`. Four to six weeks of live traffic showed otherwise. Training crawlers (GPTBot, ClaudeBot, Google AI) ingest the directory at high volume, but they cannot submit by design. Interactive agents (ChatGPT-User, Claude-User, Perplexity-User) rarely arrive at the site, and when they do, they read and leave. The autonomous-write thesis is dead at scale.</p>
       <p>What does work, on today's evidence: training-corpus ingestion is real and high-volume, so the path to AI-mediated giving is being the structured-data source that models cite when users ask charity questions. The path to verified depth is human-in-loop enrichment via consortium partners (people who run the orgs use AI to draft their own profile updates, then submit). Both are measurable. Neither requires the autonomous-write magic.</p>
       <p>So the approach has evolved. The directory is still live, the donate widget still ships zero-fee donations, the MCP server still indexes for every AI assistant that follows the standards. The metrics below now lead with what's measurable today, not what was aspirational at submission.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>Snapshots on file</h2>
+    <p class="muted">Each snapshot is a frozen point-in-time record. None has been edited since the date on its banner. New snapshots are added on three triggers: a pivot decision, a Gates milestone reached, or a quarterly review. Reverse chronological below.</p>
+    <div class="snapshot-list">
+      <a class="snapshot-item" href="/progress/2026-05-24-pivot">
+        <div class="date">2026-05-24</div>
+        <div class="title">Pivot snapshot</div>
+        <div class="desc">Six weeks of live data refuted half of theory 1 and all of theory 5. Autonomous-agent-write thesis retired. New north star: Citation Share. Hard kill trigger locked at 2026-11-23 if citation share is still 0%.</div>
+      </a>
+      <a class="snapshot-item" href="/progress/2026-04-25-application">
+        <div class="date slate">2026-04-25</div>
+        <div class="title">Hypothesis snapshot, as submitted to the Gates Foundation</div>
+        <div class="desc">The original five theories, the Months 1 through 12 build plan, and the donor-behaviour indicators that the application proposed to track. Frozen the day the application went in.</div>
+      </a>
     </div>
   </div>
 </div>
@@ -197,8 +226,8 @@
 
       <div class="metric-row">
         <div class="metric-left">
-          <div class="metric-name">AI training-crawler hits per week</div>
-          <div class="metric-desc">Visits from GPTBot, ClaudeBot, Google AI, Perplexity, Cohere training crawlers. These are the events that put GiveReady data into future model weights. Updated quarterly from a rounded 7-day rolling figure.</div>
+          <div class="metric-name">AI training-crawler hits per month</div>
+          <div class="metric-desc">Visits from GPTBot, ClaudeBot, Google AI, Perplexity, Cohere training crawlers. These are the events that put GiveReady data into future model weights. Updated quarterly from a rounded 30-day rolling figure.</div>
         </div>
         <div class="metric-value">8,000+</div>
       </div>

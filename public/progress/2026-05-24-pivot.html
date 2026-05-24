@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GiveReady, Pivot snapshot 2026-05-24</title>
+  <meta name="description" content="Frozen snapshot of the GiveReady pivot on 2026-05-24, four weeks after the Gates application went in. The autonomous-agent-write thesis was retired and replaced with training-corpus + human-in-loop enrichment via consortium." />
+  <meta property="og:title" content="GiveReady, Pivot snapshot 2026-05-24" />
+  <meta property="og:description" content="What four weeks of live data showed, what we changed, why." />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://giveready.org/progress/2026-05-24-pivot" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="robots" content="index,follow" />
+  <link rel="canonical" href="https://giveready.org/progress/2026-05-24-pivot" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #ffffff;
+      --surface: #f9fafb;
+      --surface-hover: #f3f4f6;
+      --card: #ffffff;
+      --border: #e5e5e5;
+      --border-light: #d4d4d4;
+      --text: #111111;
+      --muted: #666666;
+      --light: #999999;
+      --accent: #059669;
+      --accent-dim: rgba(5,150,105,0.08);
+      --accent-border: rgba(5,150,105,0.2);
+      --amber: #b45309;
+      --amber-dim: rgba(180,83,9,0.08);
+      --amber-border: rgba(180,83,9,0.2);
+      --slate: #475569;
+      --slate-dim: rgba(71,85,105,0.08);
+      --slate-border: rgba(71,85,105,0.2);
+      --red: #b91c1c;
+      --red-dim: rgba(185,28,28,0.08);
+      --red-border: rgba(185,28,28,0.2);
+      --nav-bg: rgba(255,255,255,0.92);
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    html.dark {
+      --bg: #0a0a0a;
+      --surface: #151515;
+      --surface-hover: #1c1c1c;
+      --card: #181818;
+      --border: #2a2a2a;
+      --border-light: #333;
+      --text: #f5f5f5;
+      --muted: #a0a0a0;
+      --light: #666;
+      --accent: #34d399;
+      --accent-dim: rgba(52,211,153,0.12);
+      --accent-border: rgba(52,211,153,0.25);
+      --amber: #fbbf24;
+      --amber-dim: rgba(251,191,36,0.10);
+      --amber-border: rgba(251,191,36,0.25);
+      --slate: #94a3b8;
+      --slate-dim: rgba(148,163,184,0.10);
+      --slate-border: rgba(148,163,184,0.25);
+      --red: #f87171;
+      --red-dim: rgba(248,113,113,0.10);
+      --red-border: rgba(248,113,113,0.25);
+      --nav-bg: rgba(10,10,10,0.85);
+    }
+
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+
+    nav { position: sticky; top: 0; z-index: 100; background: var(--nav-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); height: 52px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
+    .nav-left { display: flex; align-items: center; gap: 10px; }
+    .nav-name { font-weight: 700; font-size: 15px; color: var(--text); text-decoration: none; letter-spacing: -0.02em; }
+    .nav-tag { font-size: 10px; font-weight: 600; color: var(--amber); background: var(--amber-dim); border: 1px solid var(--amber-border); padding: 2px 8px; border-radius: 20px; letter-spacing: 0.03em; text-transform: uppercase; }
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+    .nav-link { font-size: 13px; color: var(--muted); text-decoration: none; font-weight: 500; }
+    .nav-link:hover { color: var(--text); }
+    .nav-cta { font-size: 13px; font-weight: 700; color: var(--bg); background: var(--text); text-decoration: none; padding: 7px 16px; border-radius: 20px; transition: opacity 0.15s; }
+    .nav-cta:hover { opacity: 0.85; }
+    .theme-toggle { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; cursor: pointer; transition: all 0.15s; color: var(--muted); padding: 0; }
+    .theme-toggle:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-light); }
+    .theme-toggle svg { width: 16px; height: 16px; }
+    .theme-toggle .icon-sun { display: block; }
+    .theme-toggle .icon-moon { display: none; }
+    html.dark .theme-toggle .icon-sun { display: none; }
+    html.dark .theme-toggle .icon-moon { display: block; }
+
+    .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+
+    .hero { padding: 56px 24px 24px; text-align: center; }
+    .hero .breadcrumb { font-size: 12px; color: var(--light); font-family: var(--mono); margin-bottom: 14px; }
+    .hero .breadcrumb a { color: var(--muted); text-decoration: none; }
+    .hero .breadcrumb a:hover { color: var(--text); }
+    .hero h1 { font-size: clamp(26px, 4.5vw, 34px); font-weight: 800; line-height: 1.15; letter-spacing: -0.03em; margin-bottom: 10px; }
+    .hero .subtitle { font-size: clamp(14px, 2.2vw, 16px); color: var(--muted); max-width: 540px; margin: 0 auto; }
+
+    .snapshot-banner { background: var(--amber-dim); border: 1px solid var(--amber-border); border-radius: var(--radius); padding: 18px 22px; margin: 28px auto 0; max-width: 720px; }
+    .snapshot-banner .label { display: inline-block; font-size: 11px; font-weight: 600; color: var(--amber); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+    .snapshot-banner p { font-size: 14px; line-height: 1.65; color: var(--text); margin: 0; }
+    .snapshot-banner p + p { margin-top: 8px; }
+
+    .section { padding: 32px 0; border-bottom: 1px solid var(--border); }
+    .section h2 { font-size: clamp(20px, 3.5vw, 24px); font-weight: 700; letter-spacing: -0.02em; margin-bottom: 14px; }
+    .section h3 { font-size: 16px; font-weight: 700; margin-top: 20px; margin-bottom: 6px; color: var(--text); }
+    .section p { font-size: 15px; color: var(--text); line-height: 1.7; margin-bottom: 12px; }
+    .section p.muted { color: var(--muted); }
+    .section ul.plain { list-style: none; margin-top: 8px; }
+    .section ul.plain li { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; line-height: 1.6; color: var(--text); }
+    .section ul.plain li:last-child { border-bottom: none; }
+    .section ul.plain li strong { font-weight: 700; }
+
+    .diff-row { padding: 18px 0; border-bottom: 1px solid var(--border); }
+    .diff-row:last-child { border-bottom: none; }
+    .diff-row .diff-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .diff-row .diff-side { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 14px; line-height: 1.6; margin-bottom: 6px; }
+    .diff-row .diff-then { background: var(--red-dim); border-left: 3px solid var(--red); color: var(--text); }
+    .diff-row .diff-now { background: var(--accent-dim); border-left: 3px solid var(--accent); color: var(--text); }
+    .diff-row .diff-side .tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+    .diff-row .diff-then .tag { color: var(--red); }
+    .diff-row .diff-now .tag { color: var(--accent); }
+
+    .metrics-list { margin-top: 8px; }
+    .metric-row { padding: 18px 0; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: baseline; }
+    .metric-row:last-child { border-bottom: none; }
+    .metric-row .metric-name { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+    .metric-row .metric-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .metric-row .metric-value { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .metric-row .metric-value.amber { color: var(--amber); }
+    .metric-row .metric-value.muted { color: var(--light); }
+    .metric-row .metric-context { display: block; font-size: 11px; color: var(--light); font-weight: 500; margin-top: 2px; letter-spacing: 0; }
+
+    .snapshot-nav { margin: 32px auto 0; max-width: 720px; padding: 0 24px; display: flex; justify-content: space-between; gap: 16px; }
+    .snapshot-nav a { display: inline-flex; align-items: center; padding: 10px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; color: var(--text); text-decoration: none; font-weight: 600; transition: all 0.15s; }
+    .snapshot-nav a:hover { background: var(--surface-hover); border-color: var(--border-light); }
+
+    footer { padding: 48px 24px 32px; text-align: center; }
+    footer p { font-size: 12px; color: var(--light); line-height: 1.6; max-width: 520px; margin: 0 auto 6px; }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px 20px; margin-bottom: 20px; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-left">
+    <a class="nav-name" href="/">GiveReady</a>
+    <span class="nav-tag">Pivot snapshot</span>
+  </div>
+  <div class="nav-right">
+    <a href="/" class="nav-link">Home</a>
+    <a href="/progress" class="nav-link">Progress</a>
+    <a href="https://docs.giveready.org" class="nav-link" target="_blank">Docs</a>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <a href="/onboard" class="nav-cta">Claim your page</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="wrap">
+    <div class="breadcrumb"><a href="/progress">Progress</a> &rsaquo; Snapshot 2026-05-24</div>
+    <h1>Pivot snapshot, 2026-05-24.</h1>
+    <p class="subtitle">Four weeks after the Gates application went in, the data refuted half of theory 1 and all of theory 5. This page captures the pivot, the evidence, and the new north star, frozen the day it was made.</p>
+  </div>
+</div>
+
+<div class="snapshot-banner">
+  <span class="label">Frozen snapshot, 2026-05-24</span>
+  <p>This page is a static record of the pivot decision taken on 2026-05-24 after a /plan-ceo-review on six weeks of live traffic. Nothing below has been edited since. The prior snapshot at <a href="/progress/2026-04-25-application">/progress/2026-04-25-application</a> is the unedited hypothesis from the Gates submission. Compare the two side by side to see what changed and why.</p>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>The one-paragraph version</h2>
+    <p>The autonomous-agent-write thesis is dead at scale. Six weeks of live attention produced one applied enrichment, and that one came from a manual demo. AI training crawlers (GPTBot, ClaudeBot, Google AI) ingest the directory at high volume (8,313 hits in 30 days, GPTBot alone 8,309). Interactive agents (ChatGPT-User, Claude-User, Perplexity-User) rarely arrive at the site, and when they do, they read and leave. The repositioning: GiveReady is the open, structured, neutral data layer that AI models cite when users ask charity questions, and human-in-loop enrichment via consortium partners builds verified depth on a small named set of nonprofits. Both halves are measurable. Neither requires the autonomous-write magic to land.</p>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>What the data showed in the first six weeks</h2>
+    <p class="muted">All figures as of 2026-05-23, captured at the moment of the pivot. Numbers will keep moving on the live <a href="/progress">/progress</a> page; here they are frozen.</p>
+    <ul class="plain">
+      <li><strong>Training-corpus ingestion:</strong> 8,313 training-crawler hits across the 30 days ending 2026-05-23. GPTBot/1.3 alone hit <code>/AGENTS.md</code> 8,309 times. SemrushBot, Googlebot, Bingbot all indexing normally.</li>
+      <li><strong>Interactive-agent traffic:</strong> 76 interactive-agent hits across 14 days. 0 of those resulted in an <code>/api/enrich</code> submission. The first ChatGPT-User landing on <code>/agents.md</code> happened on 2026-05-23, read and left.</li>
+      <li><strong>Applied enrichments lifetime:</strong> 1. From a manual Claude/3.5 demo on 2026-04-12, not from autonomous agent activity.</li>
+      <li><strong>Donations:</strong> 9 lifetime across the three anchor nonprofits (5 to Finn WEF for $7.01, 4 to City Kids Surfing for $5.75, 0 to Bridges for Music). All from operator wallets, none from third parties.</li>
+      <li><strong>MCP tool-call counts in inference sessions:</strong> effectively zero. Agents do not autonomously call GiveReady tools unless a user prompts them to.</li>
+      <li><strong>Stripe gateway path:</strong> shipped 2026-04-12. No third-party use to date. Charities without USDC wallets still cannot currently receive donations.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>What changed since 2026-04-25</h2>
+    <p class="muted">The five theories from the <a href="/progress/2026-04-25-application">hypothesis snapshot</a>, rescored against six weeks of data. Two retired, one revised, two unchanged.</p>
+
+    <div class="diff-row">
+      <div class="diff-title">Theory 1: AI agents will discover and act on small-nonprofit data via MCP and AGENTS.md.</div>
+      <div class="diff-side diff-then"><span class="tag">As submitted</span>Agents would both read the directory and write back to it. Multiple-agent consensus would auto-promote enrichments; disagreements would be returned as context.</div>
+      <div class="diff-side diff-now"><span class="tag">Revised 2026-05-24</span>Discovery half holds (training crawlers reading at scale). Action half retired (zero autonomous writes in six weeks). New version measures citation share: % of AI responses to 10 fixed charity-discovery prompts that include GiveReady-sourced data.</div>
+    </div>
+
+    <div class="diff-row">
+      <div class="diff-title">Theory 2: Donors actually want to give via AI assistants.</div>
+      <div class="diff-side diff-then"><span class="tag">As submitted</span>Donor intent expressed to an AI assistant would convert into completed gifts once infrastructure was live.</div>
+      <div class="diff-side diff-now"><span class="tag">Unchanged 2026-05-24</span>Still unproved. 0 non-operator donations in 41 days across the three anchors. Single biggest open question in the project. Anti-gaming rule: operator wallets do not count.</div>
+    </div>
+
+    <div class="diff-row">
+      <div class="diff-title">Theory 3: The gateway payment path works end-to-end for charities without wallets.</div>
+      <div class="diff-side diff-then"><span class="tag">As submitted</span>An agent pays GiveReady, GiveReady remits to the charity bank account via standard fiat rails, the charity sees "Donation via GiveReady" and claims its profile afterwards. Deployable in Months 1-3.</div>
+      <div class="diff-side diff-now"><span class="tag">Revised 2026-05-24</span>Architecture shipped 2026-04-12. No third-party agent has triggered a cycle. Now treated as proof-by-pilot, not proof-by-architecture: requires a non-operator person to trigger a real donation that lands in a partner charity's bank account, documented.</div>
+    </div>
+
+    <div class="diff-row">
+      <div class="diff-title">Theory 4: The framework holds across UK, US, and South African regulatory environments.</div>
+      <div class="diff-side diff-then"><span class="tag">As submitted</span>Three jurisdictions tested in parallel. City Kids Surfing (UK), IRS 990 registry (US), South African cohort selected in Months 1-2.</div>
+      <div class="diff-side diff-now"><span class="tag">Unchanged 2026-05-24</span>UK pilot named (City Kids Surfing, Joe Taylor as Charity Sector Lead). US still "via IRS 990 registry" with no named pilot. SA cohort still unselected. Operationally one-and-a-half jurisdictions. Same gap, same plan to close it via consortium work.</div>
+    </div>
+
+    <div class="diff-row">
+      <div class="diff-title">Theory 5: B2A scales at zero marginal cost.</div>
+      <div class="diff-side diff-then"><span class="tag">As submitted</span>Every AI assistant that indexes the MCP registry becomes both a distribution partner and a data contributor at zero marginal cost.</div>
+      <div class="diff-side diff-now"><span class="tag">Rewritten 2026-05-24</span>Distribution scales at zero marginal cost. Contribution does not (crawlers index, they do not write back). New split: training-corpus ingestion scales for free; enrichment depth scales via consortium-partner human-in-loop work, which is budgeted in v6 at $20K.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>The new north-star metric: Citation Share</h2>
+    <p>Of 10 fixed charity-discovery prompts run weekly against Claude, ChatGPT, and Perplexity, how many include GiveReady-sourced data in the response. Denominator 10. Numerator the count of prompts where GiveReady-sourced data appears.</p>
+    <p>Baseline expected: 0 to 5%. Training-corpus ingestion has a 6 to 18 month lag before affecting trained model weights. RAG-sourced citations (Perplexity, Bing Chat) can land sooner. Tracker outputs land at <code>01-Projects/GiveReady/citation-tracking/YYYY-MM-DD.md</code> in the project repo. Methodology stays public. Prompts cover three UK youth charities, three US youth charities, two SA youth charities, one surf therapy, one music education.</p>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>Kill triggers, locked 2026-05-24</h2>
+    <p><strong>2026-11-23 hard kill.</strong> If citation share is still 0% across all 10 prompts at the six-month mark, the training-corpus thesis is also falsified. GiveReady drops to maintenance mode and freed hours redirect to the TestVentures enterprise pipeline. Revisit in Q1 2027 only if B2A market data shows a material shift.</p>
+    <p><strong>2026-07-25 quarterly accelerator.</strong> If citation share is still 0% AND no consortium enrichments have shipped beyond the initial Joe Taylor proof point AND donations are still under $20/quarter from non-operator wallets, accelerate the maintenance-mode decision to 2026-07-25 instead of 2026-11-23.</p>
+    <p><strong>Anti-gaming rule.</strong> At least one positive signal must come from a source the operator does not control. Citations must appear in responses to standard prompts (not prompts engineered to produce the citation). Donations must come from non-operator wallets. Consortium enrichments must come from non-operator people. Operator-initiated activity counts for operational validation but does not satisfy kill-trigger thresholds.</p>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>What stays the same from the original application</h2>
+    <ul class="plain">
+      <li><strong>Architecture.</strong> Cloudflare Workers + D1 + R2 + MCP server. Same stack, same ~$50/year cost floor.</li>
+      <li><strong>Consortium.</strong> TestVentures.net as lead. Joe Taylor as UK Charity Sector Lead. City Kids Surfing as named UK pilot.</li>
+      <li><strong>Budget envelope.</strong> v6 budget unchanged. Internal reallocation only: the $20K enrichment line item now funds consortium-partner human-in-loop work rather than autonomous agent infrastructure.</li>
+      <li><strong>Jurisdictions.</strong> UK, US, South Africa. Same three regulatory environments.</li>
+      <li><strong>Open-source commitment.</strong> Code, metrics, governance toolkit publish under MIT licence at end of grant period. Unchanged.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>How this pivot was decided</h2>
+    <p class="muted">A <code>/plan-ceo-review</code> followed by a <code>/plan-eng-review</code> on 2026-05-23, run as part of the gstack toolkit. Both reviews cleared. 5 of 6 proposals accepted, 1 deferred to <code>TODOS.md</code>. 8 implementation tasks across 3 tracks were assigned definitions of done. Eight eng-review amendments (D1 through D8) refined the implementation specifics. The full CEO plan lives at <code>01-Projects/GiveReady/2026-05-23-giveready-pivot.md</code> in the project repo.</p>
+  </div>
+</div>
+
+<div class="snapshot-nav">
+  <a href="/progress/2026-04-25-application">&larr; Prior snapshot: 2026-04-25 application</a>
+  <a href="/progress">Back to /progress &rarr;</a>
+</div>
+
+<footer>
+  <div class="footer-links" style="margin-top: 48px;">
+    <a href="/">Home</a>
+    <a href="/progress">Progress</a>
+    <a href="/onboard">Claim a page</a>
+    <a href="https://docs.giveready.org" target="_blank">Docs</a>
+    <a href="https://github.com/gswardman/giveready" target="_blank">GitHub</a>
+    <a href="/agents.md">agents.md</a>
+    <a href="/llms.txt">llms.txt</a>
+    <a href="/license">Licence</a>
+  </div>
+  <p>Open-source infrastructure for charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. Revenue supports the <a href="https://finnwardman.com">Finn Wardman World Explorer Fund</a>.</p>
+  <p style="margin-top:8px;">Operated by <a href="https://testventures.net">TestVentures.net</a> (Geordie Wardman). Based in Switzerland. Contact: <a href="mailto:geordie@testventures.net">geordie@testventures.net</a></p>
+</footer>
+
+<script>
+  // Theme toggle (matches index.html and progress.html)
+  var saved;
+  try { saved = localStorage.getItem('gr-theme'); } catch(e) {}
+  if (saved === 'dark') document.documentElement.classList.add('dark');
+
+  document.getElementById('theme-toggle').addEventListener('click', function() {
+    document.documentElement.classList.toggle('dark');
+    var isDark = document.documentElement.classList.contains('dark');
+    try { localStorage.setItem('gr-theme', isDark ? 'dark' : 'light'); } catch(e) {}
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GiveReady, Hypothesis snapshot 2026-04-25</title>
+  <meta name="description" content="Frozen snapshot of the GiveReady hypothesis as submitted to the Gates Foundation on 2026-04-25. Nothing on this page has been edited since." />
+  <meta property="og:title" content="GiveReady, Hypothesis snapshot 2026-04-25" />
+  <meta property="og:description" content="What GiveReady proposed to the Gates Foundation, captured the day the application was submitted." />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://giveready.org/progress/2026-04-25-application" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="robots" content="index,follow" />
+  <link rel="canonical" href="https://giveready.org/progress/2026-04-25-application" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #ffffff;
+      --surface: #f9fafb;
+      --surface-hover: #f3f4f6;
+      --card: #ffffff;
+      --border: #e5e5e5;
+      --border-light: #d4d4d4;
+      --text: #111111;
+      --muted: #666666;
+      --light: #999999;
+      --accent: #059669;
+      --accent-dim: rgba(5,150,105,0.08);
+      --accent-border: rgba(5,150,105,0.2);
+      --amber: #b45309;
+      --amber-dim: rgba(180,83,9,0.08);
+      --amber-border: rgba(180,83,9,0.2);
+      --slate: #475569;
+      --slate-dim: rgba(71,85,105,0.08);
+      --slate-border: rgba(71,85,105,0.2);
+      --nav-bg: rgba(255,255,255,0.92);
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    html.dark {
+      --bg: #0a0a0a;
+      --surface: #151515;
+      --surface-hover: #1c1c1c;
+      --card: #181818;
+      --border: #2a2a2a;
+      --border-light: #333;
+      --text: #f5f5f5;
+      --muted: #a0a0a0;
+      --light: #666;
+      --accent: #34d399;
+      --accent-dim: rgba(52,211,153,0.12);
+      --accent-border: rgba(52,211,153,0.25);
+      --amber: #fbbf24;
+      --amber-dim: rgba(251,191,36,0.10);
+      --amber-border: rgba(251,191,36,0.25);
+      --slate: #94a3b8;
+      --slate-dim: rgba(148,163,184,0.10);
+      --slate-border: rgba(148,163,184,0.25);
+      --nav-bg: rgba(10,10,10,0.85);
+    }
+
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+
+    nav { position: sticky; top: 0; z-index: 100; background: var(--nav-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); height: 52px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
+    .nav-left { display: flex; align-items: center; gap: 10px; }
+    .nav-name { font-weight: 700; font-size: 15px; color: var(--text); text-decoration: none; letter-spacing: -0.02em; }
+    .nav-tag { font-size: 10px; font-weight: 600; color: var(--slate); background: var(--slate-dim); border: 1px solid var(--slate-border); padding: 2px 8px; border-radius: 20px; letter-spacing: 0.03em; text-transform: uppercase; }
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+    .nav-link { font-size: 13px; color: var(--muted); text-decoration: none; font-weight: 500; }
+    .nav-link:hover { color: var(--text); }
+    .nav-cta { font-size: 13px; font-weight: 700; color: var(--bg); background: var(--text); text-decoration: none; padding: 7px 16px; border-radius: 20px; transition: opacity 0.15s; }
+    .nav-cta:hover { opacity: 0.85; }
+    .theme-toggle { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; cursor: pointer; transition: all 0.15s; color: var(--muted); padding: 0; }
+    .theme-toggle:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-light); }
+    .theme-toggle svg { width: 16px; height: 16px; }
+    .theme-toggle .icon-sun { display: block; }
+    .theme-toggle .icon-moon { display: none; }
+    html.dark .theme-toggle .icon-sun { display: none; }
+    html.dark .theme-toggle .icon-moon { display: block; }
+
+    .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+
+    .hero { padding: 56px 24px 24px; text-align: center; }
+    .hero .breadcrumb { font-size: 12px; color: var(--light); font-family: var(--mono); margin-bottom: 14px; }
+    .hero .breadcrumb a { color: var(--muted); text-decoration: none; }
+    .hero .breadcrumb a:hover { color: var(--text); }
+    .hero h1 { font-size: clamp(26px, 4.5vw, 34px); font-weight: 800; line-height: 1.15; letter-spacing: -0.03em; margin-bottom: 10px; }
+    .hero .subtitle { font-size: clamp(14px, 2.2vw, 16px); color: var(--muted); max-width: 540px; margin: 0 auto; }
+
+    .snapshot-banner { background: var(--slate-dim); border: 1px solid var(--slate-border); border-radius: var(--radius); padding: 18px 22px; margin: 28px auto 0; max-width: 720px; }
+    .snapshot-banner .label { display: inline-block; font-size: 11px; font-weight: 600; color: var(--slate); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+    .snapshot-banner p { font-size: 14px; line-height: 1.65; color: var(--text); margin: 0; }
+    .snapshot-banner p + p { margin-top: 8px; }
+
+    .section { padding: 32px 0; border-bottom: 1px solid var(--border); }
+    .section h2 { font-size: clamp(20px, 3.5vw, 24px); font-weight: 700; letter-spacing: -0.02em; margin-bottom: 14px; }
+    .section h3 { font-size: 16px; font-weight: 700; margin-top: 22px; margin-bottom: 6px; color: var(--text); }
+    .section p { font-size: 15px; color: var(--text); line-height: 1.7; margin-bottom: 12px; }
+    .section p.muted { color: var(--muted); }
+    .section p.quote { padding: 14px 18px; background: var(--surface); border-left: 3px solid var(--slate); border-radius: var(--radius-sm); font-size: 14px; line-height: 1.65; color: var(--text); margin-bottom: 14px; }
+
+    .theory-list { list-style: none; margin-top: 8px; counter-reset: theory-counter; }
+    .theory-list li { padding: 18px 0; border-bottom: 1px solid var(--border); counter-increment: theory-counter; display: grid; grid-template-columns: 40px 1fr; gap: 14px; }
+    .theory-list li:last-child { border-bottom: none; }
+    .theory-list li::before { content: counter(theory-counter); font-size: 22px; font-weight: 800; color: var(--slate); letter-spacing: -0.02em; line-height: 1.2; }
+    .theory-list .theory-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .theory-list .theory-body { font-size: 14px; color: var(--muted); line-height: 1.65; }
+
+    .milestones { margin-top: 12px; }
+    .milestone-row { padding: 16px 0; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 110px 1fr; gap: 16px; align-items: baseline; }
+    .milestone-row:last-child { border-bottom: none; }
+    .milestone-row .ms-label { font-size: 12px; font-weight: 700; color: var(--slate); letter-spacing: 0.04em; text-transform: uppercase; font-family: var(--mono); }
+    .milestone-row .ms-body { font-size: 14px; color: var(--text); line-height: 1.6; }
+
+    .indicators { margin-top: 12px; }
+    .indicators li { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text); line-height: 1.55; list-style: none; }
+    .indicators li:last-child { border-bottom: none; }
+    .indicators li strong { font-weight: 700; }
+
+    .snapshot-nav { margin: 32px auto 0; max-width: 720px; padding: 0 24px; display: flex; justify-content: space-between; gap: 16px; }
+    .snapshot-nav a { display: inline-flex; align-items: center; padding: 10px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; color: var(--text); text-decoration: none; font-weight: 600; transition: all 0.15s; }
+    .snapshot-nav a:hover { background: var(--surface-hover); border-color: var(--border-light); }
+    .snapshot-nav a.spacer { visibility: hidden; }
+
+    footer { padding: 48px 24px 32px; text-align: center; }
+    footer p { font-size: 12px; color: var(--light); line-height: 1.6; max-width: 520px; margin: 0 auto 6px; }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px 20px; margin-bottom: 20px; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-left">
+    <a class="nav-name" href="/">GiveReady</a>
+    <span class="nav-tag">Snapshot</span>
+  </div>
+  <div class="nav-right">
+    <a href="/" class="nav-link">Home</a>
+    <a href="/progress" class="nav-link">Progress</a>
+    <a href="https://docs.giveready.org" class="nav-link" target="_blank">Docs</a>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <a href="/onboard" class="nav-cta">Claim your page</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="wrap">
+    <div class="breadcrumb"><a href="/progress">Progress</a> &rsaquo; Snapshot 2026-04-25</div>
+    <h1>Hypothesis snapshot, 2026-04-25.</h1>
+    <p class="subtitle">What GiveReady proposed to the Gates Foundation, captured the day the application was submitted. Nothing below has been edited since.</p>
+  </div>
+</div>
+
+<div class="snapshot-banner">
+  <span class="label">Frozen snapshot, 2026-04-25</span>
+  <p>This page is a static record of what GiveReady claimed at the moment the Gates Foundation application went in. It is not the current state of the project. The point of freezing it is so any reviewer can compare what was proposed against what the data has since shown, in our own words on both sides. The current state lives at <a href="/progress">/progress</a>. The first iteration since this submission lives at <a href="/progress/2026-05-24-pivot">/progress/2026-05-24-pivot</a>.</p>
+  <p>Source: <code>GiveReady-Gates-Proposal-v6.pdf</code>, submitted 2026-04-25 to the AI to Accelerate Charitable Giving Grand Challenge.</p>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>The problem we were solving</h2>
+    <p class="quote">Charitable giving is heavily concentrated. The largest US public charities receive the overwhelming majority of private contributions: roughly 85% of donations flow to the top 10% of organisations. The remaining 1.5 million small and mid-sized charities, the long tail that does most of the direct community work, compete for what is left.</p>
+    <p class="quote">AI assistants are becoming how people discover where to give, and without intervention they will amplify that power law: when an agent answers "who should I support?", it answers from the thin subset of charities whose websites, registrations, and mission statements happen to be legible to large language models. Small charities are unlisted, unscraped, and unreachable. Giving intent dies in the gap between asking and acting.</p>
+    <p>The application addressed Challenge Area 3 (foundational data systems interoperable with AI agents) directly, while enabling Area 1 (connecting donors with causes through AI-mediated discovery) and Area 2 (turning interest into completed donations).</p>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>What GiveReady proposed to be</h2>
+    <p class="quote">GiveReady is open, AI-native infrastructure that lets AI assistants match donor intent to verified nonprofits and complete donations in one step, so donors give more and give sooner, and so the long tail of small charities becomes discoverable and fundable, not just the top of the pyramid.</p>
+    <p>Two donation paths: x402 (sub-second USDC settlement, no intermediary, no platform fee) for charities with crypto wallets; a fiat gateway path for charities without wallets (an agent pays GiveReady, we remit to the charity's bank account via standard fiat rails, and the charity sees "Donation via GiveReady" arrive on their statement). Two enrichment paths: AI assistants pull programme details, beneficiary demographics, and impact data from public sources and submit as structured context; human reviewers validate every enrichment against regulator registries as ground truth.</p>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>The five theories the application rested on</h2>
+    <p class="muted">The proposal did not number these explicitly. Numbering added 2026-05-23 for tracking. Wording on this page matches what was implicit in the v6 text.</p>
+    <ol class="theory-list">
+      <li>
+        <div>
+          <div class="theory-title">AI agents will discover and act on small-nonprofit data when it is exposed via MCP and AGENTS.md.</div>
+          <div class="theory-body">When agents query on behalf of donors, they also enrich. Multiple independent agents submitting the same value for the same field auto-promotes it; disagreement returns the rejection reason as prior context for the next enrichment. The grant rested on agents both reading the data and writing back to it.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="theory-title">Donors actually want to give via AI assistants.</div>
+          <div class="theory-body">The primary outcome metric was AI-mediated donations completed. The proposal assumed that once the infrastructure was in place, donor intent expressed to an AI assistant would convert into completed gifts.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="theory-title">The gateway payment path works end-to-end for charities without wallets.</div>
+          <div class="theory-body">An agent pays GiveReady, GiveReady remits to the charity bank account via standard fiat processor rails, the charity sees "Donation via GiveReady" on their statement and comes to claim their profile afterwards. The whole cycle was proposed as deployable in Months 1-3.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="theory-title">The framework holds across UK, US, and South African regulatory environments.</div>
+          <div class="theory-body">Three jurisdictions tested in parallel. City Kids Surfing as the named UK pilot. Joe Taylor as UK Charity Sector Lead with ACEVO, Charity Finance Group, Institute of Fundraising, School for Social Entrepreneurs networks. US reached through the IRS 990 registry. A South African youth-charity cohort selected in Months 1-2. The claim was that if the framework holds across these three, it holds for most small charities worldwide.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="theory-title">B2A scales at zero marginal cost.</div>
+          <div class="theory-body">Every AI assistant that indexes the MCP registry was proposed to become both a distribution partner and a data contributor at zero marginal cost. Infrastructure runs at approximately $50/year on Cloudflare. Path to sustained impact rests on this: scaling does not require additional funding or nonprofit recruitment.</div>
+        </div>
+      </li>
+    </ol>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>What we said we would build, by month</h2>
+    <div class="milestones">
+      <div class="milestone-row">
+        <div class="ms-label">Months 1-3</div>
+        <div class="ms-body">Deploy the gateway path. Validate AI-assisted enrichment on 1,000 nonprofits across the UK, US, and South Africa. Onboard City Kids Surfing as the first fully verified pilot with organisational wallet and governance toolkit (Squads Protocol multi-sig custody, Bitwave audit trails, trustee-liability guidance).</div>
+      </div>
+      <div class="milestone-row">
+        <div class="ms-label">Months 4-8</div>
+        <div class="ms-body">Run 200 to 300 live AI-initiated donations across both payment paths. Month 3 and Month 6 checkpoint reports go to the Foundation. If AI-initiated donations are near zero at Month 6, the hypothesis needs revision and we will report findings transparently.</div>
+      </div>
+      <div class="milestone-row">
+        <div class="ms-label">Months 9-12</div>
+        <div class="ms-body">Expand toward 5,000 to 10,000 nonprofits. Publish the open-source governance toolkit and enrichment methodology under MIT licence, as a reusable toolkit other funders, donor-advised funds, and platforms can adopt or challenge without rebuilding it.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>Donor-behaviour indicators we said we would track</h2>
+    <p>From the proposal, in the RFP's terms. These were the success metrics at submission.</p>
+    <ul class="indicators">
+      <li><strong>Donor engagement.</strong> MCP query volume, unique donors reached through AI assistants.</li>
+      <li><strong>Time from intent to donation.</strong> Median seconds from first AI interaction to completed gift, compared with traditional web flows.</li>
+      <li><strong>New-versus-repeat donors.</strong> Was this the donor's first gift to this organisation?</li>
+      <li><strong>Conversion rate of AI-mediated recommendations to completed donations.</strong></li>
+      <li><strong>Organic charity claim rate.</strong> The percentage of charities who receive a GiveReady-routed donation and come back to claim their profile.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>What was already live at submission</h2>
+    <p>From the proposal: a working prototype was already deployed and in active use. Live API with 41,000 nonprofits on Cloudflare Workers. MCP server on the official registry. x402 donate endpoint tested. Open-source donate widget running on a live nonprofit site. AI discovery routes (<code>llms.txt</code>, <code>agents.md</code>, <code>ai-plugin.json</code>) already receiving named-agent traffic from Claude-SearchBot, Amzn-SearchBot, and MCPRegistry-Crawler. The infrastructure was real on day one; the question the grant was asking was whether the behaviours we proposed would actually happen on top of it.</p>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>Consortium named in the application</h2>
+    <p><strong>TestVentures.net</strong> led technical development and served as lead applicant. <strong>Joe Taylor</strong>, a City Kids Surfing trustee with two decades inside the UK charity sector (ACEVO, Charity Finance Group, Institute of Fundraising, School for Social Entrepreneurs), served as UK Charity Sector Lead, responsible for introductions, governance advisory, and trustee-facing credibility. <strong>City Kids Surfing</strong> (UK) was the named UK pilot charity. US nonprofits were to be reached through the IRS 990 registry. A South African pilot cohort was to be selected in Months 1-2.</p>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>What this snapshot is for</h2>
+    <p class="muted">A grant application is a hypothesis. Some of the hypothesis will hold up against live data. Some of it will not. The point of leaving this page frozen, exactly as submitted, is that any later page on this site (including the current <a href="/progress">/progress</a> view) can be compared to this one without anyone editing the past. The next snapshot after this one was 2026-05-24, when the autonomous-agent-write half of theory 1 and theory 5 was retired based on six weeks of live data. Read it at <a href="/progress/2026-05-24-pivot">/progress/2026-05-24-pivot</a>.</p>
+  </div>
+</div>
+
+<div class="snapshot-nav">
+  <a href="/progress">&larr; Back to /progress</a>
+  <a href="/progress/2026-05-24-pivot">Next snapshot: 2026-05-24 pivot &rarr;</a>
+</div>
+
+<footer>
+  <div class="footer-links" style="margin-top: 48px;">
+    <a href="/">Home</a>
+    <a href="/progress">Progress</a>
+    <a href="/onboard">Claim a page</a>
+    <a href="https://docs.giveready.org" target="_blank">Docs</a>
+    <a href="https://github.com/gswardman/giveready" target="_blank">GitHub</a>
+    <a href="/agents.md">agents.md</a>
+    <a href="/llms.txt">llms.txt</a>
+    <a href="/license">Licence</a>
+  </div>
+  <p>Open-source infrastructure for charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. Revenue supports the <a href="https://finnwardman.com">Finn Wardman World Explorer Fund</a>.</p>
+  <p style="margin-top:8px;">Operated by <a href="https://testventures.net">TestVentures.net</a> (Geordie Wardman). Based in Switzerland. Contact: <a href="mailto:geordie@testventures.net">geordie@testventures.net</a></p>
+</footer>
+
+<script>
+  // Theme toggle (matches index.html and progress.html)
+  var saved;
+  try { saved = localStorage.getItem('gr-theme'); } catch(e) {}
+  if (saved === 'dark') document.documentElement.classList.add('dark');
+
+  document.getElementById('theme-toggle').addEventListener('click', function() {
+    document.documentElement.classList.toggle('dark');
+    var isDark = document.documentElement.classList.contains('dark');
+    try { localStorage.setItem('gr-theme', isDark ? 'dark' : 'light'); } catch(e) {}
+  });
+</script>
+
+</body>
+</html>
