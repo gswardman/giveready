@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GiveReady, Progress in numbers</title>
+  <meta name="description" content="What we proposed, what the data shows, how the approach has evolved. Honest scoreboard for GiveReady's first months." />
+  <meta property="og:title" content="GiveReady, Progress in numbers" />
+  <meta property="og:description" content="Honest scoreboard. What we proposed, what we've learned, how the approach has evolved." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://giveready.org/progress" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="canonical" href="https://giveready.org/progress" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #ffffff;
+      --surface: #f9fafb;
+      --surface-hover: #f3f4f6;
+      --card: #ffffff;
+      --border: #e5e5e5;
+      --border-light: #d4d4d4;
+      --text: #111111;
+      --muted: #666666;
+      --light: #999999;
+      --accent: #059669;
+      --accent-dim: rgba(5,150,105,0.08);
+      --accent-border: rgba(5,150,105,0.2);
+      --amber: #b45309;
+      --amber-dim: rgba(180,83,9,0.08);
+      --amber-border: rgba(180,83,9,0.2);
+      --nav-bg: rgba(255,255,255,0.92);
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    html.dark {
+      --bg: #0a0a0a;
+      --surface: #151515;
+      --surface-hover: #1c1c1c;
+      --card: #181818;
+      --border: #2a2a2a;
+      --border-light: #333;
+      --text: #f5f5f5;
+      --muted: #a0a0a0;
+      --light: #666;
+      --accent: #34d399;
+      --accent-dim: rgba(52,211,153,0.12);
+      --accent-border: rgba(52,211,153,0.25);
+      --amber: #fbbf24;
+      --amber-dim: rgba(251,191,36,0.10);
+      --amber-border: rgba(251,191,36,0.25);
+      --nav-bg: rgba(10,10,10,0.85);
+    }
+
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+
+    nav { position: sticky; top: 0; z-index: 100; background: var(--nav-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); height: 52px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
+    .nav-left { display: flex; align-items: center; gap: 10px; }
+    .nav-name { font-weight: 700; font-size: 15px; color: var(--text); text-decoration: none; letter-spacing: -0.02em; }
+    .nav-tag { font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); padding: 2px 8px; border-radius: 20px; letter-spacing: 0.03em; text-transform: uppercase; }
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+    .nav-link { font-size: 13px; color: var(--muted); text-decoration: none; font-weight: 500; }
+    .nav-link:hover { color: var(--text); }
+    .nav-cta { font-size: 13px; font-weight: 700; color: var(--bg); background: var(--text); text-decoration: none; padding: 7px 16px; border-radius: 20px; transition: opacity 0.15s; }
+    .nav-cta:hover { opacity: 0.85; }
+    .theme-toggle { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; cursor: pointer; transition: all 0.15s; color: var(--muted); padding: 0; }
+    .theme-toggle:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-light); }
+    .theme-toggle svg { width: 16px; height: 16px; }
+    .theme-toggle .icon-sun { display: block; }
+    .theme-toggle .icon-moon { display: none; }
+    html.dark .theme-toggle .icon-sun { display: none; }
+    html.dark .theme-toggle .icon-moon { display: block; }
+
+    .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+
+    .hero { padding: 72px 24px 32px; text-align: center; }
+    .hero h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 12px; }
+    .hero p { font-size: clamp(15px, 2.5vw, 17px); color: var(--muted); max-width: 540px; margin: 0 auto; }
+    .last-updated { display: inline-block; margin-top: 18px; font-size: 12px; color: var(--light); font-family: var(--mono); }
+
+    .section { padding: 32px 0; border-bottom: 1px solid var(--border); }
+    .section h2 { font-size: clamp(20px, 3.5vw, 24px); font-weight: 700; letter-spacing: -0.02em; margin-bottom: 14px; }
+    .section p { font-size: 15px; color: var(--text); line-height: 1.7; margin-bottom: 12px; }
+    .section p.muted { color: var(--muted); }
+
+    .learned-block { background: var(--amber-dim); border: 1px solid var(--amber-border); border-radius: var(--radius); padding: 24px 24px 16px; margin-top: 16px; }
+    .learned-block .label { display: inline-block; font-size: 11px; font-weight: 600; color: var(--amber); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px; }
+    .learned-block p { font-size: 15px; line-height: 1.7; color: var(--text); margin-bottom: 10px; }
+    .learned-block p:last-child { margin-bottom: 0; }
+
+    .metrics-list { margin-top: 8px; }
+    .metric-row { padding: 18px 0; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: baseline; }
+    .metric-row:last-child { border-bottom: none; }
+    .metric-row .metric-left { }
+    .metric-row .metric-name { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+    .metric-row .metric-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .metric-row .metric-value { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .metric-row .metric-value.amber { color: var(--amber); }
+    .metric-row .metric-value.muted { color: var(--light); }
+    .metric-row .metric-context { display: block; font-size: 11px; color: var(--light); font-weight: 500; margin-top: 2px; letter-spacing: 0; }
+
+    .what-we-do { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+    @media (max-width: 600px) { .what-we-do { grid-template-columns: 1fr; } }
+    .what-card { padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    .what-card .label { display: inline-block; font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+    .what-card .label.amber { color: var(--amber); }
+    .what-card p { font-size: 14px; color: var(--text); line-height: 1.6; margin: 0; }
+
+    footer { padding: 48px 24px 32px; text-align: center; }
+    footer p { font-size: 12px; color: var(--light); line-height: 1.6; max-width: 520px; margin: 0 auto 6px; }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px 20px; margin-bottom: 20px; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-left">
+    <a class="nav-name" href="/">GiveReady</a>
+    <span class="nav-tag">Progress</span>
+  </div>
+  <div class="nav-right">
+    <a href="/" class="nav-link">Home</a>
+    <a href="https://docs.giveready.org" class="nav-link" target="_blank">Docs</a>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <a href="/onboard" class="nav-cta">Claim your page</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="wrap">
+    <h1>Progress, in numbers.</h1>
+    <p>What we proposed in the Gates Foundation application, what the data has shown, and how the approach has evolved. No spin. The numbers are what they are.</p>
+    <div class="last-updated">Last updated: 2026-05-23</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>What we've learned</h2>
+    <div class="learned-block">
+      <span class="label">2026-05-23 honesty note</span>
+      <p>The Gates application proposed AI agents would autonomously enrich the nonprofit directory by writing data back through `/api/enrich`. Four to six weeks of live traffic showed otherwise. Training crawlers (GPTBot, ClaudeBot, Google AI) ingest the directory at high volume, but they cannot submit by design. Interactive agents (ChatGPT-User, Claude-User, Perplexity-User) rarely arrive at the site, and when they do, they read and leave. The autonomous-write thesis is dead at scale.</p>
+      <p>What does work, on today's evidence: training-corpus ingestion is real and high-volume, so the path to AI-mediated giving is being the structured-data source that models cite when users ask charity questions. The path to verified depth is human-in-loop enrichment via consortium partners (people who run the orgs use AI to draft their own profile updates, then submit). Both are measurable. Neither requires the autonomous-write magic.</p>
+      <p>So the approach has evolved. The directory is still live, the donate widget still ships zero-fee donations, the MCP server still indexes for every AI assistant that follows the standards. The metrics below now lead with what's measurable today, not what was aspirational at submission.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>What GiveReady is now</h2>
+    <div class="what-we-do">
+      <div class="what-card">
+        <span class="label">Discovery side</span>
+        <p>Open structured data layer indexed by AI training crawlers and search crawlers. When models are trained on the web, GiveReady's nonprofit profiles are in the corpus. When users ask charity questions, GiveReady-sourced data appears in the answers. We measure this directly via the Citation Share metric below.</p>
+      </div>
+      <div class="what-card">
+        <span class="label amber">Enrichment side</span>
+        <p>Human-in-loop. Consortium partners (Joe Taylor at City Kids Surfing, Bridges for Music, Wave Project, Finn WEF) use AI assistants to draft enrichments for their own profiles, then submit. The "AI does the research, the human signs the submission" pattern that every B2A platform with documented writes (Notion MCP, Linear MCP, Stripe Agent Toolkit) has converged on.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>Metrics</h2>
+    <div class="metrics-list">
+
+      <div class="metric-row">
+        <div class="metric-left">
+          <div class="metric-name">Nonprofits indexed</div>
+          <div class="metric-desc">Total in the directory. Imported from the IRS 990 registry, Every.org seed list, and consortium-partner submissions.</div>
+        </div>
+        <div class="metric-value" id="stat-nonprofits">41,000+</div>
+      </div>
+
+      <div class="metric-row">
+        <div class="metric-left">
+          <div class="metric-name">Verified nonprofits</div>
+          <div class="metric-desc">Registration confirmed against the relevant national registry (UK Charity Commission, IRS 990, etc.). The non-verified entries are listed but flagged as "registry-thin" until a partner enriches them.</div>
+        </div>
+        <div class="metric-value" id="stat-verified">166</div>
+      </div>
+
+      <div class="metric-row">
+        <div class="metric-left">
+          <div class="metric-name">AI training-crawler hits per week</div>
+          <div class="metric-desc">Visits from GPTBot, ClaudeBot, Google AI, Perplexity, Cohere training crawlers. These are the events that put GiveReady data into future model weights. Updated quarterly from a rounded 7-day rolling figure.</div>
+        </div>
+        <div class="metric-value">8,000+</div>
+      </div>
+
+      <div class="metric-row">
+        <div class="metric-left">
+          <div class="metric-name">Citation share <span class="metric-context">(north-star metric)</span></div>
+          <div class="metric-desc">Of 10 fixed charity-discovery prompts run weekly against Claude, ChatGPT, and Perplexity, how many include GiveReady-sourced data in the response. Baseline expected 0-5%. 6-18 month training-corpus lag before trained-weight citations land. RAG-sourced citations (Perplexity, Bing Chat) can land sooner.</div>
+        </div>
+        <div class="metric-value amber">Baseline<span class="metric-context">tracker in build</span></div>
+      </div>
+
+      <div class="metric-row">
+        <div class="metric-left">
+          <div class="metric-name">Consortium-partner enrichments</div>
+          <div class="metric-desc">Human-in-loop submissions from named consortium partners. The metric that tests whether the "verified depth via people who run the orgs" thesis is working.</div>
+        </div>
+        <div class="metric-value amber">0<span class="metric-context">first one pending</span></div>
+      </div>
+
+      <div class="metric-row">
+        <div class="metric-left">
+          <div class="metric-name">Donations to anchor nonprofits</div>
+          <div class="metric-desc">Cumulative USDC donated to the three named anchors (Finn WEF, City Kids Surfing, Bridges for Music) via the x402 endpoint. All current donations are operator test donations and are not counted toward external-validation thresholds.</div>
+        </div>
+        <div class="metric-value muted">$12.76<span class="metric-context">operator tests only</span></div>
+      </div>
+
+      <div class="metric-row">
+        <div class="metric-left">
+          <div class="metric-name">Causes covered</div>
+          <div class="metric-desc">Distinct cause areas in the directory, spanning 4 countries (UK, US, South Africa, Bermuda).</div>
+        </div>
+        <div class="metric-value" id="stat-causes">29</div>
+      </div>
+
+      <div class="metric-row">
+        <div class="metric-left">
+          <div class="metric-name">Infrastructure cost</div>
+          <div class="metric-desc">Annual hosting cost on Cloudflare Workers + D1 + R2. Includes the API, the MCP server, the donate widget, and every static page.</div>
+        </div>
+        <div class="metric-value">~$50/yr</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>How we measure citation share</h2>
+    <p class="muted">Weekly: 10 fixed prompts run against three models. Perplexity returns source URLs natively, so that arm is automated. Claude and ChatGPT return text without source attribution, so those arms are manual spot-checks logged into the tracker. Prompts cover three UK youth charities, three US youth charities, two SA youth charities, one surf therapy, one music education. Tracker output lives at <code>01-Projects/GiveReady/citation-tracking/YYYY-MM-DD.md</code> in the project repo. Methodology stays public. If Perplexity changes how it returns source attribution, the tracker falls back to manual for all three models.</p>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
+    <h2>What's deferred</h2>
+    <p class="muted">Three workstreams are on the shelf until the citation-share signal moves or the Gates decision lands: a sandbox <code>/api/enrich</code> endpoint with anonymous-write tier (Netlify-model attempt at the original autonomous-write thesis, time-boxed at 14 days if reactivated); a 50-org verticalised "deep on few" pilot in one Gates GH&D-aligned cause area; a Gates honest-update milestones doc to send when Gates emails for a check-in. Full list in the project repo's <code>TODOS.md</code>.</p>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-links">
+    <a href="/">Home</a>
+    <a href="/onboard">Claim a page</a>
+    <a href="https://docs.giveready.org" target="_blank">Docs</a>
+    <a href="https://github.com/gswardman/giveready" target="_blank">GitHub</a>
+    <a href="/agents.md">agents.md</a>
+    <a href="/llms.txt">llms.txt</a>
+    <a href="/license">Licence</a>
+  </div>
+  <p>Open-source infrastructure for charitable giving. Built by <a href="https://testventures.net">TestVentures.net</a>. Revenue supports the <a href="https://finnwardman.com">Finn Wardman World Explorer Fund</a>.</p>
+  <p style="margin-top:8px;">Operated by <a href="https://testventures.net">TestVentures.net</a> (Geordie Wardman). Based in Switzerland. Contact: <a href="mailto:geordie@testventures.net">geordie@testventures.net</a></p>
+</footer>
+
+<script>
+  // Theme toggle (matches index.html)
+  var saved;
+  try { saved = localStorage.getItem('gr-theme'); } catch(e) {}
+  if (saved === 'dark') document.documentElement.classList.add('dark');
+
+  document.getElementById('theme-toggle').addEventListener('click', function() {
+    document.documentElement.classList.toggle('dark');
+    var isDark = document.documentElement.classList.contains('dark');
+    try { localStorage.setItem('gr-theme', isDark ? 'dark' : 'light'); } catch(e) {}
+  });
+
+  // Live stats from /api/stats (per eng amendment D6: no manual weekly updates)
+  fetch('/api/stats').then(function(r) { return r.json(); }).then(function(d) {
+    var n = d.nonprofits;
+    var fmt = n >= 1000 ? Math.floor(n / 1000).toLocaleString() + ',000+' : String(n);
+    var el1 = document.getElementById('stat-nonprofits');
+    var el2 = document.getElementById('stat-verified');
+    var el3 = document.getElementById('stat-causes');
+    if (el1) el1.textContent = fmt;
+    if (el2 && d.verified_nonprofits != null) el2.textContent = d.verified_nonprofits.toLocaleString();
+    if (el3 && d.causes) el3.textContent = d.causes;
+  }).catch(function() {});
+</script>
+
+</body>
+</html>
