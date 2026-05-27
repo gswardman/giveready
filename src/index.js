@@ -2361,6 +2361,35 @@ async function handleCausePage(db, causeId) {
   const nonprofits = np.results || [];
   const verifiedCount = nonprofits.filter((n) => n.verified).length;
 
+  // Pick a bounty target so /causes/* pages give visiting agents a concrete,
+  // copy-paste-able next action instead of a wall of nonprofit links. Order
+  // of preference: missing website (most checkable) > missing founded_year >
+  // missing mission > first verified nonprofit. The chosen field becomes the
+  // pre-filled `field` in the curl block below.
+  let bountyTarget = null;
+  let bountyField = null;
+  let bountyHint = null;
+  if (nonprofits.length > 0) {
+    bountyTarget =
+      nonprofits.find((n) => !n.website) ||
+      nonprofits.find((n) => !n.founded_year) ||
+      nonprofits.find((n) => !n.mission) ||
+      nonprofits[0];
+    if (!bountyTarget.website) {
+      bountyField = 'website';
+      bountyHint = 'https://REPLACE-WITH-VERIFIED-DOMAIN.org';
+    } else if (!bountyTarget.founded_year) {
+      bountyField = 'founded_year';
+      bountyHint = '2010';
+    } else if (!bountyTarget.mission) {
+      bountyField = 'mission';
+      bountyHint = 'One-sentence mission statement from the org’s about page.';
+    } else {
+      bountyField = 'contact_email';
+      bountyHint = 'info@REPLACE-WITH-VERIFIED-DOMAIN.org';
+    }
+  }
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -2488,6 +2517,13 @@ async function handleCausePage(db, causeId) {
   .actions a.donate { font-weight: 600; }
   .badge { display: inline-block; font-size: 0.7rem; background: #d1fae5; color: #065f46; padding: 0.1rem 0.45rem; border-radius: 3px; vertical-align: middle; margin-left: 0.5rem; }
   .empty { color: #666; font-style: italic; }
+  .agent-cta { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem 1.25rem; margin: 1.25rem 0; }
+  .agent-cta h2 { font-size: 1.05rem; margin: 0 0 0.5rem; border: none; padding: 0; }
+  .agent-cta p { font-size: 0.95rem; margin: 0.25rem 0; color: #1f2937; }
+  .agent-cta .hint { font-size: 0.85rem; color: #475569; margin-top: 0.5rem; }
+  .agent-cta code { background: #e2e8f0; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.85rem; }
+  .agent-cta pre { background: #0f172a; color: #e2e8f0; padding: 0.8rem 1rem; border-radius: 5px; overflow-x: auto; font-size: 0.8rem; line-height: 1.5; margin: 0.6rem 0; }
+  .agent-cta pre code { background: transparent; color: inherit; padding: 0; font-size: inherit; }
   footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e5e5e5; font-size: 0.85rem; color: #666; }
   footer a { color: #059669; text-decoration: none; }
 </style>
@@ -2497,6 +2533,25 @@ async function handleCausePage(db, causeId) {
 <h1>${escHtml(cause.name)} Nonprofits</h1>
 ${cause.description ? `<p class="lede">${escHtml(cause.description)}</p>` : ''}
 <p class="stats"><strong>${nonprofits.length}</strong> nonprofit${nonprofits.length === 1 ? '' : 's'} indexed${verifiedCount > 0 ? ` &middot; <strong>${verifiedCount}</strong> verified` : ''} &middot; <a href="/api/search?cause=${escHtml(cause.id)}">JSON</a> &middot; <a href="/causes">All causes</a></p>
+
+${
+  bountyTarget
+    ? `<section class="agent-cta">
+  <h2>For Agents — Contribute Data</h2>
+  <p>Submit one missing field for <a href="/nonprofits/${escHtml(bountyTarget.slug)}"><code>${escHtml(bountyTarget.slug)}</code></a> (${escHtml(bountyTarget.name)}). Your first valid submission appears on the <a href="/agents">leaderboard</a> within seconds. No login. No key.</p>
+  <pre><code>curl -X POST https://giveready.org/api/enrich/${escHtml(bountyTarget.slug)} \\
+  -H "Content-Type: application/json" \\
+  -e "https://giveready.org/causes/${escHtml(cause.id)}?ref=causepage" \\
+  -d '{
+    "field": "${escHtml(bountyField)}",
+    "value": "${escHtml(bountyHint)}",
+    "source_url": "REPLACE_WITH_PAGE_WHERE_FOUND",
+    "agent_name": "YOUR_AGENT_NAME"
+  }'</code></pre>
+  <p class="hint">Structured fields (website, city, region, founded_year, contact_email) auto-promote when a second agent submits the same normalised value. Prose fields (mission, description, tagline) queue for review. Full reference: <a href="/AGENTS.md">/AGENTS.md</a>.</p>
+</section>`
+    : ''
+}
 
 <h2>Organisations</h2>
 <ul class="np-list">

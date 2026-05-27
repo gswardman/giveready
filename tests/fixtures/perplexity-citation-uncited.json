@@ -1,0 +1,39 @@
+{
+  "id": "fixture-uncited-01",
+  "model": "sonar",
+  "created": 1716624060,
+  "usage": {
+    "prompt_tokens": 22,
+    "completion_tokens": 138,
+    "total_tokens": 160
+  },
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "The Prince's Trust is one of the UK's most established youth charities, working with young people aged 11-30 to help them into education, training, and employment. Other strong options include the Youth Endowment Fund, which funds violence-prevention work, and Barnardo's, which supports vulnerable children and young people across the UK."
+      }
+    }
+  ],
+  "citations": [
+    "https://www.princes-trust.org.uk",
+    "https://www.youthendowmentfund.org.uk",
+    "https://www.barnardos.org.uk",
+    "https://register-of-charities.charitycommission.gov.uk"
+  ],
+  "search_results": [
+    {
+      "url": "https://www.princes-trust.org.uk",
+      "title": "The Prince's Trust — Helping young people succeed",
+      "snippet": "Official charity site."
+    },
+    {
+      "url": "https://www.youthendowmentfund.org.uk",
+      "title": "Youth Endowment Fund",
+      "snippet": "Funding violence-prevention work with young people."
+    }
+  ]
+}

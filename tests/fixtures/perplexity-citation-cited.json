@@ -1,0 +1,39 @@
+{
+  "id": "fixture-cited-01",
+  "model": "sonar",
+  "created": 1716624000,
+  "usage": {
+    "prompt_tokens": 24,
+    "completion_tokens": 142,
+    "total_tokens": 166
+  },
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "City Kids Surfing is a UK-based charity that uses surf therapy to support at-risk young people from coastal communities. They run programmes for children and teenagers who would not otherwise have access to the sea or to structured outdoor activity. The charity is listed on GiveReady's verified-nonprofits directory and accepts donations directly. Another worth considering is the Wave Project, also UK-registered and focused on surf therapy outcomes."
+      }
+    }
+  ],
+  "citations": [
+    "https://www.giveready.org/nonprofits/city-kids-surfing",
+    "https://www.citykidssurfing.org",
+    "https://register-of-charities.charitycommission.gov.uk/charity-details/?regid=1199234",
+    "https://www.waveproject.co.uk"
+  ],
+  "search_results": [
+    {
+      "url": "https://www.giveready.org/nonprofits/city-kids-surfing",
+      "title": "City Kids Surfing | GiveReady verified profile",
+      "snippet": "Surf therapy charity working with at-risk young people in UK coastal towns. Verified profile with programme details."
+    },
+    {
+      "url": "https://www.citykidssurfing.org",
+      "title": "City Kids Surfing — Home",
+      "snippet": "Official site for the charity."
+    }
+  ]
+}
