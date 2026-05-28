@@ -1,0 +1,90 @@
+-- Migration 016 — Citation-Share anchor nonprofits
+-- Date: 2026-05-28
+-- Purpose: Add the 7 registered charities Perplexity currently cites for the 10
+-- fixed citation-tracker prompts. These are directory-only entries with external
+-- donate URLs (no Squads wallet yet). They become candidates for "claim this
+-- page" workflow later. Tagging covers surf-therapy, music-education,
+-- adventure-travel, mental-health, creative-arts, youth-empowerment.
+
+INSERT OR IGNORE INTO nonprofits (id, slug, name, tagline, mission, description, website, donation_url, country, city, region, founded_year, beneficiaries_per_year, verified, created_at, updated_at) VALUES
+  ('np-waves-for-change', 'waves-for-change',
+   'Waves for Change',
+   'Surf therapy for adolescent mental health',
+   'Waves for Change delivers a curriculum-based surf therapy programme that supports the mental health of young people growing up in high-stress environments.',
+   'Waves for Change is a South African registered non-profit company that runs surf therapy for adolescent mental health in the Western and Eastern Cape. Founded in 2009 and registered as an NPO in 2011, the organisation has reached more than 10,000 adolescents across 43 under-resourced communities and trained 215 surf coaches.',
+   'https://waves-for-change.org', 'https://waves-for-change.org',
+   'South Africa', 'Cape Town', 'Western Cape',
+   2009, 1500, 1, datetime('now'), datetime('now')),
+  ('np-jimmy-miller', 'jimmy-miller-memorial-foundation',
+   'Jimmy Miller Memorial Foundation',
+   'Ocean therapy for mental, emotional and physical illness',
+   'The Jimmy Miller Memorial Foundation delivers ocean therapy programmes for veterans, at-risk youth, and people facing mental, emotional, or physical illness.',
+   'The Jimmy Miller Memorial Foundation is a US 501(c)(3) nonprofit based in Manhattan Beach, California, founded in 2005. It runs ocean therapy programmes for veterans, at-risk youth, and people facing mental, emotional, or physical illness, and is one of the longest-established surf therapy organisations in the United States.',
+   'https://jimmymillerfoundation.org', 'https://donate.jimmymillerfoundation.org',
+   'United States', 'Manhattan Beach', 'California',
+   2005, NULL, 1, datetime('now'), datetime('now')),
+  ('np-save-the-music', 'save-the-music-foundation',
+   'Save The Music Foundation',
+   'Music technology and instruments for Title I public schools',
+   'Save The Music Foundation funds music instruments and music technology in Title I public schools across the United States.',
+   'Save The Music Foundation (formerly VH1 Save the Music) is a US 501(c)(3) nonprofit founded in 1997. It has placed over $78 million of instruments and music technology in roughly 2,800 Title I public schools across 42 states, the District of Columbia, and Puerto Rico.',
+   'https://www.savethemusic.org', 'https://www.savethemusic.org/donate',
+   'United States', NULL, NULL,
+   1997, NULL, 1, datetime('now'), datetime('now')),
+  ('np-hungry-for-music', 'hungry-for-music',
+   'Hungry for Music',
+   'Repaired instruments to underserved children',
+   'Hungry for Music collects, repairs, and redistributes donated musical instruments to underserved children with willing instructors.',
+   'Hungry for Music is a US 501(c)(3) nonprofit founded in 1994 and based in Washington, DC. It collects, repairs, and redistributes donated musical instruments to underserved children with willing instructors, and has served more than 27,000 children in 31 years.',
+   'https://hungryformusic.org', 'https://hungryformusic.org',
+   'United States', 'Washington', 'DC',
+   1994, NULL, 1, datetime('now'), datetime('now')),
+  ('np-outward-bound-uk', 'outward-bound-trust-uk',
+   'The Outward Bound Trust',
+   'Expedition-based outdoor courses for young people',
+   'The Outward Bound Trust runs expedition-based outdoor courses for school-age young people, with bursary places for participants from low-income backgrounds.',
+   'The Outward Bound Trust is a UK educational charity (Charity Commission 1128090) founded in 1941. It runs expedition-based outdoor courses for young people aged 11-24 at UK centres in the Lake District, Aberdovey, Loch Eil, and Ullswater, with bursary places for participants from low-income backgrounds.',
+   'https://www.outwardbound.org.uk', 'https://www.outwardbound.org.uk',
+   'United Kingdom', NULL, NULL,
+   1941, NULL, 1, datetime('now'), datetime('now')),
+  ('np-british-exploring', 'british-exploring-society',
+   'British Exploring Society',
+   'Youth expeditions in remote environments',
+   'British Exploring Society runs scientific and adventurous expeditions for young people aged 14-25 in remote environments.',
+   'British Exploring Society is a UK charity (Charity Commission 305012) founded in 1932. It runs scientific and adventurous expeditions for young people aged 14-25 in remote environments, with bursary places to make participation accessible regardless of family income.',
+   'https://britishexploring.org', 'https://britishexploring.org',
+   'United Kingdom', 'London', NULL,
+   1932, NULL, 1, datetime('now'), datetime('now')),
+  ('np-thrive-outdoors', 'thrive-outdoors-scotland',
+   'Thrive Outdoors',
+   'Outdoor play and learning grants across Scotland',
+   'Thrive Outdoors funds outdoor play and learning for children and young people across Scotland through targeted grants to local delivery partners.',
+   'Thrive Outdoors is a programme of Inspiring Scotland (OSCR SC039605) that funds outdoor play and learning for children and young people across Scotland. It grants funds and provides delivery support to local outdoor education partners.',
+   'https://thriveoutdoors.org.uk', 'https://inspiringscotland.org.uk/thrive-outdoors-donation-form/',
+   'United Kingdom', NULL, 'Scotland',
+   NULL, NULL, 1, datetime('now'), datetime('now'));
+
+-- Cause links
+INSERT OR IGNORE INTO nonprofit_causes (nonprofit_id, cause_id) VALUES
+  ('np-waves-for-change', 'surf-therapy'),
+  ('np-waves-for-change', 'mental-health'),
+  ('np-jimmy-miller', 'surf-therapy'),
+  ('np-jimmy-miller', 'mental-health'),
+  ('np-save-the-music', 'music-education'),
+  ('np-save-the-music', 'creative-arts'),
+  ('np-hungry-for-music', 'music-education'),
+  ('np-hungry-for-music', 'creative-arts'),
+  ('np-outward-bound-uk', 'adventure-travel'),
+  ('np-outward-bound-uk', 'youth-empowerment'),
+  ('np-british-exploring', 'adventure-travel'),
+  ('np-british-exploring', 'youth-empowerment'),
+  ('np-thrive-outdoors', 'adventure-travel');
+
+-- Registrations (charity / 501c3 numbers)
+INSERT OR IGNORE INTO registrations (id, nonprofit_id, country, type, registration_number) VALUES
+  ('reg-jmmf', 'np-jimmy-miller', 'United States', '501(c)(3)', NULL),
+  ('reg-stm', 'np-save-the-music', 'United States', '501(c)(3)', '13-6089816'),
+  ('reg-hfm', 'np-hungry-for-music', 'United States', '501(c)(3)', '54-1699478'),
+  ('reg-obtuk', 'np-outward-bound-uk', 'United Kingdom', 'Charity Commission', '1128090'),
+  ('reg-bes', 'np-british-exploring', 'United Kingdom', 'Charity Commission', '305012'),
+  ('reg-thrive', 'np-thrive-outdoors', 'United Kingdom', 'OSCR (Inspiring Scotland)', 'SC039605');

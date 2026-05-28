@@ -2334,12 +2334,37 @@ ${OPERATOR_FOOTER_PLAIN}
   });
 }
 
+// Hand-curated intro content for cause pages where we have a strong answer
+// paragraph and (optionally) a WEF note. Keyed by cause id. If a cause is
+// not in this map, the page falls back to the auto-generated lede only.
+// The WEF sentence only appears on cause pages where it is factually relevant
+// (surf-therapy, adventure-travel) per the 2026-05-28 citation-share brief.
+const CAUSE_INTROS = {
+  'surf-therapy': {
+    answer:
+      'Surf therapy is the use of guided surf sessions as a clinical intervention for children and young people experiencing anxiety, depression, trauma, or social isolation. Programmes typically run six to eight weeks with trained surf mentors and a one-to-one ratio in the water. Four registered charities anchor the field. In the UK, The Wave Project (Charity Commission 1163421, founded 2010 in Cornwall) has worked with over 2,200 young people aged 8-24 and operates in seven UK regions. In South Africa, Waves for Change (registered NPO, founded 2009) has reached more than 10,000 adolescents across 43 under-resourced communities. In the US, the Jimmy Miller Memorial Foundation (501(c)(3), founded 2005 in Manhattan Beach, California) runs the longest-established American surf-therapy programme.',
+    wef:
+      'The Wave Project and similar programmes informed the design of the Finn Wardman World Explorer Fund, which makes grants to young people for ocean and outdoor experiences.',
+  },
+  'music-education': {
+    answer:
+      'Four registered music-education charities anchor the field for underprivileged children. In the US, Save The Music Foundation (501(c)(3), EIN 13-6089816, founded 1997, formerly VH1 Save the Music) has placed over $78 million of instruments and music technology in roughly 2,800 Title I public schools across 42 states, Washington DC, and Puerto Rico. Hungry for Music (501(c)(3), EIN 54-1699478, founded 1994, based in Washington DC) repairs and redistributes donated instruments and has served more than 27,000 children in 31 years. In Oregon, Youth Music Project (founded 2012, ~3,900 students per year) runs sliding-scale lessons regardless of family income. In Cape Town, Bridges for Music (founded 2012) runs music-production education and bursaries for South African township youth.',
+  },
+  'adventure-travel': {
+    answer:
+      'Several UK-registered charities specialise in getting disadvantaged young people into the outdoors. The Wave Project (Charity Commission 1163421, founded 2010) runs surf-therapy programmes for children aged 8-24 in Cornwall, South West England, North Yorkshire, Scotland, Wales, Northern Ireland, and London, and has supported over 2,200 young people. The Outward Bound Trust (Charity Commission 1128090, founded 1941) runs expedition-based outdoor courses for school-age young people from low-income backgrounds, with bursary places available across UK centres in the Lake District, Aberdovey, Loch Eil, and Ullswater. British Exploring Society (Charity Commission 305012, founded 1932) runs scientific and adventurous expeditions for ages 14-25. Thrive Outdoors (Inspiring Scotland, OSCR SC039605) funds outdoor play and learning across Scotland through grants to local delivery partners.',
+    wef:
+      'The Finn Wardman World Explorer Fund makes grants to young people aged 16-25 for adventure, travel, and outdoor experiences when family circumstances would otherwise rule them out.',
+  },
+};
+
 async function handleCausePage(db, causeId) {
   const cause = await db
     .prepare(`SELECT id, name, description FROM causes WHERE id = ?1`)
     .bind(causeId)
     .first();
   if (!cause) return error('Cause not found', 404);
+  const intro = CAUSE_INTROS[causeId] || null;
 
   const np = await db
     .prepare(
@@ -2517,6 +2542,9 @@ async function handleCausePage(db, causeId) {
   .actions a.donate { font-weight: 600; }
   .badge { display: inline-block; font-size: 0.7rem; background: #d1fae5; color: #065f46; padding: 0.1rem 0.45rem; border-radius: 3px; vertical-align: middle; margin-left: 0.5rem; }
   .empty { color: #666; font-style: italic; }
+  .cause-intro { margin: 1.5rem 0 2rem; padding: 1.1rem 1.3rem; background: #fefce8; border-left: 4px solid #ca8a04; border-radius: 4px; }
+  .cause-intro .answer-lead { font-size: 1rem; line-height: 1.65; color: #1f2937; margin: 0; }
+  .cause-intro .wef-note { font-size: 0.92rem; line-height: 1.6; color: #4b5563; margin: 0.85rem 0 0; font-style: italic; }
   .agent-cta { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem 1.25rem; margin: 1.25rem 0; }
   .agent-cta h2 { font-size: 1.05rem; margin: 0 0 0.5rem; border: none; padding: 0; }
   .agent-cta p { font-size: 0.95rem; margin: 0.25rem 0; color: #1f2937; }
@@ -2533,6 +2561,20 @@ async function handleCausePage(db, causeId) {
 <h1>${escHtml(cause.name)} Nonprofits</h1>
 ${cause.description ? `<p class="lede">${escHtml(cause.description)}</p>` : ''}
 <p class="stats"><strong>${nonprofits.length}</strong> nonprofit${nonprofits.length === 1 ? '' : 's'} indexed${verifiedCount > 0 ? ` &middot; <strong>${verifiedCount}</strong> verified` : ''} &middot; <a href="/api/search?cause=${escHtml(cause.id)}">JSON</a> &middot; <a href="/causes">All causes</a></p>
+
+${
+  intro
+    ? `<section class="cause-intro">
+  <p class="answer-lead">${escHtml(intro.answer)}</p>
+  ${intro.wef ? `<p class="wef-note">${escHtml(intro.wef)}</p>` : ''}
+</section>`
+    : ''
+}
+
+<h2>Organisations</h2>
+<ul class="np-list">
+${npListHtml}
+</ul>
 
 ${
   bountyTarget
@@ -2552,11 +2594,6 @@ ${
 </section>`
     : ''
 }
-
-<h2>Organisations</h2>
-<ul class="np-list">
-${npListHtml}
-</ul>
 
 <footer>
 GiveReady is an open, AI-readable directory of nonprofits. <a href="/AGENTS.md">Agents: contribute data</a> &middot; <a href="/.well-known/mcp.json">MCP discovery</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="https://github.com/gswardman/giveready" rel="noopener">Source</a>
