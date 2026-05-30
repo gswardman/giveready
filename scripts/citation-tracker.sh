@@ -26,14 +26,22 @@ set -uo pipefail
 # ── Config ───────────────────────────────────────────────────────────────────
 VAULT="${VAULT:-$HOME/TestVentures.net}"
 SECRETS="$VAULT/.secrets/giveready.env"
-PROMPTS="$VAULT/giveready/scripts/citation-prompts.tsv"
+# PROMPTS and OUT are env-overridable so the same script can also run the
+# held-out control set (scripts/citation-controls.tsv) into a separate dated
+# file, e.g.:
+#   PROMPTS="$VAULT/giveready/scripts/citation-controls.tsv" \
+#   OUT="$OUT_DIR/$(date +%F)-controls.md" ./citation-tracker.sh
+# Note: the Summary line still reads "X/10" — for the 4-prompt control run,
+# read the per-prompt table, not the /10 label. The main 10-prompt run and the
+# daily-digest parser are unaffected.
+PROMPTS="${PROMPTS:-$VAULT/giveready/scripts/citation-prompts.tsv}"
 OUT_DIR="$VAULT/01-Projects/GiveReady/citation-tracking"
 FIXTURE_DIR="$VAULT/giveready/tests/fixtures"
 API_URL="https://api.perplexity.ai/chat/completions"
 MODEL="sonar"
 TODAY="$(date +%F)"
 NOW="$(date '+%H:%M %Z')"
-OUT="$OUT_DIR/$TODAY.md"
+OUT="${OUT:-$OUT_DIR/$TODAY.md}"
 
 # ── Flags ────────────────────────────────────────────────────────────────────
 DRY_RUN=0

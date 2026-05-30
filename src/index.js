@@ -2718,16 +2718,42 @@ ${OPERATOR_FOOTER_PLAIN}
 // cadence + weekly publishing makes this the simplest source of truth.
 
 const GUIDES_MANIFEST = [
-  // Example shape — uncomment + edit when shipping the first post:
-  // {
-  //   slug: 'verify-a-nonprofit-before-donating',
-  //   title: 'How to Verify a Nonprofit Before Donating',
-  //   description: 'Five trust signals to check before sending money to any charity, online or via crypto.',
-  //   published: '2026-05-08',
-  //   updated: '2026-05-08',
-  //   tags: ['verification', 'due-diligence', 'donating'],
-  //   linked_causes: ['music-education', 'mental-health'],
-  // },
+  {
+    slug: 'best-surf-therapy-charities-for-at-risk-youth',
+    title: 'Best Surf Therapy Charities for At-Risk Young People (2026)',
+    description: 'Four verified surf therapy charities that use surfing to support the mental health of at-risk children and young people, across the UK, US, and South Africa.',
+    published: '2026-05-30',
+    updated: '2026-05-30',
+    tags: ['surf-therapy', 'youth', 'mental-health', 'donating'],
+    linked_causes: ['surf-therapy', 'mental-health'],
+  },
+  {
+    slug: 'best-us-youth-charities-mentorship-sports-skills',
+    title: 'Best US Youth Charities for Mentorship, Sports, and Skills (2026)',
+    description: 'Verified US youth charities working in one-to-one mentorship, sports and outdoor recreation for low-income kids, and creative or vocational skills.',
+    published: '2026-05-30',
+    updated: '2026-05-30',
+    tags: ['us-youth', 'mentorship', 'sports', 'vocational', 'donating'],
+    linked_causes: ['youth-empowerment', 'education'],
+  },
+  {
+    slug: 'best-charities-for-cape-town-township-youth',
+    title: 'Charities Supporting Township Youth in Cape Town (2026)',
+    description: 'Two verified South African charities working with young people in Cape Town townships — surf therapy for adolescent mental health and music education for the creative economy.',
+    published: '2026-05-30',
+    updated: '2026-05-30',
+    tags: ['south-africa', 'township', 'youth', 'mental-health', 'music-education', 'donating'],
+    linked_causes: ['surf-therapy', 'music-education'],
+  },
+  {
+    slug: 'best-music-education-charities-for-underprivileged-kids',
+    title: 'Best Music Education Charities for Underprivileged Kids (2026)',
+    description: 'Verified charities that give underprivileged children access to music education — a transparency-rated US music school and a township academy in Cape Town.',
+    published: '2026-05-30',
+    updated: '2026-05-30',
+    tags: ['music-education', 'youth', 'donating'],
+    linked_causes: ['music-education', 'creative-arts'],
+  },
 ];
 
 function _parseFrontmatter(text) {
