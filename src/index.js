@@ -2040,6 +2040,24 @@ function escHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => _HTML_ESC[c]);
 }
 
+// Normalise an external URL so it is always absolute. Stored website/donation
+// values sometimes lack a scheme (e.g. "www.foo.org" or "foo.org/x"). A
+// schemeless href is resolved RELATIVE to the current path by browsers and
+// crawlers, producing junk like /causes/www.foo.org that 404s and burns crawl
+// budget (OAI-SearchBot hit dozens of these — see giveready-daily.md 2026-06-02).
+// Prepend https:// when no http(s) scheme is present. Returns '' for empty input.
+function normUrl(url) {
+  let u = String(url == null ? '' : url).trim();
+  if (!u) return '';
+  if (!/^https?:\/\//i.test(u)) u = 'https://' + u.replace(/^\/+/, '');
+  return u;
+}
+
+// normUrl + HTML-escape, for use inside an href="" attribute.
+function extHref(url) {
+  return escHtml(normUrl(url));
+}
+
 // Safe serialiser for inline JSON-LD <script type="application/ld+json"> blocks.
 // JSON.stringify alone does NOT escape the literal "</script>" sequence; an
 // attacker controlling any included string field (e.g. prose) could break out
@@ -2150,7 +2168,7 @@ async function handleNonprofitPage(db, slug) {
     name: np.name,
     ...(np.tagline ? { slogan: np.tagline } : {}),
     ...(desc ? { description: desc } : {}),
-    ...(np.website ? { sameAs: [np.website] } : {}),
+    ...(np.website ? { sameAs: [normUrl(np.website)] } : {}),
     ...(np.logo_url ? { logo: np.logo_url } : {}),
     ...(np.founded_year ? { foundingDate: String(np.founded_year) } : {}),
     ...(np.country
@@ -2305,8 +2323,8 @@ ${descHtml}
 ${isVerified && np.mission ? `<h2>Mission</h2>\n<p>${escHtml(np.mission)}</p>` : ''}
 
 <div class="actions">
-${np.donation_url ? `<a class="donate" href="${escHtml(np.donation_url)}" rel="noopener">Donate</a>` : ''}
-${np.website ? `<a class="website" href="${escHtml(np.website)}" rel="noopener">Visit website</a>` : ''}
+${np.donation_url ? `<a class="donate" href="${extHref(np.donation_url)}" rel="noopener">Donate</a>` : ''}
+${np.website ? `<a class="website" href="${extHref(np.website)}" rel="noopener">Visit website</a>` : ''}
 </div>
 
 ${donationsLine}
@@ -2325,7 +2343,7 @@ ${provenanceList
     const agent = escHtml(p.agent_name || 'unknown agent');
     const field = escHtml(p.field);
     const sourceLink = p.source_url
-      ? ` from <a href="${escHtml(p.source_url)}" rel="noopener nofollow">source</a>`
+      ? ` from <a href="${extHref(p.source_url)}" rel="noopener nofollow">source</a>`
       : '';
     return `  <li><code>${field}</code> verified by ${agent} on ${escHtml(when)}${sourceLink}</li>`;
   })
@@ -2510,12 +2528,12 @@ async function handleCausePage(db, causeId) {
             const founded = n.founded_year ? `Founded ${n.founded_year}` : '';
             const meta = [loc, founded, reach].filter(Boolean).join(' &middot; ');
             const verifiedBadge = n.verified ? '<span class="badge">Verified</span>' : '';
-            const donate = n.donation_url ? `<a class="donate" href="${escHtml(n.donation_url)}" rel="noopener">Donate</a>` : '';
+            const donate = n.donation_url ? `<a class="donate" href="${extHref(n.donation_url)}" rel="noopener">Donate</a>` : '';
             const profile = `<a class="profile" href="/nonprofits/${escHtml(n.slug)}">Profile</a>`;
             return `
           <li class="np">
             <h3><a href="/nonprofits/${escHtml(n.slug)}">${escHtml(n.name)}</a> ${verifiedBadge}</h3>
-            ${n.website ? `<p class="ext"><a href="${escHtml(n.website)}" rel="noopener">${escHtml(n.website)}</a></p>` : ''}
+            ${n.website ? `<p class="ext"><a href="${extHref(n.website)}" rel="noopener">${escHtml(n.website)}</a></p>` : ''}
             ${n.tagline ? `<p class="tagline">${escHtml(n.tagline)}</p>` : ''}
             ${meta ? `<p class="meta">${meta}</p>` : ''}
             <p class="actions">${donate} ${profile}</p>
