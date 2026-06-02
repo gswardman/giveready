@@ -1312,6 +1312,23 @@ async function handleMcpRpc(db, env, request) {
   });
 }
 
+// IndexNow ownership key. The key file must be reachable at
+// https://www.giveready.org/<KEY>.txt returning the key as plain text, so
+// Bing/Yandex can verify we own the URLs we submit via scripts/indexnow-ping.sh.
+// Perplexity retrieves from Bing's index; this is the not-retrieved fix
+// (see 00-Dashboard/giveready-daily.md, 2026-06-02).
+const INDEXNOW_KEY = '9cf63049b10a55d8f2b83e7d53c240cf';
+
+function handleIndexNowKey() {
+  return new Response(INDEXNOW_KEY, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/plain; charset=UTF-8',
+      'Cache-Control': 'public, max-age=86400',
+    },
+  });
+}
+
 function handleRobotsTxt() {
   return new Response(
     `User-agent: *
@@ -6694,6 +6711,9 @@ const _httpHandler = {
       // 2026 SEP-1649 server card
       if (path === '/.well-known/mcp/server-card.json') return handleWellKnownServerCard();
       if (path === '/robots.txt') return handleRobotsTxt();
+      // IndexNow ownership-verification key file. Must resolve before the
+      // asset router so /<key>.txt is never shadowed by a static 404.
+      if (path === '/' + INDEXNOW_KEY + '.txt') return handleIndexNowKey();
       if (path === '/llms.txt') return handleLlmsTxt();
       // Both /agents.md (lowercase, original) and /AGENTS.md (capital, 2026 root convention)
       // serve the same dynamic instruction page with bounty + 30-second wins + leaderboard.

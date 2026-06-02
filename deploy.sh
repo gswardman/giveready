@@ -168,6 +168,17 @@ done
 echo "[8/9] Deploying to Cloudflare..."
 wrangler deploy
 
+# 9b. IndexNow ping — push URLs to Bing/Yandex so Perplexity (Bing-backed)
+# can retrieve them. Runs AFTER wrangler deploy so the /<key>.txt file is
+# live first. Non-fatal: a rejected ping never blocks a deploy.
+echo "Submitting URLs to IndexNow..."
+if [ -x scripts/indexnow-ping.sh ]; then
+  sleep 2
+  scripts/indexnow-ping.sh || echo "  IndexNow ping failed (non-fatal); re-run scripts/indexnow-ping.sh manually."
+else
+  echo "  Skipped (scripts/indexnow-ping.sh not found or not executable)."
+fi
+
 # 10. MCP registry
 if [ "$SKIP_MCP" = false ]; then
   echo "[9/9] Publishing MCP server..."

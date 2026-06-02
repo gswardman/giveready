@@ -129,11 +129,23 @@ fi
 
 # ── Iterate prompts, collect Perplexity citations ────────────────────────────
 TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
+DIAG="$(mktemp)"
+trap 'rm -f "$TMP" "$DIAG"' EXIT
 
 CITED_IDS=""   # space-separated list of cited prompt_ids (bash 3.2-safe, no arrays)
 TOTAL=0
 CITED_COUNT=0
+
+# Source-set diagnostics counters (hypothesis #2, added 2026-05-31).
+# Three-way drop-off classification for giveready.org per prompt.
+CITED_DIAG=0   # giveready.org in .citations[]                     (won the citation)
+RNC_DIAG=0     # giveready.org in .search_results[] but not cited  (retrieved, lost the cite)
+NR_DIAG=0      # giveready.org in neither                          (not retrieved at all)
+
+# host-only, www-stripped, de-duplicated, "; "-joined domain list from a
+# newline-separated list of URLs on stdin. (paste -d treats a multi-char arg as a
+# rotating list of single-char delimiters, so the join is done in awk instead.)
+dom() { awk -F/ 'NF>2{print $3}' | sed 's/^www\.//' | awk 'NF && !seen[$0]++ { out = out sep $0; sep="; " } END { print out }'; }
 
 # Read TSV: id<TAB>bucket<TAB>prompt. Skip header (id == "id").
 while IFS=$'\t' read -r ID BUCKET PROMPT; do
@@ -185,6 +197,23 @@ while IFS=$'\t' read -r ID BUCKET PROMPT; do
   printf '| %s | perplexity | %s | %s | %s | %s |\n' \
     "$TODAY" "$ID" "$CITED" "$URL_FOUND" "$NOTES" >> "$TMP"
 
+  # ── Source-set diagnostics (hypothesis #2) ─────────────────────────────────
+  # Capture the full raw source set, not just the top-2 cited domains, so we can
+  # locate where giveready.org drops off: did it lose the citation, or was it
+  # never retrieved at all? .search_results[] is Perplexity's retrieved set,
+  # which is broader than .citations[] (the subset it actually cited).
+  SEARCH_URLS=$(echo "$RESP" | jq -r '.search_results[]?.url' 2>/dev/null)
+  if [ "$CITED" = "y" ]; then
+    GR_STATUS="cited"; CITED_DIAG=$((CITED_DIAG + 1))
+  elif echo "$SEARCH_URLS" | grep -qi 'giveready\.org'; then
+    GR_STATUS="retrieved-not-cited"; RNC_DIAG=$((RNC_DIAG + 1))
+  else
+    GR_STATUS="not-retrieved"; NR_DIAG=$((NR_DIAG + 1))
+  fi
+  CIT_DOMS=$(echo "$CITATIONS" | dom); [ -z "$CIT_DOMS" ] && CIT_DOMS="—"
+  SR_DOMS=$(echo "$SEARCH_URLS" | dom); [ -z "$SR_DOMS" ] && SR_DOMS="—"
+  printf '| %s | %s | %s | %s |\n' "$ID" "$GR_STATUS" "$CIT_DOMS" "$SR_DOMS" >> "$DIAG"
+
   # Polite pacing — sonar's rate limits are generous but no need to hammer.
   [ "$DRY_RUN" -eq 0 ] && sleep 0.3
 done < "$PROMPTS"
@@ -234,6 +263,7 @@ FINAL="$(mktemp)"
   echo "- Claude: pending manual check"
   echo "- ChatGPT: pending manual check"
   echo "- Combined citation share: $COMBINED_NUM/$COMBINED_DENOM ($COMBINED_PCT%)"
+  echo "- Source-set diagnostics (Perplexity, of 10): $CITED_DIAG cited / $RNC_DIAG retrieved-not-cited / $NR_DIAG not-retrieved"
   echo ""
   echo "## Per-prompt results"
   echo ""
@@ -248,6 +278,18 @@ FINAL="$(mktemp)"
   else
     printf "%b" "$NEWLY_CITED"
   fi
+  echo ""
+  echo "## Source-set diagnostics (Perplexity)"
+  echo ""
+  echo "Where giveready.org sits in each prompt's full raw source set. \`cited\` = won the citation; \`retrieved-not-cited\` = in Perplexity's retrieved set but not cited (we are in the running, losing the cite); \`not-retrieved\` = absent from the source set entirely (a discoverability/indexing gap, not a citation-format problem)."
+  echo ""
+  echo "- cited: $CITED_DIAG/10"
+  echo "- retrieved-not-cited: $RNC_DIAG/10"
+  echo "- not-retrieved: $NR_DIAG/10"
+  echo ""
+  echo "| prompt_id | giveready_status | citation_domains | search_result_domains |"
+  echo "|---|---|---|---|"
+  cat "$DIAG"
 } > "$FINAL"
 
 mv "$FINAL" "$OUT"
