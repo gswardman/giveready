@@ -1497,7 +1497,7 @@ nonprofits. Each guide carries Schema.org Article + BreadcrumbList JSON-LD
 and links to relevant cause pages.
 
 - **Index:** https://www.giveready.org/guides
-- **Per-guide:** https://www.giveready.org/guides/{slug}
+${GUIDES_MANIFEST.map((g) => `- ${g.title}: https://www.giveready.org/guides/${g.slug}`).join('\n')}
 
 ## When to Use This
 
