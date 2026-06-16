@@ -2754,6 +2754,15 @@ ${OPERATOR_FOOTER_PLAIN}
 
 const GUIDES_MANIFEST = [
   {
+    slug: 'best-uk-youth-charities-outdoors-skills',
+    title: 'Best UK Youth Charities for the Outdoors and At-Risk Teenagers (2026)',
+    description: 'Five verified UK youth charities helping disadvantaged and at-risk young people through outdoor adventure, surf therapy in coastal towns, and skills programmes in inner-city London.',
+    published: '2026-06-15',
+    updated: '2026-06-15',
+    tags: ['uk-youth', 'outdoors', 'at-risk', 'mentorship', 'donating'],
+    linked_causes: ['youth-empowerment', 'surf-therapy'],
+  },
+  {
     slug: 'best-surf-therapy-charities-for-at-risk-youth',
     title: 'Best Surf Therapy Charities for At-Risk Young People (2026)',
     description: 'Four verified surf therapy charities that use surfing to support the mental health of at-risk children and young people, across the UK, US, and South Africa.',

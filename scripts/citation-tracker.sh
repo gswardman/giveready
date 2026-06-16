@@ -105,24 +105,39 @@ if [ "$DRY_RUN" -eq 1 ]; then
     exit 1
   fi
 else
-  PING_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
-    -X POST "$API_URL" \
-    -H "Authorization: Bearer $PERPLEXITY_API_KEY" \
-    -H "Content-Type: application/json" \
-    -d '{"model":"'"$MODEL"'","messages":[{"role":"user","content":"ok"}]}' \
-    --max-time 30)
+  # Retry the pre-flight ping up to 5 times with backoff. HTTP 000 means curl
+  # never got a response (DNS, TLS, timeout, or a cron run firing before the
+  # network is up) — almost always transient, so a single blip should not burn
+  # the whole day's run. Capture curl's exit code too, so a real failure
+  # (rc=6 DNS, 7 refused, 28 timeout, 35 TLS) is diagnosable from the log.
+  PING_CODE="000"
+  PING_ERR=""
+  for attempt in 1 2 3 4 5; do
+    PING_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+      -X POST "$API_URL" \
+      -H "Authorization: Bearer $PERPLEXITY_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"model":"'"$MODEL"'","messages":[{"role":"user","content":"ok"}]}' \
+      --max-time 30)
+    CURL_RC=$?
+    [ "$PING_CODE" = "200" ] && break
+    PING_ERR="curl_rc=$CURL_RC http=$PING_CODE"
+    echo "Health-check attempt $attempt/5 failed ($PING_ERR), retrying..." >&2
+    [ "$attempt" -lt 5 ] && sleep $((attempt * 15))
+  done
   if [ "$PING_CODE" = "200" ]; then
     HEALTH="OK"
   else
-    HEALTH="FAILED (HTTP $PING_CODE on health-check)"
+    HEALTH="FAILED (HTTP $PING_CODE on health-check after 5 attempts; last $PING_ERR)"
     cat > "$OUT" <<EOF
 # Citation Tracker — $TODAY
 
 _Run at $NOW. Tracker health: $HEALTH._
 
-Tracker failed pre-flight health check. No data collected.
+Tracker failed pre-flight health check after 5 attempts. No data collected.
+Last curl diagnostic: $PING_ERR
 EOF
-    echo "Tracker health FAILED: HTTP $PING_CODE" >&2
+    echo "Tracker health FAILED after 3 attempts: $PING_ERR" >&2
     exit 1
   fi
 fi
@@ -264,6 +279,7 @@ FINAL="$(mktemp)"
   echo "- ChatGPT: pending manual check"
   echo "- Combined citation share: $COMBINED_NUM/$COMBINED_DENOM ($COMBINED_PCT%)"
   echo "- Source-set diagnostics (Perplexity, of 10): $CITED_DIAG cited / $RNC_DIAG retrieved-not-cited / $NR_DIAG not-retrieved"
+  echo "- Retrieval share (Perplexity, daily driver): $((CITED_DIAG + RNC_DIAG))/10 prompts surface giveready.org in the source set (cited + retrieved-not-cited)"
   echo ""
   echo "## Per-prompt results"
   echo ""
