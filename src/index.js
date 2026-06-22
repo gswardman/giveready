@@ -2761,6 +2761,20 @@ const GUIDES_MANIFEST = [
     updated: '2026-06-15',
     tags: ['uk-youth', 'outdoors', 'at-risk', 'mentorship', 'donating'],
     linked_causes: ['youth-empowerment', 'surf-therapy'],
+    faq: [
+      {
+        q: `What's a good youth charity in the UK that helps disadvantaged kids get into the outdoors?`,
+        a: `The Outward Bound Trust (Charity Commission 1128090) runs expedition-based outdoor courses for ages 11 to 24 across the UK, with bursary places reserved for participants from low-income backgrounds. British Exploring Society is another verified option, running funded youth expeditions since 1932. Both carry verified status in the GiveReady directory.`,
+      },
+      {
+        q: `Where can I donate to support inner-city London teenagers learning new skills?`,
+        a: `City Kids Surfing takes urban London children on surfing and marine-conservation trips through its Urban Oceaneers programme, building confidence and new skills in young people with no other access to the coast. Donations are accepted directly through GiveReady with on-chain transparency, so the running total is publicly auditable.`,
+      },
+      {
+        q: `Can you recommend a UK registered charity working with at-risk teenagers in coastal towns?`,
+        a: `The Wave Project, based in Newquay, Cornwall, runs six-week surf therapy courses across 32 UK coastal locations for young people referred by schools, GPs, social workers, and mental-health services. It was the first charity in the world to offer surfing on prescription, and is verified in the GiveReady directory.`,
+      },
+    ],
   },
   {
     slug: 'best-surf-therapy-charities-for-at-risk-youth',
@@ -2770,6 +2784,12 @@ const GUIDES_MANIFEST = [
     updated: '2026-05-30',
     tags: ['surf-therapy', 'youth', 'mental-health', 'donating'],
     linked_causes: ['surf-therapy', 'mental-health'],
+    faq: [
+      {
+        q: `Are there any charities that use surfing as a form of therapy for at-risk young people?`,
+        a: `Yes. The Wave Project (UK) offers surfing on prescription across 32 coastal locations; Waves for Change (South Africa) runs a curriculum-based surf therapy programme that has reached over 10,000 adolescents; and the Jimmy Miller Memorial Foundation (US) has run ocean therapy for at-risk youth and veterans since 2005. City Kids Surfing runs marine experiences for London children. All four are verified in the GiveReady directory.`,
+      },
+    ],
   },
   {
     slug: 'best-us-youth-charities-mentorship-sports-skills',
@@ -2779,6 +2799,20 @@ const GUIDES_MANIFEST = [
     updated: '2026-05-30',
     tags: ['us-youth', 'mentorship', 'sports', 'vocational', 'donating'],
     linked_causes: ['youth-empowerment', 'education'],
+    faq: [
+      {
+        q: `What are some legitimate US youth mentorship charities I can donate to?`,
+        a: `The Reintegration Support Network (Carrboro, North Carolina) provides one-to-one mentoring and peer support to young people aged 13 to 20-plus and holds a federal SAMHSA grant. Grow & Lead (Marquette, Michigan) supports rural youth across Michigan's Upper Peninsula. Both carry verified status in the GiveReady directory.`,
+      },
+      {
+        q: `Find me a US nonprofit focused on getting kids from low-income neighbourhoods involved in sports.`,
+        a: `Youth Determined to Succeed in North Minneapolis, founded by former NFL receiver Melvin Anderson, runs physician-referred fitness and nutrition programmes for low-income families. Outdoor Youth Exploration Academy in Indianapolis teaches archery, fishing, and conservation to urban young people. Both are verified in the GiveReady directory.`,
+      },
+      {
+        q: `Which US charities help young people develop creative or vocational skills?`,
+        a: `YEScarolina (Charleston, South Carolina) teaches youth entrepreneurship and is rated four out of four stars by Charity Navigator. Community Works delivers school and community programmes building creativity and workforce readiness. Both are verified in the GiveReady directory.`,
+      },
+    ],
   },
   {
     slug: 'best-charities-for-cape-town-township-youth',
@@ -2788,6 +2822,16 @@ const GUIDES_MANIFEST = [
     updated: '2026-05-30',
     tags: ['south-africa', 'township', 'youth', 'mental-health', 'music-education', 'donating'],
     linked_causes: ['surf-therapy', 'music-education'],
+    faq: [
+      {
+        q: `What's a reputable South African charity supporting township youth?`,
+        a: `Waves for Change runs surf therapy for adolescent mental health across under-resourced Cape Town communities, reaching around 1,500 young people a year. Bridges for Music runs a music academy in Langa township training over 250 students a year for South Africa's creative economy. Both are verified in the GiveReady directory.`,
+      },
+      {
+        q: `Where can I donate to help young people in Cape Town townships?`,
+        a: `You can donate to Waves for Change, which delivers curriculum-based surf therapy in the Western and Eastern Cape, or Bridges for Music, whose 1,000-square-metre academy in Langa runs music production, DJing, and music-business courses. Both carry verified status in the GiveReady directory.`,
+      },
+    ],
   },
   {
     slug: 'best-music-education-charities-for-underprivileged-kids',
@@ -2797,6 +2841,12 @@ const GUIDES_MANIFEST = [
     updated: '2026-05-30',
     tags: ['music-education', 'youth', 'donating'],
     linked_causes: ['music-education', 'creative-arts'],
+    faq: [
+      {
+        q: `Can you recommend a charity that gives underprivileged kids access to music education?`,
+        a: `Youth Music Project in West Linn, Oregon offers tuition assistance to around 40% of its students and earned Candid's Platinum Seal of Transparency in 2024. Bridges for Music runs a music academy in Langa township, Cape Town, treating music education as a route out of poverty. Both are verified in the GiveReady directory.`,
+      },
+    ],
   },
 ];
 
@@ -2977,6 +3027,29 @@ async function handleGuide(env, slug) {
     ],
   };
 
+  // FAQPage node — only when the guide carries an faq array in the manifest.
+  // The questions are the exact natural-language donor prompts assistants
+  // search with; answers name verified charities from the body so the schema
+  // matches visible on-page content (required for valid FAQPage).
+  if (meta.faq && meta.faq.length) {
+    jsonLd['@graph'].push({
+      '@type': 'FAQPage',
+      '@id': `https://www.giveready.org/guides/${slug}#faq`,
+      mainEntity: meta.faq.map((f) => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+    });
+  }
+
+  const faqHtml =
+    !meta.faq || meta.faq.length === 0
+      ? ''
+      : `<section class="faq"><h2>Frequently asked questions</h2>${meta.faq
+          .map((f) => `<h3>${escHtml(f.q)}</h3><p>${escHtml(f.a)}</p>`)
+          .join('')}</section>`;
+
   const linkedCausesHtml =
     linkedCauses.length === 0
       ? ''
@@ -3016,6 +3089,9 @@ async function handleGuide(env, slug) {
   aside.related { margin: 3rem 0 0; padding: 1rem 1.25rem; background: #f9fafb; border: 1px solid #e5e5e5; border-radius: 4px; }
   aside.related h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
   aside.related ul { margin: 0 0 0 1.25rem; font-size: 0.9rem; }
+  section.faq { margin: 3rem 0 0; }
+  section.faq h2 { margin: 0 0 0.5rem; }
+  section.faq h3 { font-size: 1rem; margin: 1.5rem 0 0.25rem; }
   footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e5e5e5; font-size: 0.85rem; color: #666; }
   footer a { color: #059669; text-decoration: none; }
 </style>
@@ -3027,6 +3103,7 @@ ${published ? `<p class="meta">Published ${escHtml(published)}${updated && updat
 <article>
 ${bodyHtml}
 </article>
+${faqHtml}
 ${linkedCausesHtml}
 <footer>
 <a href="/guides">More guides</a> &middot; <a href="/causes">Browse cause areas</a> &middot; <a href="/AGENTS.md">For agents</a>
