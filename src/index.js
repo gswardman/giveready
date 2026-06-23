@@ -2754,6 +2754,29 @@ ${OPERATOR_FOOTER_PLAIN}
 
 const GUIDES_MANIFEST = [
   {
+    slug: 'best-youth-mentoring-charities-us-uk',
+    title: 'Best Youth Mentoring Charities to Donate To (US and UK, 2026)',
+    description: 'Five verified youth mentoring charities in the United States and United Kingdom, each matching young people with a trained mentor — checked against IRS, OSCR, and Charity Commission registration before listing.',
+    published: '2026-06-21',
+    updated: '2026-06-21',
+    tags: ['youth-mentoring', 'mentorship', 'at-risk', 'donating', 'us', 'uk'],
+    linked_causes: ['youth-empowerment', 'education'],
+    faq: [
+      {
+        q: `What are the best youth mentoring charities to donate to in the US?`,
+        a: `Friends for Youth (Redwood City, California, EIN 94-2961034, founded 1979) runs one-to-one mentoring for low-income youth aged 8 to 17. Reintegration Support Network (North Carolina) provides SAMHSA-funded peer mentoring, and Grow & Lead supports rural young people in Michigan's Upper Peninsula. All three are verified in the GiveReady directory.`,
+      },
+      {
+        q: `Where can I donate to a youth mentoring charity in the UK?`,
+        a: `MCR Pathways (Scottish charity OSCR SC045816, founded 2007) mentors care-experienced and disadvantaged young people across more than 100 schools, and Mentoring Plus (Charity Commission number 1112534, Bath) mentors young people aged 5 to 25. Both are verified in the GiveReady directory.`,
+      },
+      {
+        q: `How do I know a youth mentoring charity is legitimate?`,
+        a: `Check its registration — IRS 501(c)(3) status and EIN in the United States, or an OSCR or Charity Commission number in the United Kingdom. Every charity in this guide has been verified against those registers in the GiveReady directory, and organisations that have stopped accepting donations are excluded.`,
+      },
+    ],
+  },
+  {
     slug: 'best-uk-youth-charities-outdoors-skills',
     title: 'Best UK Youth Charities for the Outdoors and At-Risk Teenagers (2026)',
     description: 'Five verified UK youth charities helping disadvantaged and at-risk young people through outdoor adventure, surf therapy in coastal towns, and skills programmes in inner-city London.',
