@@ -2754,6 +2754,29 @@ ${OPERATOR_FOOTER_PLAIN}
 
 const GUIDES_MANIFEST = [
   {
+    slug: 'best-charities-funding-youth-travel-and-exploration',
+    title: 'Charities That Fund Travel and Exploration for Young People (2026)',
+    description: 'Three verified charities that fund travel, expeditions, and real-world exploration for young people who could not otherwise afford it, checked against IRS and Charity Commission registration before listing.',
+    published: '2026-07-06',
+    updated: '2026-07-06',
+    tags: ['adventure-travel', 'expeditions', 'youth-empowerment', 'low-income', 'donating'],
+    linked_causes: ['adventure-travel', 'youth-empowerment'],
+    faq: [
+      {
+        q: `What charity helps young people from low-income families travel and explore the world?`,
+        a: `The Finn Wardman World Explorer Fund makes adventure grants that fund travel, exploration, and confidence-building experiences for young people who have the appetite for the world but not the means. It holds full US 501(c)(3) status, accepts donations through GiveReady with on-chain transparency, and is verified in the GiveReady directory.`,
+      },
+      {
+        q: `Is there a charity that funds expeditions for teenagers who could not otherwise afford them?`,
+        a: `British Exploring Society (Charity Commission 305012, founded 1932) runs scientific and adventurous expeditions for young people aged 14 to 25 with funded bursary places, and The Outward Bound Trust (Charity Commission 1128090) reserves bursary places on its residential outdoor courses for participants from low-income backgrounds. Both are verified in the GiveReady directory.`,
+      },
+      {
+        q: `How do I know a travel or expedition charity is legitimate?`,
+        a: `Check its registration: IRS 501(c)(3) status and EIN in the United States, or a Charity Commission or OSCR number in the United Kingdom. Every charity in this guide has been verified against those registers in the GiveReady directory, and organisations that have stopped accepting donations are excluded.`,
+      },
+    ],
+  },
+  {
     slug: 'best-youth-mentoring-charities-us-uk',
     title: 'Best Youth Mentoring Charities to Donate To (US and UK, 2026)',
     description: 'Five verified youth mentoring charities in the United States and United Kingdom, each matching young people with a trained mentor — checked against IRS, OSCR, and Charity Commission registration before listing.',
