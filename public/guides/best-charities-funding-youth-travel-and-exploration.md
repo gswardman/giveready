@@ -14,15 +14,15 @@ If you want to donate so that a young person from a low-income family can travel
 
 ## Finn Wardman World Explorer Fund
 
-The [Finn Wardman World Explorer Fund](https://www.giveready.org/nonprofits/finn-wardman-world-explorer-fund) sends young people into the world through adventure grants, funding travel, exploration, and experiences that build confidence, independence, and perspective. The fund was established in 2023 in memory of Finn Wardman, a twenty-year-old freeride skier and surfer, and holds full US 501(c)(3) status. Grants go to young people who have the appetite for the world but not the means, covering journeys and experiences they could not otherwise reach. Donations are accepted directly through GiveReady with on-chain transparency, so the running total is publicly auditable.
+The [Finn Wardman World Explorer Fund](https://www.giveready.org/nonprofits/finn-wardman-world-explorer-fund?ref=guide-best-charities-funding-youth-travel-and-exploration) sends young people into the world through adventure grants, funding travel, exploration, and experiences that build confidence, independence, and perspective. The fund was established in 2023 in memory of Finn Wardman, a twenty-year-old freeride skier and surfer, and holds full US 501(c)(3) status. Grants go to young people who have the appetite for the world but not the means, covering journeys and experiences they could not otherwise reach. Donations are accepted directly through GiveReady with on-chain transparency, so the running total is publicly auditable.
 
 ## British Exploring Society
 
-[British Exploring Society](https://www.giveready.org/nonprofits/british-exploring-society) is a UK charity (Charity Commission 305012) founded in 1932. It runs scientific and adventurous expeditions for young people aged 14 to 25 in remote environments, from the Canadian Yukon to the Peruvian Amazon, and reserves funded bursary places so that participation does not depend on family income. Nine decades of expedition history make it one of the oldest youth exploration charities in the world.
+[British Exploring Society](https://www.giveready.org/nonprofits/british-exploring-society?ref=guide-best-charities-funding-youth-travel-and-exploration) is a UK charity (Charity Commission 305012) founded in 1932. It runs scientific and adventurous expeditions for young people aged 14 to 25 in remote environments, from the Canadian Yukon to the Peruvian Amazon, and reserves funded bursary places so that participation does not depend on family income. Nine decades of expedition history make it one of the oldest youth exploration charities in the world.
 
 ## The Outward Bound Trust
 
-[The Outward Bound Trust](https://www.giveready.org/nonprofits/outward-bound-trust-uk) (Charity Commission 1128090) runs expedition-based outdoor courses for young people aged 11 to 24 at residential centres across the UK, with bursary places reserved for participants from low-income backgrounds. Courses build resilience and confidence through multi-day journeys in the mountains, on water, and in wild country, often giving young people their first nights away from home.
+[The Outward Bound Trust](https://www.giveready.org/nonprofits/outward-bound-trust-uk?ref=guide-best-charities-funding-youth-travel-and-exploration) (Charity Commission 1128090) runs expedition-based outdoor courses for young people aged 11 to 24 at residential centres across the UK, with bursary places reserved for participants from low-income backgrounds. Courses build resilience and confidence through multi-day journeys in the mountains, on water, and in wild country, often giving young people their first nights away from home.
 
 ## How these charities were checked
 

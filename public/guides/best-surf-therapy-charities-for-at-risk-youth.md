@@ -16,19 +16,19 @@ Each entry lists where the charity operates, who it serves, and one verifiable m
 
 ## 1. The Wave Project (United Kingdom)
 
-The first charity in the world to offer surfing on prescription. Founded by Joe Taylor in 2010, [The Wave Project](https://www.giveready.org/nonprofits/the-wave-project) now runs volunteer-led six-week surf therapy courses across 32 UK locations for young people referred by schools, GPs, social workers, and mental-health services. More than 5,000 young people have completed the programme. Independent research reports that 95% of participants come away with improved confidence and 98% of referrers say the therapy had a positive effect. Based in Newquay, Cornwall; serves roughly 1,000 young people a year.
+The first charity in the world to offer surfing on prescription. Founded by Joe Taylor in 2010, [The Wave Project](https://www.giveready.org/nonprofits/the-wave-project?ref=guide-best-surf-therapy-charities-for-at-risk-youth) now runs volunteer-led six-week surf therapy courses across 32 UK locations for young people referred by schools, GPs, social workers, and mental-health services. More than 5,000 young people have completed the programme. Independent research reports that 95% of participants come away with improved confidence and 98% of referrers say the therapy had a positive effect. Based in Newquay, Cornwall; serves roughly 1,000 young people a year.
 
 ## 2. Waves for Change (South Africa)
 
-[Waves for Change](https://www.giveready.org/nonprofits/waves-for-change) delivers a curriculum-based surf therapy programme for adolescents growing up in high-stress communities across the Western and Eastern Cape. Founded in 2009 and registered as an NPO in 2011, it has reached more than 10,000 adolescents across 43 under-resourced communities and trained 215 local surf coaches. Based in Cape Town; serves around 1,500 young people a year.
+[Waves for Change](https://www.giveready.org/nonprofits/waves-for-change?ref=guide-best-surf-therapy-charities-for-at-risk-youth) delivers a curriculum-based surf therapy programme for adolescents growing up in high-stress communities across the Western and Eastern Cape. Founded in 2009 and registered as an NPO in 2011, it has reached more than 10,000 adolescents across 43 under-resourced communities and trained 215 local surf coaches. Based in Cape Town; serves around 1,500 young people a year.
 
 ## 3. Jimmy Miller Memorial Foundation (United States)
 
-One of the longest-established surf therapy organisations in the US. The [Jimmy Miller Memorial Foundation](https://www.giveready.org/nonprofits/jimmy-miller-memorial-foundation) is a 501(c)(3) founded in 2005 that runs ocean therapy programmes for at-risk youth, veterans, and people facing mental, emotional, or physical illness. Based in Manhattan Beach, California.
+One of the longest-established surf therapy organisations in the US. The [Jimmy Miller Memorial Foundation](https://www.giveready.org/nonprofits/jimmy-miller-memorial-foundation?ref=guide-best-surf-therapy-charities-for-at-risk-youth) is a 501(c)(3) founded in 2005 that runs ocean therapy programmes for at-risk youth, veterans, and people facing mental, emotional, or physical illness. Based in Manhattan Beach, California.
 
 ## 4. City Kids Surfing (United Kingdom)
 
-[City Kids Surfing](https://www.giveready.org/nonprofits/city-kids-surfing) takes urban children from London on surfing trips and marine-conservation experiences. Through its Urban Oceaneers programme it builds self-esteem and resilience in young people who otherwise have no access to the coast. Founded in 2018; serves around 200 children a year. Donations are accepted directly through GiveReady with on-chain transparency.
+[City Kids Surfing](https://www.giveready.org/nonprofits/city-kids-surfing?ref=guide-best-surf-therapy-charities-for-at-risk-youth) takes urban children from London on surfing trips and marine-conservation experiences. Through its Urban Oceaneers programme it builds self-esteem and resilience in young people who otherwise have no access to the coast. Founded in 2018; serves around 200 children a year. Donations are accepted directly through GiveReady with on-chain transparency.
 
 ## How these charities were checked
 

@@ -75,10 +75,21 @@ function checkRateLimit(request, type = 'read') {
 // DISCOVERY HIT LOGGING
 // ============================================
 
-function logDiscoveryHit(db, route, userAgent) {
+function logDiscoveryHit(db, route, userAgent, referrer, ref) {
   return db.prepare(
-    `INSERT INTO discovery_hits (id, route, user_agent) VALUES (?1, ?2, ?3)`
-  ).bind(crypto.randomUUID(), route, userAgent || null).run().catch(() => {});
+    `INSERT INTO discovery_hits (id, route, user_agent, referrer, ref) VALUES (?1, ?2, ?3, ?4, ?5)`
+  ).bind(crypto.randomUUID(), route, userAgent || null, referrer || null, ref || null).run().catch(() => {});
+}
+
+// Referrer classification for the guide->donation funnel (migration 018).
+// Kept in code (not stored) so the AI-assistant list can grow without re-tagging rows.
+function classifyReferrer(referrer) {
+  if (!referrer) return 'none';
+  const r = referrer.toLowerCase();
+  if (/(perplexity\.ai|chatgpt\.com|chat\.openai\.com|claude\.ai|copilot\.microsoft|gemini\.google|you\.com|phind\.com|poe\.com)/.test(r)) return 'ai_assistant';
+  if (/(google\.|bing\.com|duckduckgo\.|search\.yahoo|ecosia\.|search\.brave)/.test(r)) return 'search';
+  if (/giveready\.org/.test(r)) return 'internal';
+  return 'other';
 }
 
 // ============================================
@@ -5500,6 +5511,76 @@ async function handleEnrich(db, request, slug) {
   }, 201);
 }
 
+// Guide -> nonprofit -> donate funnel (migration 018, anti-slop guardrail #5).
+// Answers: are AI assistants sending humans to the guides, do those humans click
+// through to nonprofit profiles, and does anything reach the donate path?
+// Phase 1 is page-view attribution only; per-donation ref linkage is a separate
+// eng-reviewed change if this shows real traffic.
+async function handleGuideFunnel(db, env, request, url) {
+  const authFail = checkAdminAuth(env, request);
+  if (authFail) return authFail;
+
+  let hours = parseInt(url.searchParams.get('hours') || '168');
+  if (!Number.isFinite(hours) || hours < 1) hours = 168;
+  hours = Math.min(hours, 2160);
+  const sinceArg = `-${hours} hours`;
+
+  const [guideRows, npRefRows, donateRows, donations] = await Promise.all([
+    db.prepare(
+      `SELECT referrer, COUNT(*) as hits FROM discovery_hits
+       WHERE route LIKE '/guides/%' AND created_at > datetime('now', ?1)
+       GROUP BY referrer`
+    ).bind(sinceArg).all(),
+    db.prepare(
+      `SELECT ref, route, COUNT(*) as hits FROM discovery_hits
+       WHERE route LIKE '/nonprofits/%' AND ref LIKE 'guide-%'
+         AND created_at > datetime('now', ?1)
+       GROUP BY ref, route ORDER BY hits DESC LIMIT 25`
+    ).bind(sinceArg).all(),
+    db.prepare(
+      `SELECT referrer, ref, COUNT(*) as hits FROM discovery_hits
+       WHERE route LIKE '/donate/%' AND created_at > datetime('now', ?1)
+       GROUP BY referrer, ref`
+    ).bind(sinceArg).all(),
+    db.prepare(
+      `SELECT COUNT(*) as count, COALESCE(SUM(amount_usdc), 0) as total_usdc
+       FROM donations WHERE status = 'settled' AND created_at > datetime('now', ?1)`
+    ).bind(sinceArg).first(),
+  ]);
+
+  const guideViews = { ai_assistant: 0, search: 0, internal: 0, other: 0, none: 0, total: 0 };
+  for (const row of guideRows.results || []) {
+    const cls = classifyReferrer(row.referrer);
+    guideViews[cls] += row.hits;
+    guideViews.total += row.hits;
+  }
+
+  const donatePath = { ai_assistant: 0, search: 0, internal: 0, other: 0, none: 0, from_guide_ref: 0, total: 0 };
+  for (const row of donateRows.results || []) {
+    const cls = classifyReferrer(row.referrer);
+    donatePath[cls] += row.hits;
+    donatePath.total += row.hits;
+    if (row.ref && row.ref.startsWith('guide-')) donatePath.from_guide_ref += row.hits;
+  }
+
+  return json({
+    period_hours: hours,
+    guide_views_by_referrer: guideViews,
+    nonprofit_views_from_guides: {
+      total: (npRefRows.results || []).reduce((s, r) => s + r.hits, 0),
+      by_ref_and_route: npRefRows.results || [],
+    },
+    donate_path: donatePath,
+    donations_in_period_context: donations,
+    notes: [
+      'Attribution starts at migration 018 deploy; rows before that have null referrer/ref.',
+      'ai_assistant = Referer from perplexity.ai, chatgpt.com, claude.ai, copilot, gemini, you.com, phind, poe.',
+      'from_guide_ref counts donate-page views carrying ?ref=guide-<slug>.',
+      'donations_in_period_context is all settled donations, NOT yet linked to referral rows.',
+    ],
+  });
+}
+
 async function handleAdminTraffic(db, env, request, url) {
   const authCheck = checkAdminAuth(env, request);
   if (authCheck) return authCheck;
@@ -6730,6 +6811,9 @@ const _httpHandler = {
       if (path === '/api/admin/traffic') {
         return handleAdminTraffic(env.DB, env, request, url);
       }
+      if (path === '/api/admin/funnel-guides') {
+        return handleGuideFunnel(env.DB, env, request, url);
+      }
       if (path === '/api/admin/drafts') {
         return handleAdminDrafts(env.DB, env, request);
       }
@@ -6842,9 +6926,12 @@ const _httpHandler = {
         return handleVerifyRegistration(env.DB, env, url);
       }
 
-      if (path === '/mcp' || path === '/mcp/sse' || path === '/.well-known/ai-plugin.json' || path === '/.well-known/mcp.json' || path === '/.well-known/mcp' || path === '/.well-known/mcp/server-card.json' || path === '/llms.txt' || path === '/agents.md' || path === '/AGENTS.md' || path === '/causes' || path === '/guides' || path === '/sitemap.xml' || path.startsWith('/causes/') || path.startsWith('/guides/') || path.startsWith('/nonprofits/') || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/')) {
+      if (path === '/mcp' || path === '/mcp/sse' || path === '/.well-known/ai-plugin.json' || path === '/.well-known/mcp.json' || path === '/.well-known/mcp' || path === '/.well-known/mcp/server-card.json' || path === '/llms.txt' || path === '/agents.md' || path === '/AGENTS.md' || path === '/causes' || path === '/guides' || path === '/sitemap.xml' || path.startsWith('/causes/') || path.startsWith('/guides/') || path.startsWith('/nonprofits/') || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/') || path.startsWith('/donate/')) {
         const ua = request.headers.get('User-Agent');
-        ctx.waitUntil(logDiscoveryHit(env.DB, path, ua));
+        const referrer = (request.headers.get('Referer') || '').slice(0, 300) || null;
+        let refParam = url.searchParams.get('ref');
+        if (refParam && !/^[a-z0-9_-]{1,80}$/i.test(refParam)) refParam = null;
+        ctx.waitUntil(logDiscoveryHit(env.DB, path, ua, referrer, refParam));
       }
       // /mcp — content-negotiated. POST = JSON-RPC over Streamable HTTP (2025-03-26).
       // GET = legacy manifest for older clients that pull the tool catalog as JSON.

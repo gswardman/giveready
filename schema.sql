@@ -103,11 +103,14 @@ CREATE TABLE IF NOT EXISTS discovery_hits (
   id TEXT PRIMARY KEY,
   route TEXT NOT NULL,
   user_agent TEXT,
+  referrer TEXT,
+  ref TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_discovery_route ON discovery_hits(route);
 CREATE INDEX IF NOT EXISTS idx_discovery_created ON discovery_hits(created_at);
+CREATE INDEX IF NOT EXISTS idx_discovery_ref ON discovery_hits(ref);
 
 -- Query log for measuring AI discoverability
 CREATE TABLE IF NOT EXISTS query_log (

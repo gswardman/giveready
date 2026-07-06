@@ -14,11 +14,11 @@ If you want to support a charity that gives underprivileged children access to m
 
 ## Youth Music Project
 
-[Youth Music Project](https://www.giveready.org/nonprofits/youth-music-project) is Clackamas County's only nonprofit music school, founded in 2012 in West Linn, Oregon. Its facility includes 22 classrooms, a 200-seat performance hall, and professional recording studios, and it teaches guitar, drums, bass, piano, ukulele, violin, vocals, and music production. Around 40% of all students receive tuition assistance, and the school charges 60 to 84% less than for-profit music schools in the area, so family income does not decide who gets to learn. It earned Candid's Platinum Seal of Transparency in 2024 and reaches roughly 3,900 young people a year.
+[Youth Music Project](https://www.giveready.org/nonprofits/youth-music-project?ref=guide-best-music-education-charities-for-underprivileged-kids) is Clackamas County's only nonprofit music school, founded in 2012 in West Linn, Oregon. Its facility includes 22 classrooms, a 200-seat performance hall, and professional recording studios, and it teaches guitar, drums, bass, piano, ukulele, violin, vocals, and music production. Around 40% of all students receive tuition assistance, and the school charges 60 to 84% less than for-profit music schools in the area, so family income does not decide who gets to learn. It earned Candid's Platinum Seal of Transparency in 2024 and reaches roughly 3,900 young people a year.
 
 ## Bridges for Music
 
-[Bridges for Music](https://www.giveready.org/nonprofits/bridges-for-music) runs a 1,000-square-metre academy in Langa, a township in Cape Town, South Africa. Founded in 2012, it teaches music production, DJing, performance, and music-business entrepreneurship. Each year more than 250 students complete its courses, and its Industry Access programme creates around 250 job placements a year into South Africa's creative economy — treating music education as a practical route out of poverty rather than an extra. Serves around 500 young people a year.
+[Bridges for Music](https://www.giveready.org/nonprofits/bridges-for-music?ref=guide-best-music-education-charities-for-underprivileged-kids) runs a 1,000-square-metre academy in Langa, a township in Cape Town, South Africa. Founded in 2012, it teaches music production, DJing, performance, and music-business entrepreneurship. Each year more than 250 students complete its courses, and its Industry Access programme creates around 250 job placements a year into South Africa's creative economy — treating music education as a practical route out of poverty rather than an extra. Serves around 500 young people a year.
 
 ## How these charities were checked
 
