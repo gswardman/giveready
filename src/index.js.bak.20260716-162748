@@ -5581,54 +5581,6 @@ async function handleGuideFunnel(db, env, request, url) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// GET /api/admin/guide-crawl?hours=720&token=...
-// Per-guide, per-bot crawl recency over the /guides/* routes. Read-only over
-// discovery_hits (no migration). Added 2026-07-16 to make the crawl-then-cite
-// lag measurable per guide instead of via the 30d PerplexityBot aggregate.
-// ---------------------------------------------------------------------------
-async function handleGuideCrawl(db, env, request, url) {
-  const authCheck = checkAdminAuth(env, request);
-  if (authCheck) return authCheck;
-
-  const hours = parseInt(url.searchParams.get('hours') || '720'); // 30d default
-  const since = `datetime('now', '-${hours} hours')`;
-
-  const rows = (await db.prepare(
-    `SELECT route, user_agent, COUNT(*) AS hits, MAX(created_at) AS last_seen
-       FROM discovery_hits
-      WHERE route LIKE '/guides/%'
-        AND created_at > ${since}
-        AND user_agent IS NOT NULL
-      GROUP BY route, user_agent`
-  ).all()).results;
-
-  const classify = (ua) => {
-    const hit = KNOWN_AGENT_PATTERNS.find((e) => ua.includes(e.pattern));
-    return hit ? { name: hit.name, type: hit.type } : { name: 'other', type: 'other' };
-  };
-
-  const guides = {};
-  for (const r of rows) {
-    const g = (guides[r.route] ||= { route: r.route, perplexity_last_crawl: null, crawls: {} });
-    const c = classify(r.user_agent);
-    const cur = (g.crawls[c.name] ||= { type: c.type, hits: 0, last_seen: null });
-    cur.hits += r.hits;
-    if (!cur.last_seen || r.last_seen > cur.last_seen) cur.last_seen = r.last_seen;
-    if (/perplex/i.test(r.user_agent)) {
-      if (!g.perplexity_last_crawl || r.last_seen > g.perplexity_last_crawl) {
-        g.perplexity_last_crawl = r.last_seen;
-      }
-    }
-  }
-
-  return json({
-    period: `last ${hours} hours`,
-    guides: Object.values(guides).sort((a, b) =>
-      (a.perplexity_last_crawl || '').localeCompare(b.perplexity_last_crawl || '')),
-  });
-}
-
 async function handleAdminTraffic(db, env, request, url) {
   const authCheck = checkAdminAuth(env, request);
   if (authCheck) return authCheck;
@@ -6861,9 +6813,6 @@ const _httpHandler = {
       }
       if (path === '/api/admin/funnel-guides') {
         return handleGuideFunnel(env.DB, env, request, url);
-      }
-      if (path === '/api/admin/guide-crawl') {
-        return handleGuideCrawl(env.DB, env, request, url);
       }
       if (path === '/api/admin/drafts') {
         return handleAdminDrafts(env.DB, env, request);
