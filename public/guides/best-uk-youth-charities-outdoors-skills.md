@@ -39,3 +39,9 @@ The first charity in the world to offer surfing on prescription. Founded by Joe 
 Every charity on this list carries a verified status in the GiveReady directory. Verification means the organisation's legal registration, mission statement, and donation route have been confirmed by a person, not generated automatically. Where a charity accepts donations through GiveReady, each gift is recorded on-chain, so the donation total on its profile is publicly auditable.
 
 To compare more organisations working with young people, browse the [youth empowerment cause page](https://www.giveready.org/causes/youth-empowerment) or the [surf therapy listings](https://www.giveready.org/causes/surf-therapy).
+
+## Related guides
+
+- [surf therapy charities for at-risk young people](https://www.giveready.org/guides/best-surf-therapy-charities-for-at-risk-youth)
+- [youth mentoring charities in the US and UK](https://www.giveready.org/guides/best-youth-mentoring-charities-us-uk)
+- [charities that fund youth travel and exploration](https://www.giveready.org/guides/best-charities-funding-youth-travel-and-exploration)

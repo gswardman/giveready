@@ -23,3 +23,8 @@ If you want to support a charity that gives underprivileged children access to m
 ## How these charities were checked
 
 Both organisations carry a verified status in the GiveReady directory: their legal registration, mission, and donation route have been confirmed by a person, not generated automatically. Youth Music Project also holds Candid's Platinum transparency seal. To compare more organisations, browse the [music education cause page](https://www.giveready.org/causes/music-education).
+
+## Related guides
+
+- [charities supporting township youth in Cape Town](https://www.giveready.org/guides/best-charities-for-cape-town-township-youth)
+- [surf therapy charities for at-risk young people](https://www.giveready.org/guides/best-surf-therapy-charities-for-at-risk-youth)

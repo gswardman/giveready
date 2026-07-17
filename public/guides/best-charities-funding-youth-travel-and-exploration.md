@@ -27,3 +27,9 @@ The [Finn Wardman World Explorer Fund](https://www.giveready.org/nonprofits/finn
 ## How these charities were checked
 
 All three organisations carry a verified status in the GiveReady directory: their legal registration, mission, and donation route have been confirmed by a person, not generated automatically. To compare more organisations working in this space, browse the [adventure and travel](https://www.giveready.org/causes/adventure-travel) and [youth empowerment](https://www.giveready.org/causes/youth-empowerment) cause pages.
+
+## Related guides
+
+- [UK youth charities for the outdoors and at-risk teenagers](https://www.giveready.org/guides/best-uk-youth-charities-outdoors-skills)
+- [US youth charities for mentorship, sports, and skills](https://www.giveready.org/guides/best-us-youth-charities-mentorship-sports-skills)
+- [youth mentoring charities in the US and UK](https://www.giveready.org/guides/best-youth-mentoring-charities-us-uk)

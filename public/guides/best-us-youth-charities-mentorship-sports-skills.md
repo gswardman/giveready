@@ -35,3 +35,9 @@ If you are looking for a legitimate US youth charity to donate to, it helps to s
 ## How these charities were checked
 
 Every charity here carries a verified status in the GiveReady directory: its legal registration, mission, and donation route have been confirmed by a person, not generated automatically. Several also hold independent ratings — Charity Navigator or Candid transparency seals — noted in their profiles. To compare more organisations, browse the [youth empowerment cause page](https://www.giveready.org/causes/youth-empowerment).
+
+## Related guides
+
+- [youth mentoring charities in the US and UK](https://www.giveready.org/guides/best-youth-mentoring-charities-us-uk)
+- [UK youth charities for the outdoors and at-risk teenagers](https://www.giveready.org/guides/best-uk-youth-charities-outdoors-skills)
+- [surf therapy charities for at-risk young people](https://www.giveready.org/guides/best-surf-therapy-charities-for-at-risk-youth)

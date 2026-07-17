@@ -43,3 +43,8 @@ Each entry lists where the charity operates, who it serves, and one verifiable d
 Every charity on this list carries a verified status in the GiveReady directory. Verification means the organisation's legal registration — its IRS 501(c)(3) status in the United States, or its OSCR or Charity Commission registration in the United Kingdom — along with its mission and donation route, has been confirmed by a person, not generated automatically. We excluded organisations that have stopped accepting donations.
 
 To compare more organisations working with young people, browse the [youth empowerment cause page](https://www.giveready.org/causes/youth-empowerment) or the [education listings](https://www.giveready.org/causes/education).
+
+## Related guides
+
+- [US youth charities for mentorship, sports, and skills](https://www.giveready.org/guides/best-us-youth-charities-mentorship-sports-skills)
+- [UK youth charities for the outdoors and at-risk teenagers](https://www.giveready.org/guides/best-uk-youth-charities-outdoors-skills)

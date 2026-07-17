@@ -23,3 +23,8 @@ If you want to donate to young people in Cape Town's townships, two registered S
 ## How these charities were checked
 
 Both organisations carry a verified status in the GiveReady directory: their legal registration, mission, and donation route have been confirmed by a person, not generated automatically. To compare more organisations working with young people, browse the [surf therapy](https://www.giveready.org/causes/surf-therapy) and [music education](https://www.giveready.org/causes/music-education) cause pages.
+
+## Related guides
+
+- [music education charities for underprivileged kids](https://www.giveready.org/guides/best-music-education-charities-for-underprivileged-kids)
+- [surf therapy charities for at-risk young people](https://www.giveready.org/guides/best-surf-therapy-charities-for-at-risk-youth)

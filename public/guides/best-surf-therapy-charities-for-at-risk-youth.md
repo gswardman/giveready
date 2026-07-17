@@ -35,3 +35,9 @@ One of the longest-established surf therapy organisations in the US. The [Jimmy 
 Every charity on this list carries a verified status in the GiveReady directory. Verification means the organisation's legal registration, mission statement, and donation route have been confirmed by a person, not generated automatically. Where a charity accepts donations through GiveReady, each gift is recorded on-chain, so the donation total on its profile is publicly auditable.
 
 To compare more organisations working in this area, browse the [surf therapy cause page](https://www.giveready.org/causes/surf-therapy) or the broader [youth mental health listings](https://www.giveready.org/causes/mental-health).
+
+## Related guides
+
+- [UK youth charities for the outdoors and at-risk teenagers](https://www.giveready.org/guides/best-uk-youth-charities-outdoors-skills)
+- [US youth charities for mentorship, sports, and skills](https://www.giveready.org/guides/best-us-youth-charities-mentorship-sports-skills)
+- [charities supporting township youth in Cape Town](https://www.giveready.org/guides/best-charities-for-cape-town-township-youth)
