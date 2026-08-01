@@ -4899,6 +4899,11 @@ async function handleOnboard(db, request) {
   }, 201);
 }
 
+// Health checks and probes tag themselves with an RFC 2606 .invalid domain,
+// which can never be a real address. Excluded from every funnel count so that
+// monitoring the path does not pollute the path's own numbers.
+const FUNNEL_SYNTHETIC = `(email_domain IS NOT NULL AND email_domain LIKE '%.invalid')`;
+
 // GET /api/admin/funnel-onboarding?hours=N
 // The operator-facing read of the charity path. Answers one question:
 // where do charities stop, and why. Ordered by how far along the path each
@@ -4924,14 +4929,14 @@ async function handleOnboardingFunnel(db, env, request, url) {
     SELECT step, outcome, COUNT(*) AS hits, COUNT(DISTINCT actor_hash) AS actors,
            MAX(created_at) AS last_seen
     FROM onboarding_events
-    WHERE created_at > datetime('now', ?1)
+    WHERE created_at > datetime('now', ?1) AND NOT ${FUNNEL_SYNTHETIC}
     GROUP BY step, outcome
   `).bind(since).all();
 
   const failures = await db.prepare(`
     SELECT step, reason, COUNT(*) AS hits, MAX(created_at) AS last_seen
     FROM onboarding_events
-    WHERE created_at > datetime('now', ?1) AND outcome = 'fail' AND reason IS NOT NULL
+    WHERE created_at > datetime('now', ?1) AND NOT ${FUNNEL_SYNTHETIC} AND outcome = 'fail' AND reason IS NOT NULL
     GROUP BY step, reason
     ORDER BY hits DESC
     LIMIT 20
@@ -4940,7 +4945,7 @@ async function handleOnboardingFunnel(db, env, request, url) {
   const domains = await db.prepare(`
     SELECT email_domain, COUNT(DISTINCT actor_hash) AS actors, MIN(created_at) AS first_seen
     FROM onboarding_events
-    WHERE created_at > datetime('now', ?1) AND email_domain IS NOT NULL
+    WHERE created_at > datetime('now', ?1) AND NOT ${FUNNEL_SYNTHETIC} AND email_domain IS NOT NULL
     GROUP BY email_domain
     ORDER BY actors DESC
     LIMIT 15
