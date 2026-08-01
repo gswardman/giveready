@@ -651,7 +651,13 @@ async function handleDonate(db, env, request, slug) {
       `SELECT donation_url, website, name FROM nonprofits WHERE id = ?1`
     ).bind(nonprofit.id).first();
 
-    const donationUrl = full?.donation_url || full?.website;
+    // Registration stamps donation_url with GiveReady's OWN donate page, so
+    // sending a donor there is a loop: /api/donate/slug answers "go to
+    // giveready.org/donate/slug", which answers the same thing again. Only
+    // treat donation_url as off-site if it actually points off-site.
+    const stamped = full?.donation_url || '';
+    const offSite = stamped && !/^https?:\/\/(www\.)?giveready\.org\//i.test(stamped);
+    const donationUrl = (offSite ? stamped : null) || full?.website || null;
     const attribution = encodeURIComponent('giveready.org');
 
     // Build redirect URL with attribution (utm params so the charity sees the source)
@@ -4736,7 +4742,12 @@ async function handleOnboard(db, request) {
 
   // Generate ID and URLs
   const id = crypto.randomUUID();
-  const donation_url = `https://giveready.org/donate/${slug}`;
+  // donation_url is where a donor is sent when there is no USDC wallet, so it
+  // must point at the charity, never back at GiveReady — self-referencing
+  // values made /api/donate answer with its own URL in a loop. Prefer an
+  // explicit override, then their website, else leave it null and let the
+  // donate handler fall back.
+  const donation_url = donation_url_override || website || null;
   const now = new Date().toISOString();
 
   // mission and description are NOT NULL in the schema, but the lightweight
@@ -4873,18 +4884,44 @@ async function handleAdminReject(db, env, request, slug) {
 
   const id = nonprofit.id;
 
-  // Delete related records
-  await db.prepare(
-    `DELETE FROM nonprofit_causes WHERE nonprofit_id = ?1`
-  ).bind(id).run();
+  // Delete related records. Order matters: everything holding a foreign key
+  // into nonprofits (or into charity_users) has to go first, or the final
+  // DELETE throws and the whole call 500s.
+  //
+  // charity_sessions -> charity_users -> nonprofits is the dependency chain.
+  // Registration started writing charity_users rows on 2026-08-01, so from
+  // that date every draft has one and rejecting a draft without clearing it
+  // fails. profile_edits is an audit trail and also references both.
+  try {
+    await db.prepare(`
+      DELETE FROM charity_sessions
+      WHERE active_nonprofit_id = ?1
+         OR charity_user_id IN (SELECT id FROM charity_users WHERE nonprofit_id = ?1)
+    `).bind(id).run();
 
-  await db.prepare(
-    `DELETE FROM registrations WHERE nonprofit_id = ?1`
-  ).bind(id).run();
+    await db.prepare(
+      `DELETE FROM profile_edits WHERE nonprofit_id = ?1`
+    ).bind(id).run();
 
-  await db.prepare(
-    `DELETE FROM nonprofits WHERE id = ?1`
-  ).bind(id).run();
+    await db.prepare(
+      `DELETE FROM charity_users WHERE nonprofit_id = ?1`
+    ).bind(id).run();
+
+    await db.prepare(
+      `DELETE FROM nonprofit_causes WHERE nonprofit_id = ?1`
+    ).bind(id).run();
+
+    await db.prepare(
+      `DELETE FROM registrations WHERE nonprofit_id = ?1`
+    ).bind(id).run();
+
+    await db.prepare(
+      `DELETE FROM nonprofits WHERE id = ?1`
+    ).bind(id).run();
+  } catch (e) {
+    console.error(`[AdminReject] Failed to delete ${slug} (${id}): ${e && e.message}`);
+    return error(`Reject failed: ${(e && e.message) || 'database error'}`, 500);
+  }
 
   return json({
     success: true,
