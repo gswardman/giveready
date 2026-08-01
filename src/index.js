@@ -667,6 +667,12 @@ async function handleDonate(db, env, request, slug) {
       redirectUrl = `${donationUrl}${separator}utm_source=${attribution}&utm_medium=ai-agent&utm_campaign=giveready-directory`;
     }
 
+    await logOnboardingEvent(db, 'donate_redirect', {
+      nonprofit_id: nonprofit.id, slug: nonprofit.slug,
+      user_agent: request.headers.get('user-agent') || null,
+      reason: donationUrl ? 'sent to own donation page' : 'no donation url and no website',
+    });
+
     return json({
       payment_method: 'redirect',
       message: `${nonprofit.name} accepts donations through their website. To donate with zero fees via USDC, ask them to claim their free page on GiveReady.`,
@@ -717,6 +723,12 @@ async function handleDonate(db, env, request, slug) {
       `INSERT INTO donations (id, nonprofit_id, amount_usdc, amount_atomic, network, status)
        VALUES (?1, ?2, ?3, ?4, ?5, 'pending')`
     ).bind(nonce, nonprofit.id, amountUSDC, amountAtomic, SOLANA_MAINNET).run();
+
+    await logOnboardingEvent(db, 'donate_quote', {
+      nonprofit_id: nonprofit.id, slug: nonprofit.slug,
+      user_agent: request.headers.get('user-agent') || null,
+      reason: `$${amountUSDC} USDC quoted`,
+    });
 
     return new Response(JSON.stringify({
       error: 'Payment required',
@@ -4293,6 +4305,43 @@ function isValidEmail(email) {
   return email && email.includes('@');
 }
 
+// ============================================
+// ONBOARDING FUNNEL INSTRUMENTATION (migration 020)
+// ============================================
+//
+// One append-only row per step of the charity path, success or failure.
+// Added 2026-08-01 after four faults on that path went months undetected
+// because a failed registration left no trace anywhere.
+//
+// Non-negotiable property: this must never be able to break the request it
+// is measuring. Every call is fire-and-forget with a swallowed error. An
+// instrumentation bug that 500s a charity signup would be worse than the
+// blindness it is fixing.
+async function logOnboardingEvent(db, step, fields = {}) {
+  try {
+    const email = (fields.email || '').trim().toLowerCase();
+    const actorHash = email ? (await sha256Hex(email)).slice(0, 16) : null;
+    await db.prepare(`
+      INSERT INTO onboarding_events
+        (id, step, outcome, nonprofit_id, slug, actor_hash, email_domain, reason, user_agent)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+    `).bind(
+      crypto.randomUUID(),
+      step,
+      fields.outcome || 'ok',
+      fields.nonprofit_id || null,
+      fields.slug || null,
+      actorHash,
+      email ? emailDomain(email) : null,
+      fields.reason ? String(fields.reason).slice(0, 500) : null,
+      fields.user_agent ? String(fields.user_agent).slice(0, 300) : null
+    ).run();
+  } catch (e) {
+    // Deliberately swallowed. A log write failing is not worth a 500.
+    console.error(`[funnel] log failed for step=${step}: ${e && e.message}`);
+  }
+}
+
 // Solana addresses are base58-encoded 32-byte public keys: 32-44 chars,
 // no 0/O/I/l. This is a shape check, not an on-chain existence check —
 // it catches paste errors and ETH addresses, which is what we see in
@@ -4621,10 +4670,12 @@ async function handleAdminVerify(db, env, request, slug) {
 }
 
 async function handleOnboard(db, request) {
+  const ua = request.headers.get('user-agent') || null;
   let body;
   try {
     body = await request.json();
   } catch {
+    await logOnboardingEvent(db, 'register_attempt', { outcome: 'fail', reason: 'Invalid JSON', user_agent: ua });
     return error('Invalid JSON', 400);
   }
 
@@ -4702,13 +4753,20 @@ async function handleOnboard(db, request) {
 
   // ─── NEW REGISTRATION FLOW ────────────────────────────────────
 
+  await logOnboardingEvent(db, 'register_attempt', { email, user_agent: ua });
+
   // Validate required fields
   if (!name || !email || !country) {
+    await logOnboardingEvent(db, 'register_fail', {
+      email, user_agent: ua, outcome: 'fail',
+      reason: `Missing required fields (name:${!!name} email:${!!email} country:${!!country})`,
+    });
     return error('Missing required fields: name, email, country', 400);
   }
 
   // Validate email
   if (!isValidEmail(email)) {
+    await logOnboardingEvent(db, 'register_fail', { email, user_agent: ua, outcome: 'fail', reason: 'Invalid email address' });
     return error('Invalid email address', 400);
   }
 
@@ -4719,6 +4777,7 @@ async function handleOnboard(db, request) {
   // Optional wallet. Reject a malformed one loudly rather than storing it
   // and having donations quoted against an address that cannot receive.
   if (usdc_wallet && !isValidSolanaAddress(usdc_wallet)) {
+    await logOnboardingEvent(db, 'register_fail', { email, user_agent: ua, outcome: 'fail', reason: 'Malformed usdc_wallet' });
     return error('usdc_wallet does not look like a Solana address (expected 32-44 base58 characters). Leave it blank to add it later from your dashboard.', 400);
   }
 
@@ -4806,8 +4865,17 @@ async function handleOnboard(db, request) {
     // Never let a DB error escape as an opaque worker exception again — the
     // caller gets a readable reason and the failure is greppable in the tail.
     console.error(`[Onboard] Registration failed for "${name}" (${email}, ${country}): ${e && e.message}`);
+    await logOnboardingEvent(db, 'register_fail', {
+      email, slug, user_agent: ua, outcome: 'fail',
+      reason: (e && e.message) || 'database error',
+    });
     return error(`Registration failed: ${(e && e.message) || 'database error'}`, 500);
   }
+
+  await logOnboardingEvent(db, 'register_success', {
+    email, slug, nonprofit_id: id, user_agent: ua,
+    reason: usdc_wallet ? 'with wallet' : 'no wallet',
+  });
 
   // Log wallet signature if provided (for future verification)
   if (wallet_signature) {
@@ -4829,6 +4897,107 @@ async function handleOnboard(db, request) {
         : 'Add a Solana USDC wallet in your dashboard to accept zero-fee donations initiated by AI agents.',
     ],
   }, 201);
+}
+
+// GET /api/admin/funnel-onboarding?hours=N
+// The operator-facing read of the charity path. Answers one question:
+// where do charities stop, and why. Ordered by how far along the path each
+// step sits, so the drop is readable top to bottom rather than by volume.
+async function handleOnboardingFunnel(db, env, request, url) {
+  const authCheck = checkAdminAuth(env, request);
+  if (authCheck) return authCheck;
+
+  const hoursRaw = parseInt(url.searchParams.get('hours') || '168', 10);
+  const hours = Math.min(Math.max(Number.isFinite(hoursRaw) ? hoursRaw : 168, 1), 8760);
+  const since = `-${hours} hours`;
+
+  // Path order. Anything not listed sorts last.
+  const STEP_ORDER = [
+    'register_attempt', 'register_fail', 'register_success',
+    'claim_attempt',
+    'signin_request', 'signin_no_charity', 'signin_success',
+    'profile_edit', 'wallet_set', 'wallet_cleared',
+    'verified', 'donate_redirect', 'donate_quote', 'donate_settled',
+  ];
+
+  const steps = await db.prepare(`
+    SELECT step, outcome, COUNT(*) AS hits, COUNT(DISTINCT actor_hash) AS actors,
+           MAX(created_at) AS last_seen
+    FROM onboarding_events
+    WHERE created_at > datetime('now', ?1)
+    GROUP BY step, outcome
+  `).bind(since).all();
+
+  const failures = await db.prepare(`
+    SELECT step, reason, COUNT(*) AS hits, MAX(created_at) AS last_seen
+    FROM onboarding_events
+    WHERE created_at > datetime('now', ?1) AND outcome = 'fail' AND reason IS NOT NULL
+    GROUP BY step, reason
+    ORDER BY hits DESC
+    LIMIT 20
+  `).bind(since).all();
+
+  const domains = await db.prepare(`
+    SELECT email_domain, COUNT(DISTINCT actor_hash) AS actors, MIN(created_at) AS first_seen
+    FROM onboarding_events
+    WHERE created_at > datetime('now', ?1) AND email_domain IS NOT NULL
+    GROUP BY email_domain
+    ORDER BY actors DESC
+    LIMIT 15
+  `).bind(since).all();
+
+  const rows = steps.results || [];
+  const counts = {};
+  for (const r of rows) {
+    counts[r.step] = (counts[r.step] || 0) + r.hits;
+  }
+
+  const attempts = counts.register_attempt || 0;
+  const successes = counts.register_success || 0;
+  const verified = counts.verified || 0;
+
+  // The honest headline: of everyone who tried to register, how many got a
+  // page a donor could actually give through.
+  const completion = attempts > 0 ? Number(((verified / attempts) * 100).toFixed(1)) : null;
+
+  // Biggest single drop between consecutive populated steps on the path.
+  let worstDrop = null;
+  const populated = STEP_ORDER.filter(s => !s.endsWith('_fail') && !s.endsWith('_no_charity') && counts[s] != null);
+  for (let i = 0; i < populated.length - 1; i++) {
+    const from = populated[i], to = populated[i + 1];
+    const lost = (counts[from] || 0) - (counts[to] || 0);
+    if (lost > 0 && (!worstDrop || lost > worstDrop.lost)) {
+      worstDrop = { from, to, lost, from_count: counts[from], to_count: counts[to] };
+    }
+  }
+
+  return json({
+    period: `last ${hours} hours`,
+    summary: {
+      register_attempts: attempts,
+      register_successes: successes,
+      register_failures: counts.register_fail || 0,
+      signin_requests: counts.signin_request || 0,
+      signin_dead_ends: counts.signin_no_charity || 0,
+      wallets_set: counts.wallet_set || 0,
+      verified,
+      donate_quotes: counts.donate_quote || 0,
+      donate_redirects: counts.donate_redirect || 0,
+      completion_rate_pct: completion,
+    },
+    biggest_drop: worstDrop,
+    steps: rows.sort((a, b) => {
+      const ia = STEP_ORDER.indexOf(a.step), ib = STEP_ORDER.indexOf(b.step);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    }),
+    top_failure_reasons: failures.results || [],
+    domains: domains.results || [],
+    notes: [
+      'Instrumentation starts at migration 020 deploy (2026-08-01). Nothing before that date exists.',
+      'actor counts are distinct hashed emails, not people. No raw emails or IPs are stored.',
+      'completion_rate_pct is verified / register_attempts over the window, so it lags for orgs still in review.',
+    ],
+  });
 }
 
 async function handleAdminDrafts(db, env, request) {
@@ -4861,6 +5030,14 @@ async function handleAdminApprove(db, env, request, slug) {
   if (result.changes === 0) {
     return error('Draft not found or already approved', 404);
   }
+
+  const approved = await db.prepare(
+    `SELECT id, contact_email, usdc_wallet FROM nonprofits WHERE slug = ?1`
+  ).bind(slug).first();
+  await logOnboardingEvent(db, 'verified', {
+    nonprofit_id: approved?.id, slug, email: approved?.contact_email,
+    reason: approved?.usdc_wallet ? 'x402 now live (wallet present)' : 'no wallet, donors redirected',
+  });
 
   return json({
     success: true,
@@ -6818,6 +6995,7 @@ async function handleAuthRequest(db, env, ctx, request) {
 
   // Fire email asynchronously so the client navigates to /check-email immediately
   ctx.waitUntil(sendLoginMagicLink(email, token, env));
+  ctx.waitUntil(logOnboardingEvent(db, 'signin_request', { email, user_agent: ua }));
 
   console.log(`[Auth] Magic link requested: ${email}`);
 
@@ -6862,7 +7040,14 @@ async function handleAuthVerify(db, env, request, url) {
 
   const list = users.results || [];
   if (list.length === 0) {
-    // Valid email, no access. Point them at claim-request.
+    // Valid email, no access. This is the exact dead end doobneek would have
+    // hit: registered fine, magic link fine, no charity bound to the email.
+    // It used to be silent. Now it is a counted funnel step.
+    await logOnboardingEvent(db, 'signin_no_charity', {
+      email: row.email, outcome: 'fail', user_agent: ua,
+      reason: 'Email verified but no charity_users row bound to it',
+    });
+    // Point them at claim-request.
     return new Response(verifyResultHTML(
       'No dashboard access yet',
       `This email is verified, but no GiveReady charity is linked to it yet. ` +
@@ -6887,6 +7072,11 @@ async function handleAuthVerify(db, env, request, url) {
 
   const cookie = `gr_session=${sessionToken}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_DAYS * 24 * 60 * 60}`;
   const redirect = list.length > 1 ? '/dashboard/pick-charity' : '/dashboard';
+
+  await logOnboardingEvent(db, 'signin_success', {
+    email: row.email, nonprofit_id: first.nonprofit_id, slug: first.slug, user_agent: ua,
+    reason: `${list.length} charity binding(s)`,
+  });
 
   console.log(`[Auth] Sign-in success: ${row.email} (${list.length} charity binding(s))`);
 
@@ -7027,6 +7217,10 @@ async function handleCharityProfilePatch(db, request) {
   if ('usdc_wallet' in body) {
     const w = (body.usdc_wallet || '').trim();
     if (w && !isValidSolanaAddress(w)) {
+      await logOnboardingEvent(db, 'wallet_set', {
+        nonprofit_id: existing.id, slug: existing.slug, email: existing.contact_email,
+        outcome: 'fail', reason: 'Malformed Solana address rejected',
+      });
       return apiError('VALIDATION_FAILED', 'That does not look like a Solana wallet address. Expected 32-44 base58 characters.');
     }
     body.usdc_wallet = w || null;
@@ -7068,6 +7262,20 @@ async function handleCharityProfilePatch(db, request) {
     ).run().catch(e => console.error('[profile_edits] insert failed:', e));
   }
 
+  // A wallet change is the step that decides whether x402 is available at
+  // all, so it is counted separately from an ordinary profile edit.
+  const walletChange = audit.find(c => c.field === 'usdc_wallet');
+  if (walletChange) {
+    await logOnboardingEvent(db, walletChange.next ? 'wallet_set' : 'wallet_cleared', {
+      nonprofit_id: existing.id, slug: existing.slug, email: existing.contact_email,
+      reason: existing.verified ? 'live immediately (already verified)' : 'pending verification',
+    });
+  }
+  await logOnboardingEvent(db, 'profile_edit', {
+    nonprofit_id: existing.id, slug: existing.slug, email: existing.contact_email,
+    reason: audit.map(c => c.field).join(','),
+  });
+
   return json({ ok: true, changes: audit.length });
 }
 
@@ -7085,6 +7293,10 @@ async function handleCharityQueries(db, request, url) {
       AND ql.created_at > datetime('now', ?2)
       AND ql.query_text IS NOT NULL
       AND ql.query_text <> ''
+      -- Migration 012 flagged the seeded fixtures. The admin traffic endpoint
+      -- already excludes them; this one did not, so a charity could have been
+      -- shown synthetic searches as if they were real donor demand.
+      AND COALESCE(ql.is_demo, 0) = 0
     GROUP BY ql.query_text
     ORDER BY hits DESC, last_seen DESC
     LIMIT 50
@@ -7174,6 +7386,9 @@ const _httpHandler = {
       }
       if (path === '/api/admin/funnel-guides') {
         return handleGuideFunnel(env.DB, env, request, url);
+      }
+      if (path === '/api/admin/funnel-onboarding') {
+        return handleOnboardingFunnel(env.DB, env, request, url);
       }
       if (path === '/api/admin/guide-crawl') {
         return handleGuideCrawl(env.DB, env, request, url);
