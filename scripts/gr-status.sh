@@ -46,7 +46,13 @@ else
   todo "registration endpoint returned unexpected HTTP $code"
 fi
 
-if curl -s "$BASE/onboard" | grep -q 'new-org-mission'; then
+# Fetch into a variable rather than piping into `grep -q`. Under `set -o
+# pipefail`, grep -q exits as soon as it matches, SIGPIPEs curl, and the
+# pipeline reports failure — so a successful match can read as "not found".
+# It only fires when curl has not finished writing, which makes it an
+# intermittent false negative. Reported by the unattended run 2026-08-02.
+onboard_html=$(curl -s "$BASE/onboard")
+if printf '%s' "$onboard_html" | grep -q 'new-org-mission'; then
   pass "onboarding form collects mission/website/registration/wallet"
 else
   todo "onboarding form is the old 3-field version — deploy pending"
@@ -57,7 +63,8 @@ echo
 echo "INSTRUMENTATION"
 
 funnel=$(curl -s "$BASE/api/admin/funnel-onboarding?hours=168&token=$TOKEN")
-if echo "$funnel" | grep -q '"summary"'; then
+# Bash pattern match, no pipe — same SIGPIPE reasoning as above.
+if [[ "$funnel" == *'"summary"'* ]]; then
   pass "funnel endpoint live"
   echo "$funnel" | python3 -c "
 import sys, json
