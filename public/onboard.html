@@ -346,10 +346,46 @@
             <label>Country <span style="color: var(--accent);">*</span></label>
             <select id="new-org-country">
               <option value="">Select country</option>
-              <option value="UK">United Kingdom</option>
-              <option value="US">United States</option>
-              <option value="SA">South Africa</option>
+              <option value="United States">United States</option>
+              <option value="United Kingdom">United Kingdom</option>
+              <option value="South Africa">South Africa</option>
+              <option value="Canada">Canada</option>
+              <option value="Ireland">Ireland</option>
+              <option value="Australia">Australia</option>
+              <option value="New Zealand">New Zealand</option>
+              <option value="Germany">Germany</option>
+              <option value="France">France</option>
+              <option value="Netherlands">Netherlands</option>
+              <option value="Switzerland">Switzerland</option>
+              <option value="Kenya">Kenya</option>
+              <option value="Nigeria">Nigeria</option>
+              <option value="India">India</option>
+              <option value="Other">Other</option>
             </select>
+          </div>
+          <div class="form-group">
+            <label>City</label>
+            <input type="text" id="new-org-city" placeholder="e.g. Cape Town" />
+          </div>
+          <div class="form-group full-width">
+            <label>Mission <span style="color: var(--accent);">*</span></label>
+            <textarea id="new-org-mission" rows="3" placeholder="One or two sentences on who you serve and how. This is what AI assistants read when deciding whether to recommend you."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Website</label>
+            <input type="url" id="new-org-website" placeholder="https://example.org" />
+          </div>
+          <div class="form-group">
+            <label>Registration number</label>
+            <input type="text" id="new-org-regnum" placeholder="EIN, charity no., NPO no." />
+          </div>
+          <div class="form-group full-width">
+            <label>Solana USDC wallet <span style="color: var(--muted); font-weight: 400;">(optional)</span></label>
+            <input type="text" id="new-org-wallet" placeholder="Paste a Solana wallet address, or leave blank" />
+            <p style="color: var(--muted); font-size: 13px; line-height: 1.5; margin-top: 6px;">
+              Add this and AI agents can donate to you directly in USDC with no platform fee and no card processing — the funds go straight to your wallet, not to us.
+              You can skip it now and add it from your dashboard later.
+            </p>
           </div>
         </div>
         <div class="button-row">
@@ -719,9 +755,21 @@
     const name = document.getElementById('new-org-name').value.trim();
     const email = document.getElementById('new-org-email').value.trim();
     const country = document.getElementById('new-org-country').value;
+    const city = document.getElementById('new-org-city').value.trim();
+    const mission = document.getElementById('new-org-mission').value.trim();
+    const website = document.getElementById('new-org-website').value.trim();
+    const regnum = document.getElementById('new-org-regnum').value.trim();
+    const wallet = document.getElementById('new-org-wallet').value.trim();
 
-    if (!name || !email || !country) {
-      alert('Please fill in all required fields');
+    if (!name || !email || !country || !mission) {
+      alert('Please fill in organisation name, contact email, country and mission.');
+      return;
+    }
+
+    // Catch a pasted Ethereum address before the round trip — it is the
+    // most common wrong paste and the server message is less specific.
+    if (wallet && /^0x[0-9a-fA-F]{40}$/.test(wallet)) {
+      alert('That looks like an Ethereum address. GiveReady settles USDC on Solana — please paste a Solana wallet address, or leave the field blank.');
       return;
     }
 
@@ -733,18 +781,38 @@
           orgName: name,
           contactEmail: email,
           country: country,
+          city: city || undefined,
+          mission: mission,
+          website: website || undefined,
+          registration_number: regnum || undefined,
+          registration_country: country,
+          usdc_wallet: wallet || undefined,
           claim_new: true,
         }),
       });
 
       if (response.ok) {
-        alert('Registration submitted. You should receive a verification email shortly.');
-        document.getElementById('new-org-name').value = '';
-        document.getElementById('new-org-email').value = '';
-        document.getElementById('new-org-country').value = '';
+        const created = await response.json().catch(() => null);
+        const walletLine = wallet
+          ? '\n\nYour USDC wallet is saved — zero-fee agent donations switch on once you are verified.'
+          : '\n\nYou can add a Solana USDC wallet from your dashboard to accept zero-fee donations from AI agents.';
+        alert(
+          `Registered. Sign in at giveready.org/signin with ${email} to finish your profile.` +
+          `\n\nYour page is pending review before it goes live.` + walletLine
+        );
+        ['new-org-name','new-org-email','new-org-country','new-org-city','new-org-mission','new-org-website','new-org-regnum','new-org-wallet']
+          .forEach(id => { document.getElementById(id).value = ''; });
         toggleRegisterForm();
+        if (created && created.signin_url) window.location.href = created.signin_url;
       } else {
-        alert('Error registering. Please try again.');
+        // Surface the server's reason so a failed registration is actionable
+        // rather than a dead end (2026-08-01).
+        let reason = '';
+        try {
+          const payload = await response.json();
+          reason = payload && (payload.error || payload.message) ? `\n\n${payload.error || payload.message}` : '';
+        } catch (_) { /* non-JSON body, fall through to the generic message */ }
+        alert(`Error registering (${response.status}).${reason}\n\nIf this keeps happening, email hello@giveready.org and we will add your organisation manually.`);
       }
     } catch (error) {
       alert('Network error. Please try again.');

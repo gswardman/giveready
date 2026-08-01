@@ -4287,6 +4287,33 @@ function isValidEmail(email) {
   return email && email.includes('@');
 }
 
+// Solana addresses are base58-encoded 32-byte public keys: 32-44 chars,
+// no 0/O/I/l. This is a shape check, not an on-chain existence check —
+// it catches paste errors and ETH addresses, which is what we see in
+// practice. A wrong-but-well-formed address is still possible, which is
+// why usdc_wallet only goes live behind verified = 1.
+const SOLANA_ADDRESS_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+function isValidSolanaAddress(addr) {
+  return typeof addr === 'string' && SOLANA_ADDRESS_RE.test(addr.trim());
+}
+
+// The 41k bulk-imported rows store full country names. The onboarding form
+// used to post ISO-ish codes, which made every self-registered charity
+// invisible to country filters. Normalise on the way in.
+const COUNTRY_ALIASES = {
+  US: 'United States', USA: 'United States', 'U.S.': 'United States',
+  UK: 'United Kingdom', GB: 'United Kingdom', 'U.K.': 'United Kingdom',
+  SA: 'South Africa', ZA: 'South Africa',
+  CA: 'Canada', AU: 'Australia', NZ: 'New Zealand', IE: 'Ireland',
+  DE: 'Germany', FR: 'France', NL: 'Netherlands', CH: 'Switzerland',
+  KE: 'Kenya', NG: 'Nigeria', IN: 'India',
+};
+function normaliseCountry(input) {
+  const raw = (input || '').trim();
+  if (!raw) return raw;
+  return COUNTRY_ALIASES[raw.toUpperCase()] || raw;
+}
+
 // Helper: extract domain from email
 function emailDomain(email) {
   return (email || '').split('@')[1]?.toLowerCase() || '';
@@ -4679,6 +4706,16 @@ async function handleOnboard(db, request) {
     return error('Invalid email address', 400);
   }
 
+  // Match the country vocabulary the rest of the directory uses, otherwise
+  // a self-registered charity never shows up under a country filter.
+  const countryValue = normaliseCountry(country);
+
+  // Optional wallet. Reject a malformed one loudly rather than storing it
+  // and having donations quoted against an address that cannot receive.
+  if (usdc_wallet && !isValidSolanaAddress(usdc_wallet)) {
+    return error('usdc_wallet does not look like a Solana address (expected 32-44 base58 characters). Leave it blank to add it later from your dashboard.', 400);
+  }
+
   // Generate slug
   let slug = generateSlug(name);
 
@@ -4702,34 +4739,63 @@ async function handleOnboard(db, request) {
   const donation_url = `https://giveready.org/donate/${slug}`;
   const now = new Date().toISOString();
 
-  // Insert nonprofit
-  await db.prepare(`
-    INSERT INTO nonprofits (
-      id, slug, name, contact_email, country, city, mission, description, website, founded_year,
-      beneficiaries_per_year, usdc_wallet, donation_url, verified, created_at, updated_at
-    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
-  `).bind(
-    id, slug, name, email, country || null, city || null, mission || null, description || mission || null,
-    website || null, founded_year || null, beneficiaries_per_year || null, usdc_wallet || null,
-    donation_url, 0, now, now
-  ).run();
+  // mission and description are NOT NULL in the schema, but the lightweight
+  // "Register new charity" form on /onboard only collects name, email and
+  // country. Both arrived undefined, the INSERT hit the constraint, and the
+  // thrown error surfaced to the user as a bare 500 / "Error registering.
+  // Please try again." (reported by doobneek Inc., 2026-08-01).
+  // Placeholders are replaced at admin review; they are never shown as
+  // verified copy because new rows land with verified = 0.
+  const missionValue = mission || description || `${name} — mission pending review.`;
+  const descriptionValue =
+    description || mission || `${name} registered via the GiveReady onboarding form. Profile details pending review.`;
 
-  // Insert causes if provided
-  if (causes && Array.isArray(causes) && causes.length > 0) {
-    for (const causeId of causes) {
-      await db.prepare(`
-        INSERT OR IGNORE INTO nonprofit_causes (nonprofit_id, cause_id)
-        VALUES (?1, ?2)
-      `).bind(id, causeId).run();
-    }
-  }
-
-  // Insert registration if provided
-  if (registration_number) {
+  try {
+    // Insert nonprofit
     await db.prepare(`
-      INSERT INTO registrations (id, nonprofit_id, country, type, registration_number)
-      VALUES (?1, ?2, ?3, ?4, ?5)
-    `).bind(crypto.randomUUID(), id, registration_country || country, registration_type || 'nonprofit', registration_number).run();
+      INSERT INTO nonprofits (
+        id, slug, name, contact_email, country, city, mission, description, website, founded_year,
+        beneficiaries_per_year, usdc_wallet, donation_url, verified, created_at, updated_at
+      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+    `).bind(
+      id, slug, name, email, countryValue, city || null, missionValue, descriptionValue,
+      website || null, founded_year || null, beneficiaries_per_year || null, usdc_wallet || null,
+      donation_url, 0, now, now
+    ).run();
+
+    // Insert causes if provided
+    if (causes && Array.isArray(causes) && causes.length > 0) {
+      for (const causeId of causes) {
+        await db.prepare(`
+          INSERT OR IGNORE INTO nonprofit_causes (nonprofit_id, cause_id)
+          VALUES (?1, ?2)
+        `).bind(id, causeId).run();
+      }
+    }
+
+    // Insert registration if provided
+    if (registration_number) {
+      await db.prepare(`
+        INSERT INTO registrations (id, nonprofit_id, country, type, registration_number)
+        VALUES (?1, ?2, ?3, ?4, ?5)
+      `).bind(crypto.randomUUID(), id, normaliseCountry(registration_country) || countryValue, registration_type || 'nonprofit', registration_number).run();
+    }
+
+    // Bind the registering email to the new nonprofit so the person who
+    // registered can actually sign in at /signin. Without this row,
+    // handleAuthVerify finds no charity for the email and shows
+    // "No dashboard access yet" — a dead end for every self-registration.
+    // verified_at stays null: the magic link proves the email, admin review
+    // still gates going live (nonprofits.verified = 0).
+    await db.prepare(`
+      INSERT OR IGNORE INTO charity_users (id, nonprofit_id, email, role)
+      VALUES (?1, ?2, ?3, 'admin')
+    `).bind(crypto.randomUUID(), id, email.trim().toLowerCase()).run();
+  } catch (e) {
+    // Never let a DB error escape as an opaque worker exception again — the
+    // caller gets a readable reason and the failure is greppable in the tail.
+    console.error(`[Onboard] Registration failed for "${name}" (${email}, ${country}): ${e && e.message}`);
+    return error(`Registration failed: ${(e && e.message) || 'database error'}`, 500);
   }
 
   // Log wallet signature if provided (for future verification)
@@ -4743,7 +4809,14 @@ async function handleOnboard(db, request) {
     id,
     slug,
     preview_url: `https://giveready.org/donate/${slug}?preview=1`,
+    signin_url: 'https://giveready.org/signin',
     admin_message: 'Your profile is pending review. You will receive an email when it goes live.',
+    next_steps: [
+      `Sign in at https://giveready.org/signin with ${email} to finish your profile.`,
+      usdc_wallet
+        ? 'Your USDC wallet is saved. Zero-fee agent donations switch on once your profile is verified.'
+        : 'Add a Solana USDC wallet in your dashboard to accept zero-fee donations initiated by AI agents.',
+    ],
   }, 201);
 }
 
@@ -6894,6 +6967,11 @@ const ALLOWED_PROFILE_FIELDS = [
   'city', 'region', 'country', 'founded_year',
   'beneficiaries_per_year', 'donation_url', 'contact_email',
   'logo_url', 'annual_budget_usd', 'budget_year', 'team_size',
+  // usdc_wallet is self-serve so a charity can switch on zero-fee x402
+  // agent donations without waiting on the operator. Format-validated in
+  // handleCharityProfilePatch; it only takes effect once verified = 1,
+  // because handleDonate requires a verified row before quoting a 402.
+  'usdc_wallet',
 ];
 
 async function handleCharityProfilePatch(db, request) {
@@ -6906,6 +6984,16 @@ async function handleCharityProfilePatch(db, request) {
   const existing = await db.prepare(`SELECT * FROM nonprofits WHERE id = ?1`)
     .bind(auth.session.active_nonprofit_id).first();
   if (!existing) return apiError('NOT_FOUND', 'Charity not found', 404);
+
+  // A bad wallet address means donations vanish, so this one field gets
+  // checked rather than trusted. Empty string clears it (turns x402 off).
+  if ('usdc_wallet' in body) {
+    const w = (body.usdc_wallet || '').trim();
+    if (w && !isValidSolanaAddress(w)) {
+      return apiError('VALIDATION_FAILED', 'That does not look like a Solana wallet address. Expected 32-44 base58 characters.');
+    }
+    body.usdc_wallet = w || null;
+  }
 
   const updates = [];
   const params = [];

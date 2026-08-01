@@ -283,6 +283,17 @@
           <div><label>Contact email</label><input type="email" name="contact_email" /></div>
         </div>
 
+        <div class="card">
+          <div class="card-header"><h3>Zero-fee donations</h3><span class="hint">Optional</span></div>
+          <p style="color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 14px;">
+            Add a Solana USDC wallet and AI agents can donate to you directly over the x402 payment protocol.
+            No platform fee, no card processing, no middleman — the transfer settles on-chain straight to this address.
+            Leave it blank and donors are sent to your own donation page instead.
+          </p>
+          <div><label>Solana USDC wallet</label><input type="text" name="usdc_wallet" placeholder="32-44 character Solana address" /></div>
+          <p id="walletState" style="font-size: 13px; line-height: 1.6; margin-top: 10px;"></p>
+        </div>
+
         <div class="sticky-save-bar">
           <span id="saveStatus" class="save-status">Not yet saved</span>
           <button type="submit" class="save-btn" id="profileSaveBtn">Save changes</button>
@@ -445,14 +456,34 @@
     function renderProfile() {
       if (!profile) return;
       const form = document.getElementById('profileForm');
-      const fields = ['name', 'tagline', 'mission', 'description', 'city', 'founded_year', 'country', 'beneficiaries_per_year', 'website', 'contact_email'];
+      const fields = ['name', 'tagline', 'mission', 'description', 'city', 'founded_year', 'country', 'beneficiaries_per_year', 'website', 'contact_email', 'usdc_wallet'];
       fields.forEach(f => {
         const el = form.querySelector('[name="' + f + '"]');
         if (el) el.value = profile[f] || '';
       });
+      renderWalletState();
       renderStrength();
       renderShareTab();
       maybeShowWelcome();
+    }
+
+    // Tell the charity plainly which of the two donation paths is live for
+    // them right now. A wallet alone is not enough — handleDonate only
+    // quotes an x402 payment for a verified row.
+    function renderWalletState() {
+      const el = document.getElementById('walletState');
+      if (!el) return;
+      const hasWallet = (profile.usdc_wallet || '').trim().length > 0;
+      if (hasWallet && profile.verified) {
+        el.style.color = 'var(--accent)';
+        el.textContent = 'Live. Agents asking for ' + (profile.name || 'your charity') + ' are quoted a direct USDC payment to this wallet.';
+      } else if (hasWallet) {
+        el.style.color = 'var(--muted)';
+        el.textContent = 'Saved. This switches on as soon as your profile is verified.';
+      } else {
+        el.style.color = 'var(--muted)';
+        el.textContent = 'No wallet yet — donors are currently sent to your own donation page.';
+      }
     }
 
     function renderStrength() {
@@ -564,10 +595,15 @@
     async function saveProfile() {
       const form = document.getElementById('profileForm');
       const data = {};
-      ['name', 'tagline', 'mission', 'description', 'city', 'country', 'website', 'contact_email'].forEach(f => {
+      ['name', 'tagline', 'mission', 'description', 'city', 'country', 'website', 'contact_email', 'usdc_wallet'].forEach(f => {
         const el = form.querySelector('[name="' + f + '"]');
-        if (el) data[f] = el.value;
+        if (el) data[f] = el.value.trim();
       });
+
+      if (data.usdc_wallet && /^0x[0-9a-fA-F]{40}$/.test(data.usdc_wallet)) {
+        showErrorToast('That is an Ethereum address. GiveReady settles USDC on Solana.');
+        return;
+      }
       ['founded_year', 'beneficiaries_per_year'].forEach(f => {
         const el = form.querySelector('[name="' + f + '"]');
         if (el && el.value) data[f] = parseInt(el.value, 10);
@@ -581,9 +617,20 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
         });
-        if (!resp || !resp.ok) { showErrorToast('Save failed. Try again.'); return; }
+        if (!resp || !resp.ok) {
+          // Surface the server's reason (e.g. a malformed wallet) rather
+          // than a blanket "save failed" the charity cannot act on.
+          let reason = 'Save failed. Try again.';
+          try {
+            const body = await resp.json();
+            if (body && (body.message || body.error)) reason = body.message || body.error;
+          } catch (_) { /* keep the default */ }
+          showErrorToast(reason);
+          return;
+        }
         const result = await resp.json();
         profile = { ...profile, ...data };
+        renderWalletState();
         showSaveToast(result.changes === 0 ? 'No changes.' : 'Saved.');
         profileDirty = false;
         const s = document.getElementById('saveStatus');
