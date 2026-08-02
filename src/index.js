@@ -547,9 +547,29 @@ async function handleStats(db) {
         `SELECT COUNT(*) as count FROM query_log WHERE created_at > datetime('now', '-7 days')`
       ).first();
 
+      // Nonprofit and verified counts are LIVE, not cached.
+      //
+      // stats_cache is only written after bulk imports, so these two froze at
+      // the last import and every self-registered charity was invisible to
+      // /api/stats. On 2026-08-02 that produced a false conclusion in the daily
+      // digest: it read "nonprofit count is flat at 41,216" as evidence the
+      // registration bug was still unfixed, on a day when a charity had
+      // registered, been verified and gone live. A frozen number feeding a
+      // learning loop is worse than a missing one.
+      //
+      // The cache existed for a 2M-row future that has not arrived; COUNT(*)
+      // over 41k rows is cheap. The genuinely expensive aggregates below stay
+      // cached.
+      const npLive = await db.prepare(
+        `SELECT COUNT(*) AS count FROM nonprofits`
+      ).first();
+      const verifiedLive = await db.prepare(
+        `SELECT COUNT(*) AS count FROM nonprofits WHERE verified = 1`
+      ).first();
+
       return json({
-        nonprofits: stats.nonprofit_count || 0,
-        verified_nonprofits: stats.verified_count || 0,
+        nonprofits: npLive?.count ?? stats.nonprofit_count ?? 0,
+        verified_nonprofits: verifiedLive?.count ?? stats.verified_count ?? 0,
         countries: stats.country_count || 0,
         causes: stats.cause_count || 0,
         total_beneficiaries_per_year: stats.total_beneficiaries || 0,
