@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GiveReady, Progress in numbers</title>
-  <meta name="description" content="What we proposed, what the data shows, how the approach has evolved. Honest scoreboard for GiveReady's first months." />
+  <meta name="description" content="Citation share went from 0 to 9 of 10 prompts in 71 days. The numbers downstream are still early. The honest scoreboard, the methodology, and what the result does and does not prove." />
   <meta property="og:title" content="GiveReady, Progress in numbers" />
-  <meta property="og:description" content="Honest scoreboard. What we proposed, what we've learned, how the approach has evolved." />
+  <meta property="og:description" content="0 to 9 of 10 cited prompts in 71 days. The honest scoreboard, with methodology and limitations." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://giveready.org/progress" />
   <meta name="twitter:card" content="summary" />
@@ -104,6 +104,7 @@
     .metric-row .metric-value { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .metric-row .metric-value.amber { color: var(--amber); }
     .metric-row .metric-value.muted { color: var(--light); }
+    .metric-row .metric-value.green { color: var(--accent); }
     .metric-row .metric-context { display: block; font-size: 11px; color: var(--light); font-weight: 500; margin-top: 2px; letter-spacing: 0; }
 
     .what-we-do { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
@@ -151,8 +152,8 @@
 <div class="hero">
   <div class="wrap">
     <h1>Progress, in numbers.</h1>
-    <p>What we proposed in the Gates Foundation application, what the data has shown, and how the approach has evolved. No spin. The numbers are what they are. The snapshots below let any reviewer compare what we claimed against what we now claim, in our own words on both sides.</p>
-    <div class="last-updated">Last updated: 2026-05-24 &middot; 2 snapshots on file</div>
+    <p>What we proposed in the original Gates Foundation application, what the data has shown since, and how the approach has changed. The numbers are what they are, including the ones that stayed at zero. The snapshots below let any reviewer compare what we claimed against what we now claim, in our own words on both sides.</p>
+    <div class="last-updated">Last updated: 2026-08-02 &middot; 2 snapshots on file</div>
   </div>
 </div>
 
@@ -160,9 +161,19 @@
   <div class="wrap">
     <h2>What we've learned</h2>
     <div class="learned-block">
+      <span class="label">2026-08-02 progress note</span>
+      <p><strong>The discovery half is working. The payment half is still early.</strong></p>
+      <p>The May pivot set Citation Share as the north star: of 10 fixed charity-discovery prompts, how many return an answer that cites giveready.org. On 2026-05-24 that number was 0 of 10. On 2026-08-02 it is 9 of 10 on Perplexity, 71 days later, on a prompt list written and frozen before the guides existed. The single miss is absent from Perplexity's source set entirely, which is an indexing gap rather than a lost citation.</p>
+      <p>The numbers downstream of that are still at zero, and we are publishing them anyway. Over the last 30 days: 314 guide views, none of which arrived from an AI assistant. No guide-attributed donations. Ten directory queries in the life of the site. One nonprofit has attempted to register, during a period when the registration form was returning an error, since fixed. Small numbers on a small base, early.</p>
+      <p>Industry data (SparkToro, 2025) puts roughly 93% of AI search sessions ending without a click, so a citation is a mention rather than a visit, and citation share can keep climbing while click-through stays flat. And the part of this that actually matters, an AI assistant paying a charity on a person's behalf, is not ready yet. The x402 rails GiveReady runs on work today and are largely unused, and on any realistic reading they are a year or so away from being something an assistant reaches for as a matter of course. The directory, the guides and the citation position are being built now so they are already in place when that changes.</p>
+      <p>So the near-term success condition moves, openly, and before the measurement that would have tested it. The May pivot said the thesis is proven by a non-operator donation attributable to an AI answer. At today's volume, and with agent payments where they are, that is not yet a fair test, so it is logged as unproven rather than refuted, with the amendment dated 2026-08-07 ahead of the 2026-08-08 reading. The check we applied to ourselves: would we have amended this rule if the test were about to pass? Readers can judge that for themselves.</p>
+      <p>The build pace now matches that timeline. New guide production pauses and crawl work stops, because citation share has held steady on days when crawl volume fell. The effort goes into keeping the directory, the donate rails and the daily measurement running while the payment layer catches up, and into writing the citation result up as evidence for AI-for-charitable-giving grant applications, which is what it is good for today. The next full review is 2026-11-23. Three things would bring work forward sooner: charity signups picking up, a grant application reaching interview stage, or an outside party asking for the citation methodology.</p>
+      <p>What funding changes: the constraint here is hours, not ideas. The measurement runs, the rails run, and the directory is 41,000 organisations deep. Funded, the work that resumes first is the citation-to-click measurement, verified depth across the thin entries, and putting the methodology in front of the charities and researchers who have asked for it. We are ready to do that work and would welcome a partner for it.</p>
+    </div>
+    <div class="learned-block" style="margin-top:16px;">
       <span class="label">2026-05-23 honesty note</span>
-      <p>The Gates application proposed AI agents would autonomously enrich the nonprofit directory by writing data back through `/api/enrich`. Four to six weeks of live traffic showed otherwise. Training crawlers (GPTBot, ClaudeBot, Google AI) ingest the directory at high volume, but they cannot submit by design. Interactive agents (ChatGPT-User, Claude-User, Perplexity-User) rarely arrive at the site, and when they do, they read and leave. The autonomous-write thesis is dead at scale.</p>
-      <p>What does work, on today's evidence: training-corpus ingestion is real and high-volume, so the path to AI-mediated giving is being the structured-data source that models cite when users ask charity questions. The path to verified depth is human-in-loop enrichment via consortium partners (people who run the orgs use AI to draft their own profile updates, then submit). Both are measurable. Neither requires the autonomous-write magic.</p>
+      <p>The Gates application proposed AI agents would autonomously enrich the nonprofit directory by writing data back through `/api/enrich`. Four to six weeks of live traffic showed otherwise. Training crawlers (GPTBot, ClaudeBot, Google AI) ingest the directory at high volume, but they cannot submit by design. Interactive agents (ChatGPT-User, Claude-User, Perplexity-User) rarely arrive at the site, and when they do, they read and leave. The autonomous-write thesis is dead at scale now, but that doesn't mean it will stay that way. So we keep tracking and training off of our live data looking for loopholes or methods that can change.</p>
+      <p>What does work, on today's evidence: document ingestion is real and high-volume, so the path to AI-mediated giving is being the structured-data source that models cite when users ask charity questions. The path to verified depth is human-in-loop enrichment via consortium partners (people who run the orgs use AI to draft their own profile updates, then submit). Both are measurable. Neither requires the autonomous-write magic.</p>
       <p>So the approach has evolved. The directory is still live, the donate widget still ships zero-fee donations, the MCP server still indexes for every AI assistant that follows the standards. The metrics below now lead with what's measurable today, not what was aspirational at submission.</p>
     </div>
   </div>
@@ -171,7 +182,7 @@
 <div class="section">
   <div class="wrap">
     <h2>Snapshots on file</h2>
-    <p class="muted">Each snapshot is a frozen point-in-time record. None has been edited since the date on its banner. New snapshots are added on three triggers: a pivot decision, a Gates milestone reached, or a quarterly review. Reverse chronological below.</p>
+    <p class="muted">Each snapshot is a frozen point-in-time record. None has been edited since the date on its banner. New snapshots are added on three triggers: a pivot decision, a grant milestone reached, or a quarterly review. The 2026-08-02 update is recorded on this page rather than as a new snapshot. Reverse chronological below.</p>
     <div class="snapshot-list">
       <a class="snapshot-item" href="/progress/2026-05-24-pivot">
         <div class="date">2026-05-24</div>
@@ -197,7 +208,7 @@
       </div>
       <div class="what-card">
         <span class="label amber">Enrichment side</span>
-        <p>Human-in-loop. Consortium partners (Joe Taylor at City Kids Surfing, Bridges for Music, Wave Project, Finn WEF) use AI assistants to draft enrichments for their own profiles, then submit. The "AI does the research, the human signs the submission" pattern that every B2A platform with documented writes (Notion MCP, Linear MCP, Stripe Agent Toolkit) has converged on.</p>
+        <p>Human-in-loop, and so far ahead of demand. The design is that consortium partners use AI assistants to draft enrichments for their own profiles and then submit them, the "AI does the research, the human signs the submission" pattern every B2A platform with documented writes has converged on. One organisation has attempted to register so far and consortium submissions are still at zero. The rails work and are waiting on the charity side to arrive.</p>
       </div>
     </div>
   </div>
@@ -221,39 +232,56 @@
           <div class="metric-name">Verified nonprofits</div>
           <div class="metric-desc">Registration confirmed against the relevant national registry (UK Charity Commission, IRS 990, etc.). The non-verified entries are listed but flagged as "registry-thin" until a partner enriches them.</div>
         </div>
-        <div class="metric-value" id="stat-verified">166</div>
+        <div class="metric-value" id="stat-verified">177</div>
       </div>
 
       <div class="metric-row">
         <div class="metric-left">
-          <div class="metric-name">AI training-crawler hits per month</div>
-          <div class="metric-desc">Visits from GPTBot, ClaudeBot, Google AI, Perplexity, Cohere training crawlers. These are the events that put GiveReady data into future model weights. Updated quarterly from a rounded 30-day rolling figure.</div>
+          <div class="metric-name">AI training-crawler hits, 7 days</div>
+          <div class="metric-desc">Visits from GPTBot, ClaudeBot, Google AI, Perplexity and Cohere crawlers. Read this one sceptically: 3,936 of the 7,907 hits went to a single file, /AGENTS.md, which our own logs classify as a bounded retry pattern rather than ingestion breadth. Crawl volume has also moved independently of citation share, so we no longer treat it as a leading indicator of anything.</div>
         </div>
-        <div class="metric-value">8,000+</div>
+        <div class="metric-value">7,907</div>
       </div>
 
       <div class="metric-row">
         <div class="metric-left">
           <div class="metric-name">Citation share <span class="metric-context">(north-star metric)</span></div>
-          <div class="metric-desc">Of 10 fixed charity-discovery prompts run weekly against Claude, ChatGPT, and Perplexity, how many include GiveReady-sourced data in the response. Baseline expected 0-5%. 6-18 month training-corpus lag before trained-weight citations land. RAG-sourced citations (Perplexity, Bing Chat) can land sooner.</div>
+          <div class="metric-desc">Of 10 fixed charity-discovery prompts, how many return an answer citing giveready.org. Baseline 0 of 10 on 2026-05-24. The Perplexity arm is automated and is the number quoted here. The Claude and ChatGPT arms are manual and currently unfilled, so the combined figure would understate the result; treat the Perplexity number as the real one and the other two as unmeasured. Prompts frozen until 2026-11-23.</div>
         </div>
-        <div class="metric-value amber">Baseline<span class="metric-context">tracker in build</span></div>
+        <div class="metric-value green">9 / 10<span class="metric-context">Perplexity, 2026-08-02</span></div>
       </div>
 
       <div class="metric-row">
         <div class="metric-left">
-          <div class="metric-name">Consortium-partner enrichments</div>
-          <div class="metric-desc">Human-in-loop submissions from named consortium partners. The metric that tests whether the "verified depth via people who run the orgs" thesis is working.</div>
+          <div class="metric-name">AI-referred guide views, 30 days</div>
+          <div class="metric-desc">Guide page views arriving with an AI assistant as the referrer, out of 314 total guide views in the window. This is the number that decides whether a citation produces a visit. Referrer stripping by the answer engines is a real confound and cannot be fully excluded, but the donate path recorded 6 AI-assistant referrals over the same 30 days, so referrer data does survive on some routes.</div>
         </div>
-        <div class="metric-value amber">0<span class="metric-context">first one pending</span></div>
+        <div class="metric-value amber">0<span class="metric-context">of 314 total</span></div>
+
+      </div>
+
+      <div class="metric-row">
+        <div class="metric-left">
+          <div class="metric-name">Donations attributable to a guide</div>
+          <div class="metric-desc">Donate-path arrivals carrying a guide referral tag. Referral attribution shipped 2026-07-25 and the propagation bug found that day was fixed. Perfect attribution applied to zero AI-referred arrivals still yields zero.</div>
+        </div>
+        <div class="metric-value amber">0</div>
+      </div>
+
+      <div class="metric-row">
+        <div class="metric-left">
+          <div class="metric-name">Directory queries, lifetime</div>
+          <div class="metric-desc">Searches run against the directory API by anyone other than the operator, across the life of the site. Zero this week.</div>
+        </div>
+        <div class="metric-value amber">10</div>
       </div>
 
       <div class="metric-row">
         <div class="metric-left">
           <div class="metric-name">Donations to anchor nonprofits</div>
-          <div class="metric-desc">Cumulative USDC donated to the three named anchors (Finn WEF, City Kids Surfing, Bridges for Music) via the x402 endpoint. All current donations are operator test donations and are not counted toward external-validation thresholds.</div>
+          <div class="metric-desc">Cumulative USDC donated to the three named anchors (Finn WEF, City Kids Surfing, Bridges for Music) via the x402 endpoint. Nine donations, all dated April 2026, all operator test donations. None of any origin in the 112 days since. The rails work and are ahead of the market they are built for.</div>
         </div>
-        <div class="metric-value muted">$12.76<span class="metric-context">operator tests only</span></div>
+        <div class="metric-value muted">$12.76</div>
       </div>
 
       <div class="metric-row">
@@ -262,6 +290,14 @@
           <div class="metric-desc">Distinct cause areas in the directory, spanning 4 countries (UK, US, South Africa, Bermuda).</div>
         </div>
         <div class="metric-value" id="stat-causes">29</div>
+      </div>
+
+      <div class="metric-row">
+        <div class="metric-left">
+          <div class="metric-name">Agent enrichment submissions</div>
+          <div class="metric-desc">Write submissions to /api/enrich from AI agents, from 22 unique agents, one applied as a manual demo. Quiet since 2026-07-12. Kept on the page because the original proposal leaned on autonomous agent writes, and this is what that has produced so far.</div>
+        </div>
+        <div class="metric-value muted">51</div>
       </div>
 
       <div class="metric-row">
@@ -278,15 +314,31 @@
 
 <div class="section">
   <div class="wrap">
+    <h2>What the citation result does and does not prove</h2>
+    <div class="what-we-do">
+      <div class="what-card">
+        <span class="label">It proves</span>
+        <p>That a single operator working with AI assistants can make small, unrated, niche charities citable by a general AI answer engine, using structured guides over an open data layer, in 71 days, on roughly $50 a year of infrastructure. The prompts were frozen before the guides were written. The result is externally observable: anyone can run the same 10 prompts and check.</p>
+      </div>
+      <div class="what-card">
+        <span class="label amber">It does not prove</span>
+        <p>That citations produce visits, donations, or charity signups. None of those has moved yet, and the honest reading is that the agent-payment layer they depend on is not ready. The sample is also small and self-selected: 10 prompts, written by us, on one engine with automated source attribution. The Claude and ChatGPT arms are manual and currently unfilled. If Perplexity changed how it retrieves sources tomorrow, the number would move without anything about GiveReady changing.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="wrap">
     <h2>How we measure citation share</h2>
-    <p class="muted">Weekly: 10 fixed prompts run against three models. Perplexity returns source URLs natively, so that arm is automated. Claude and ChatGPT return text without source attribution, so those arms are manual spot-checks logged into the tracker. Prompts cover three UK youth charities, three US youth charities, two SA youth charities, one surf therapy, one music education. Tracker output lives at <code>01-Projects/GiveReady/citation-tracking/YYYY-MM-DD.md</code> in the project repo. Methodology stays public. If Perplexity changes how it returns source attribution, the tracker falls back to manual for all three models.</p>
+    <p class="muted">Ten fixed prompts run daily against Perplexity, Claude and ChatGPT, covering UK, US and South African youth charities plus surf therapy and music education. The Perplexity arm is automated and is the number quoted above; the Claude and ChatGPT arms are manual and currently unfilled. The prompt list was written and frozen before the guides existed and stays frozen until 2026-11-23, so the number cannot be improved by choosing easier questions, and the full methodology is available to any funder or researcher who asks.</p>
   </div>
 </div>
 
 <div class="section">
   <div class="wrap">
     <h2>What's deferred</h2>
-    <p class="muted">Three workstreams are on the shelf until the citation-share signal moves or the Gates decision lands: a sandbox <code>/api/enrich</code> endpoint with anonymous-write tier (Netlify-model attempt at the original autonomous-write thesis, time-boxed at 14 days if reactivated); a 50-org verticalised "deep on few" pilot in one Gates GH&D-aligned cause area; a Gates honest-update milestones doc to send when Gates emails for a check-in. Full list in the project repo's <code>TODOS.md</code>.</p>
+    <p class="muted">New guide production is paused, and crawl-lift work has stopped because citation share held steady across days when crawl volume fell, so the two are less connected than we assumed. Measuring citation-to-click directly is the piece of work most worth doing, and it waits too, since at this volume it would cost more hours than the answer is currently worth. Also waiting: charity dashboard and onboarding improvements, x402 work beyond the rails that already run, and the manual Claude and ChatGPT citation legs. Full list in the project repo's <code>TODOS.md</code>. All of it comes back up for review on 2026-11-23, or sooner if the charity side or a grant application moves.</p>
   </div>
 </div>
 
