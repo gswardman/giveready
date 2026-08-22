@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Daily IRS registry standing check.
+
+  06:15, thirty minutes before the citation tracker at 06:45 and just over an
+  hour before the cloud digest at 07:20, so the digest reads a status that was
+  refreshed the same morning.
+
+  RunAtLoad is false on purpose: loading the plist should not trigger a download
+  of two multi-megabyte IRS files and a D1 write.
+
+  If the Mac is asleep at 06:15, launchd runs this at next wake. That is safe
+  here: the script is idempotent, it recomputes status from the current files
+  rather than applying a diff, so a late run produces the same result as an
+  on-time one.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>net.testventures.giveready.registry-check</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>exec "$HOME/TestVentures.net/giveready/scripts/registry-check-daily.sh"</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>15</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/giveready-registry-check.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/giveready-registry-check.err</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
