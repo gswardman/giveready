@@ -6232,17 +6232,46 @@ async function handleAdminTraffic(db, env, request, url) {
   // independent GROUP BYs, and inferring the intersection by hand. Inference is
   // not measurement. This joins them.
   //
-  // Cardinality control: SQL groups by raw (user_agent, route), capped at 400
-  // rows. JS then collapses raw UA to friendly agent name and raw route to route
-  // class, re-summing as it goes. So 7 guide URLs x 3 UA strings for the same
-  // crawler collapse into one row, and the cap is applied before collapsing,
-  // which is where the volume is.
+  // CARDINALITY BUG, found and fixed 2026-08-22 before this shipped anywhere.
+  //
+  // First cut grouped by raw (user_agent, route) with LIMIT 400 and collapsed to
+  // route classes in JS. That silently dropped 62% of hits: GPTBot crawling
+  // 41,000 /nonprofits/<slug> URLs produces thousands of single-hit groups, and
+  // ORDER BY hits DESC LIMIT 400 cut every one of them. Measured on the 30d
+  // window, GPTBot came back as 3,926 against a true 7,849.
+  //
+  // The bias ran in the worst possible direction: it over-weighted single
+  // high-volume routes (/AGENTS.md, one route, thousands of hits) and
+  // under-weighted high-cardinality classes (/nonprofits, 41k routes, few hits
+  // each). That is the exact shape of the conclusion the endpoint was built to
+  // test, so the artifact looked like a finding.
+  //
+  // Fix: classify in SQL, then GROUP BY (user_agent, route_class). Cardinality
+  // falls from ~thousands to ~30 agents x 11 classes, so no cap truncates
+  // anything real. routeClassFor() is kept in JS as the readable spec and is
+  // unit-tested; this CASE must stay in step with it.
   const agentRouteRaw = await db.prepare(
-    `SELECT user_agent, route, COUNT(*) as hits,
+    `SELECT user_agent,
+            CASE
+              WHEN route IN ('/AGENTS.md','/agents.md') THEN 'agents-manifest'
+              WHEN route = '/llms.txt' THEN 'llms'
+              WHEN route = '/sitemap.xml' THEN 'sitemap'
+              WHEN route = '/mcp' OR route LIKE '/mcp/%' THEN 'mcp'
+              WHEN route LIKE '/guides%' THEN 'guides'
+              WHEN route LIKE '/nonprofits%' THEN 'nonprofits'
+              WHEN route LIKE '/causes%' THEN 'causes'
+              WHEN route LIKE '/donate%' THEN 'donate'
+              WHEN route LIKE '/api/agents%' OR route LIKE '/api/enrich%'
+                OR route LIKE '/api/needs-enrichment%' OR route LIKE '/api/enrichments%'
+                THEN 'agent-api'
+              WHEN route LIKE '/api/%' THEN 'other-api'
+              ELSE 'other'
+            END AS route_class,
+            COUNT(*) as hits,
             MAX(created_at) AS last_seen
        FROM discovery_hits
       WHERE created_at > ${since} AND user_agent IS NOT NULL${noiseFilter}
-      GROUP BY user_agent, route ORDER BY hits DESC LIMIT 400`
+      GROUP BY user_agent, route_class ORDER BY hits DESC LIMIT 500`
   ).all();
 
   const agentRouteMap = new Map();
@@ -6251,7 +6280,7 @@ async function handleAdminTraffic(db, env, request, url) {
     // Dropping them would recreate the blind spot this endpoint exists to remove.
     const agent = agentNameFor(row.user_agent) || `unclassified: ${String(row.user_agent).slice(0, 40)}`;
     const type = agentTypeFor(row.user_agent) || 'unclassified';
-    const cls = routeClassFor(row.route);
+    const cls = row.route_class; // classified in SQL, see cardinality note above
     const key = `${agent} ${cls}`;
     const prev = agentRouteMap.get(key);
     if (prev) {
