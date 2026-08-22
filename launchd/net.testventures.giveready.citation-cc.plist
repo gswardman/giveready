@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Claude + ChatGPT citation reading, run on the Mac.
+
+  Why on the Mac and not in the cloud task: the Cowork sandbox egress proxy
+  reaches api.perplexity.ai but blocks api.anthropic.com and api.openai.com.
+  These two engines can only be measured from a host with direct network access.
+
+  Why 06:45: the cloud digest task fires at 07:20 and READS this file. Running
+  35 minutes earlier leaves room for a slow run without racing the digest.
+
+  Safety note on late wakes. The 2026-07-04/05 incident happened because a Mac
+  job and a cloud job wrote THE SAME file, so a late wake overwrote a good
+  reading with a stale one. That cannot happen here: this job only ever writes
+  YYYY-MM-DD-cc.md and the cloud task only ever writes YYYY-MM-DD.md. If the Mac
+  is asleep at 06:45, launchd runs this at next wake, the digest reports Claude
+  and ChatGPT as "not measured today", and the late run simply fills in the file
+  afterwards. A missed day is visible, never a false zero.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>net.testventures.giveready.citation-cc</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>exec "$HOME/TestVentures.net/giveready/scripts/citation-tracker-cc.sh"</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>45</integer>
+    </dict>
+
+    <!-- Do not fire on every login or plist reload; this job costs money. -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/giveready-citation-cc.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/giveready-citation-cc.err</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

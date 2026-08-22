@@ -6224,6 +6224,58 @@ async function handleAdminTraffic(db, env, request, url) {
       GROUP BY user_agent ORDER BY hits DESC LIMIT 30`
   ).all();
 
+  // Agent x route matrix (added 2026-08-22).
+  //
+  // Standing Learning Loop hypothesis, carried unactioned 2026-08-20..22:
+  // "the PerplexityBot sweep is hitting AGENTS.md, not the guides." Answering it
+  // previously meant reading discovery_by_route and discovery_by_user_agent, two
+  // independent GROUP BYs, and inferring the intersection by hand. Inference is
+  // not measurement. This joins them.
+  //
+  // Cardinality control: SQL groups by raw (user_agent, route), capped at 400
+  // rows. JS then collapses raw UA to friendly agent name and raw route to route
+  // class, re-summing as it goes. So 7 guide URLs x 3 UA strings for the same
+  // crawler collapse into one row, and the cap is applied before collapsing,
+  // which is where the volume is.
+  const agentRouteRaw = await db.prepare(
+    `SELECT user_agent, route, COUNT(*) as hits,
+            MAX(created_at) AS last_seen
+       FROM discovery_hits
+      WHERE created_at > ${since} AND user_agent IS NOT NULL${noiseFilter}
+      GROUP BY user_agent, route ORDER BY hits DESC LIMIT 400`
+  ).all();
+
+  const agentRouteMap = new Map();
+  for (const row of (agentRouteRaw.results || [])) {
+    // Unrecognised UAs keep a truncated raw string rather than being dropped.
+    // Dropping them would recreate the blind spot this endpoint exists to remove.
+    const agent = agentNameFor(row.user_agent) || `unclassified: ${String(row.user_agent).slice(0, 40)}`;
+    const type = agentTypeFor(row.user_agent) || 'unclassified';
+    const cls = routeClassFor(row.route);
+    const key = `${agent} ${cls}`;
+    const prev = agentRouteMap.get(key);
+    if (prev) {
+      prev.hits += row.hits;
+      if (row.last_seen > prev.last_seen) prev.last_seen = row.last_seen;
+    } else {
+      agentRouteMap.set(key, { agent, agent_type: type, route_class: cls, hits: row.hits, last_seen: row.last_seen });
+    }
+  }
+  const agentRouteMatrix = [...agentRouteMap.values()].sort((a, b) => b.hits - a.hits);
+
+  // Per-agent guide reach. The single number the daily digest keeps asking for:
+  // of everything this crawler did, how much of it landed on a guide page.
+  const guideReach = {};
+  for (const row of agentRouteMatrix) {
+    const g = guideReach[row.agent] || (guideReach[row.agent] = { agent_type: row.agent_type, guides: 0, total: 0 });
+    g.total += row.hits;
+    if (row.route_class === 'guides') g.guides += row.hits;
+  }
+  for (const k of Object.keys(guideReach)) {
+    const g = guideReach[k];
+    g.guide_share_pct = g.total ? Math.round((g.guides / g.total) * 1000) / 10 : 0;
+  }
+
   // Recent discovery hits (last 20) — always filtered view so the digest
   // doesn't get flooded with Bun pollers in the recent list either.
   const recentDiscovery = await db.prepare(
@@ -6393,6 +6445,9 @@ async function handleAdminTraffic(db, env, request, url) {
     },
     discovery_by_route: discoveryByRoute.results,
     discovery_by_user_agent: discoveryByAgent.results,
+    // Added 2026-08-22. Replaces manual cross-referencing of the two fields above.
+    discovery_by_agent_route: agentRouteMatrix,
+    guide_reach_by_agent: guideReach,
     noise_breakdown: noiseBreakdown.results,
     recent_discovery_hits: recentDiscovery.results,
     recent_queries: recentQueries.results,
@@ -6878,6 +6933,18 @@ const KNOWN_AGENT_PATTERNS = [
   // agent that uses this UA, or if we want the search-crawler footprint
   // visible in the dashboard for SEO reasons.
   { pattern: 'SemrushBot',         name: 'SEMrush',                   type: 'search_crawler' },
+  // Brave (added 2026-08-22). Load-bearing beyond ordinary SEO: Anthropic lists
+  // Brave Search as the subprocessor behind Claude's web_search tool, so Brave's
+  // index is what Claude retrieves from. A page absent from Brave cannot be cited
+  // by Claude no matter how good it is. Confirmed 2026-08-22: giveready.org root,
+  // causes/* and docs.giveready.org are in Brave's index; /guides/* is NOT, and
+  // Claude scored 0/10 with all ten misses classed not-retrieved.
+  // Until today Brave was absent from this allowlist entirely, so any BraveBot
+  // visit fell into noise_breakdown and was invisible. The first Brave hit on a
+  // /guides route is the signal that the 2026-08-22 URL submissions worked.
+  { pattern: 'BraveBot',           name: 'Brave Search',              type: 'search_crawler' },
+  { pattern: 'Bravebot',           name: 'Brave Search',              type: 'search_crawler' },
+  { pattern: 'Brave-Search',       name: 'Brave Search',              type: 'search_crawler' },
   // MCP ecosystem crawlers
   { pattern: 'MCPRegistry',        name: 'MCP Registry',              type: 'search_crawler' },
   { pattern: 'Smithery',           name: 'Smithery',                  type: 'search_crawler' },
@@ -6901,6 +6968,44 @@ function agentTypeFor(ua) {
   if (!ua) return null;
   const hit = KNOWN_AGENT_PATTERNS.find((entry) => ua.includes(entry.pattern));
   return hit ? hit.type : null;
+}
+
+// UA → friendly name. Same lookup as agentTypeFor, different field. Used by the
+// agent x route matrix so the output reads "Perplexity" rather than 140 chars of
+// Mozilla boilerplate, and so two UA strings for the same crawler collapse into
+// one row.
+function agentNameFor(ua) {
+  if (!ua) return null;
+  const hit = KNOWN_AGENT_PATTERNS.find((entry) => ua.includes(entry.pattern));
+  return hit ? hit.name : null;
+}
+
+// Route → route class (added 2026-08-22).
+//
+// Why classes and not raw routes: the standing question is never "how many hits
+// on /guides/best-surf-therapy-charities-for-at-risk-youth", it is "did this
+// crawler touch the guides AT ALL". Raw routes scatter that across seven rows
+// and hide it. The 2026-08-17..21 PerplexityBot sweep is the case in point:
+// 446 hits, 223 of them on /AGENTS.md, 14 across all guide URLs combined, and
+// answering that took two independent GROUP BYs and manual arithmetic.
+//
+// Order matters. First match wins.
+function routeClassFor(route) {
+  if (!route) return 'other';
+  if (route === '/AGENTS.md' || route === '/agents.md') return 'agents-manifest';
+  if (route === '/llms.txt') return 'llms';
+  if (route === '/sitemap.xml') return 'sitemap';
+  if (route === '/mcp' || route.startsWith('/mcp/')) return 'mcp';
+  if (route.startsWith('/guides')) return 'guides';
+  if (route.startsWith('/nonprofits')) return 'nonprofits';
+  if (route.startsWith('/causes')) return 'causes';
+  if (route.startsWith('/donate')) return 'donate';
+  if (route.startsWith('/api/agents') || route.startsWith('/api/enrich')
+      || route.startsWith('/api/needs-enrichment') || route.startsWith('/api/enrichments')) {
+    return 'agent-api';
+  }
+  if (route.startsWith('/api/')) return 'other-api';
+  return 'other';
 }
 
 // Legacy blocklist kept for feature flag rollback (AGENT_FILTER_MODE=blocklist).
