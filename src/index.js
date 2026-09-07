@@ -1977,6 +1977,10 @@ function handleRobotsTxt() {
   return new Response(
     `User-agent: *
 Allow: /
+# /out/ is the outbound donate click tracker. A crawler following it would
+# manufacture click events, the same way printing the enrich endpoint in the
+# sitemap manufactured 113 GET "write attempts" over 30 days. Keep it closed.
+Disallow: /out/
 
 # Search/grounding crawlers — explicit allow.
 # Cloudflare's managed AI-bot block (Bots → AI bot management in dashboard)
@@ -4669,9 +4673,14 @@ const DONATE_PAGE_HTML = `<!DOCTYPE html>
       h += '<div class="growth-cta" style="margin-bottom:16px;">';
       h += '<h3>Donate to ' + esc(nonprofit.name) + '</h3>';
       if (donUrl) {
-        var utmUrl = donUrl + (donUrl.indexOf('?') > -1 ? '&' : '?') + 'utm_source=giveready.org&utm_medium=donor&utm_campaign=giveready-directory';
+        // Route through /out/<slug> so the click is logged before the handoff.
+        // UTMs are attached server-side in handleOutboundDonate, including
+        // utm_content carrying the guide that produced the click. donUrl is
+        // still the guard above: no destination, no button.
+        var outRef = urlParams.get('ref') || '';
+        var outUrl = '/out/' + encodeURIComponent(slug) + (/^guide-[a-z0-9-]{1,80}$/.test(outRef) ? '?ref=' + encodeURIComponent(outRef) : '');
         h += '<p>This charity hasn\\u2019t claimed their GiveReady page yet. You can donate through their website, and let them know about GiveReady so they can receive donations with zero fees.</p>';
-        h += '<a href="' + esc(utmUrl) + '" target="_blank" rel="noopener" class="growth-cta-btn" style="margin-bottom:12px;display:inline-block;">Donate on their website \\u2192</a>';
+        h += '<a href="' + esc(outUrl) + '" target="_blank" rel="noopener nofollow" class="growth-cta-btn" style="margin-bottom:12px;display:inline-block;">Donate on their website \\u2192</a>';
       } else {
         h += '<p>This charity hasn\\u2019t set up donations on GiveReady yet.</p>';
       }
@@ -6818,6 +6827,97 @@ async function handleEnrich(db, request, slug) {
   }, 201);
 }
 
+// ---------------------------------------------------------------------------
+// GET /out/<slug>?ref=guide-<slug>
+// Outbound click tracker for charities with no USDC wallet, which is all 41,227.
+//
+// WHY THIS EXISTS (2026-09-07). The donate page rendered a bare anchor straight
+// to the charity's own donation page with UTMs attached. A donor who clicked it
+// left, and GiveReady learned nothing. So the funnel could report "51 donate-path
+// views in 7d" and say nothing at all about whether a single person acted on them.
+// Meanwhile the digest's "Donations: 9 total, $12.76, last 2026-04-12" line was
+// measuring only the on-chain x402 rail, a rail with zero payable recipients,
+// and reading to a human as "GiveReady has driven $12.76 of giving in its life".
+// The path every actual donor takes was completely uninstrumented.
+//
+// This route captures the last event GiveReady can observe before the handoff.
+// It is the difference between interest and intent, and unlike anything on the
+// far side of the redirect it needs no cooperation from the charity.
+//
+// A 302 rather than a sendBeacon on the existing anchor, deliberately. A beacon
+// leaves the user's path untouched, but it is blocked by privacy tooling and
+// undercounts by an amount nobody can measure. Every metric failure on this
+// project has been a number that was wrong invisibly: the write funnel counting
+// crawlers, the Brave counter that could never fire, this. An unknowable
+// undercount is the wrong trade here. The redirect catches every click.
+//
+// NOT AN OPEN REDIRECT. The destination is read from the database by slug and
+// never from a query parameter. Do not add a `to=` or `url=` param to this route.
+//
+// Disallowed in robots.txt and marked noindex. A crawler following this link
+// would manufacture click events, which is exactly the mistake the sitemap made
+// by printing the enrich endpoint as a fetchable URL.
+// ---------------------------------------------------------------------------
+async function handleOutboundDonate(db, request, url, slug) {
+  const bounce = (to) => new Response(null, {
+    status: 302,
+    headers: {
+      Location: to,
+      'X-Robots-Tag': 'noindex, nofollow',
+      'Cache-Control': 'no-store',
+    },
+  });
+
+  let row = null;
+  try {
+    row = await db.prepare(
+      `SELECT id, name, slug, donation_url, website FROM nonprofits WHERE slug = ?1`
+    ).bind(slug).first();
+  } catch (e) {
+    console.error(`[out] lookup failed for ${slug}: ${(e && e.message) || e}`);
+  }
+  // Unknown slug, or the lookup threw: send them somewhere useful rather than
+  // erroring. A broken donate link is a worse outcome than a missing measurement.
+  if (!row) return bounce('/nonprofits');
+
+  // Same off-site guard as the API donate path. Registration stamps
+  // donation_url with GiveReady's own donate page, and bouncing a donor there
+  // would loop back into this route.
+  const stamped = row.donation_url || '';
+  const offSite = stamped && !/^https?:\/\/(www\.)?giveready\.org\//i.test(stamped);
+  const dest = (offSite ? stamped : null) || row.website || null;
+  if (!dest) return bounce(`/nonprofits/${encodeURIComponent(slug)}`);
+
+  let target;
+  try {
+    target = new URL(dest);
+  } catch (_e) {
+    return bounce(`/nonprofits/${encodeURIComponent(slug)}`);
+  }
+
+  // utm_content carries the guide that produced the click. utm_campaign was a
+  // constant, so a charity looking at its own analytics could see that
+  // GiveReady sent someone and nothing more, and neither side could tell which
+  // guide did the work. Validated against a strict pattern before it goes
+  // anywhere near a URL.
+  const rawRef = url.searchParams.get('ref') || '';
+  const ref = /^guide-[a-z0-9-]{1,80}$/.test(rawRef) ? rawRef : null;
+
+  target.searchParams.set('utm_source', 'giveready.org');
+  target.searchParams.set('utm_medium', 'donor');
+  target.searchParams.set('utm_campaign', 'giveready-directory');
+  target.searchParams.set('utm_content', ref || 'direct');
+
+  await logOnboardingEvent(db, 'donate_click_out', {
+    nonprofit_id: row.id,
+    slug: row.slug,
+    user_agent: request.headers.get('user-agent') || null,
+    reason: `ref=${ref || 'direct'} host=${target.hostname}`,
+  });
+
+  return bounce(target.toString());
+}
+
 // Guide -> nonprofit -> donate funnel (migration 018, anti-slop guardrail #5).
 // Answers: are AI assistants sending humans to the guides, do those humans click
 // through to nonprofit profiles, and does anything reach the donate path?
@@ -6832,7 +6932,7 @@ async function handleGuideFunnel(db, env, request, url) {
   hours = Math.min(hours, 2160);
   const sinceArg = `-${hours} hours`;
 
-  const [guideRows, npRefRows, donateRows, donations] = await Promise.all([
+  const [guideRows, npRefRows, donateRows, donations, clickOutRows] = await Promise.all([
     db.prepare(
       `SELECT referrer, COUNT(*) as hits FROM discovery_hits
        WHERE route LIKE '/guides/%' AND created_at > datetime('now', ?1)
@@ -6853,6 +6953,16 @@ async function handleGuideFunnel(db, env, request, url) {
       `SELECT COUNT(*) as count, COALESCE(SUM(amount_usdc), 0) as total_usdc
        FROM donations WHERE status = 'settled' AND created_at > datetime('now', ?1)`
     ).bind(sinceArg).first(),
+    // Outbound clicks to a charity's own donation page (2026-09-07). This is
+    // the far end of the funnel for every nonprofit without a wallet, which is
+    // all of them. Before this existed the funnel stopped at the donate-page
+    // view and the only completion metric was on-chain settlement, which no
+    // real donor has ever used.
+    db.prepare(
+      `SELECT slug, reason, COUNT(*) as hits FROM onboarding_events
+       WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)
+       GROUP BY slug, reason ORDER BY hits DESC LIMIT 25`
+    ).bind(sinceArg).all().catch(() => ({ results: [] })),
   ]);
 
   const guideViews = { ai_assistant: 0, search: 0, internal: 0, other: 0, none: 0, total: 0 };
@@ -6881,12 +6991,21 @@ async function handleGuideFunnel(db, env, request, url) {
       by_ref_and_route: npRefRows.results || [],
     },
     donate_path: donatePath,
+    // The measurable end of the redirect funnel. total is clicks that left for
+    // a charity's own donation page; by_guide attributes them to the guide in
+    // utm_content. What happens after the click is in the charity's analytics,
+    // not ours, which is why the UTMs exist.
+    donate_click_out: {
+      total: (clickOutRows.results || []).reduce((n, r) => n + (r.hits || 0), 0),
+      by_slug_and_ref: clickOutRows.results || [],
+    },
     donations_in_period_context: donations,
     notes: [
       'Attribution starts at migration 018 deploy; rows before that have null referrer/ref.',
       'ai_assistant = Referer from perplexity.ai, chatgpt.com, claude.ai, copilot, gemini, you.com, phind, poe.',
       'from_guide_ref counts donate-page views carrying ?ref=guide-<slug>.',
       'donations_in_period_context is all settled donations, NOT yet linked to referral rows.',
+      'donations_in_period_context counts the on-chain x402 rail ONLY. 0 of 41,227 nonprofits have a wallet, so it cannot see a donation made on a charity own site. donate_click_out is the honest completion metric for the redirect path.',
     ],
   });
 }
@@ -7186,6 +7305,11 @@ async function handleAdminTraffic(db, env, request, url) {
   let attemptsByError = [];
   let attemptsByUa = [];
   let recentAttempts = [];
+  // Added 2026-09-07. See the block above attemptsByCallerClass below for why.
+  let attemptsByCallerClass = [];
+  let attemptsByIntent = [];
+  let attemptsByErrorClassInteractive = [];
+  let attemptsInPeriodInteractive = 0;
   try {
     const attemptsTotal = await db.prepare(
       `SELECT COUNT(*) as total FROM enrichment_attempts WHERE created_at > ${since}`
@@ -7205,6 +7329,93 @@ async function handleAdminTraffic(db, env, request, url) {
        GROUP BY error_class ORDER BY count DESC`
     ).all();
     attemptsByError = byError.results || [];
+
+    // WHO IS ACTUALLY CALLING THE WRITE PATH, AND DID THEY MEAN TO WRITE.
+    // Added 2026-09-07 after the daily digest fired its >50% halt rule on a
+    // population that cannot convert. The 30-day read that morning was 121
+    // attempts: one iPhone Safari string at 69, Amazonbot at 26, curl at 18,
+    // node at 7, Googlebot at 1. Zero interactive agents. The halt rule was
+    // measuring a polling scraper and a bulk crawler and calling it agent
+    // demand.
+    //
+    // This is the same lesson the discovery-hits taxonomy already learned on
+    // 2026-05-20, when 8,335 of 8,338 "writing-agent" hits turned out to be
+    // training crawlers that physically cannot submit. See the comment on
+    // KNOWN_AGENT_PATTERNS. That fix was applied to discovery_hits and never
+    // carried across to enrichment_attempts, so the same conflation survived
+    // in the write funnel for 110 days. When a denominator is corrected in one
+    // table, check every other table that counts the same population.
+    //
+    // Two independent splits, because they answer different questions:
+    //   caller class — WHO called. Only interactive_agent can convert.
+    //   intent       — did the request MEAN to write. A GET on the enrich URL
+    //                  is manufactured demand: /AGENTS.md and the sitemap both
+    //                  print that URL as plain text, and a crawler following a
+    //                  link arrives by GET. Counting those as write attempts
+    //                  means every manifest crawl inflates the funnel.
+    //
+    // Report both alongside the raw totals rather than replacing them. The raw
+    // count is still the honest measure of "traffic hitting this endpoint"; it
+    // is just not a measure of agent write demand, and the digest must be able
+    // to tell the two apart without re-deriving it every morning.
+    //
+    // COST: enrichment_attempts is small (low hundreds of rows in a 30d window)
+    // so the LIKE-chain scan here is nothing like the ~1.8M rows_read that the
+    // same pattern costs against discovery_hits. Do not copy this shape onto a
+    // large table without an index.
+    const interactiveCallerConds = buildLikeOr(KNOWN_INTERACTIVE_AGENT_PATTERNS);
+    const trainingCallerConds    = buildLikeOr(KNOWN_TRAINING_CRAWLER_PATTERNS);
+    const searchCallerConds      = buildLikeOr(KNOWN_SEARCH_CRAWLER_PATTERNS);
+    const byCaller = await db.prepare(
+      `SELECT
+         CASE
+           WHEN user_agent IS NULL THEN 'unclassified'
+           WHEN (${interactiveCallerConds}) THEN 'interactive_agent'
+           WHEN (${trainingCallerConds})    THEN 'training_crawler'
+           WHEN (${searchCallerConds})      THEN 'search_crawler'
+           ELSE 'unclassified'
+         END AS caller_class,
+         COUNT(*) as count
+       FROM enrichment_attempts
+       WHERE created_at > ${since}
+       GROUP BY caller_class ORDER BY count DESC`
+    ).all();
+    attemptsByCallerClass = byCaller.results || [];
+
+    // Intent split. 'read_get' is anything the GET brief handler or a method
+    // mismatch produced; 'write_post' is anything only reachable through the
+    // POST branch. 'ambiguous_legacy' is the bare 'nonprofit_not_found' class,
+    // which both branches wrote until the prefix landed today: those rows
+    // cannot be attributed and are reported as their own bucket rather than
+    // silently assigned to whichever side flatters the number.
+    const byIntent = await db.prepare(
+      `SELECT
+         CASE
+           WHEN error_class LIKE 'get_brief%'     THEN 'read_get'
+           WHEN error_class LIKE 'wrong_method_%' THEN 'read_get'
+           WHEN error_class = 'nonprofit_not_found' THEN 'ambiguous_legacy'
+           ELSE 'write_post'
+         END AS intent,
+         COUNT(*) as count
+       FROM enrichment_attempts
+       WHERE created_at > ${since}
+       GROUP BY intent ORDER BY count DESC`
+    ).all();
+    attemptsByIntent = byIntent.results || [];
+
+    // The honest denominator: error classes for interactive agents only. If
+    // this comes back empty, no agent capable of submitting has touched the
+    // endpoint in the window, and no percentage computed over the raw total
+    // says anything about agent behaviour.
+    const byErrorInteractive = await db.prepare(
+      `SELECT error_class, COUNT(*) as count FROM enrichment_attempts
+       WHERE created_at > ${since} AND user_agent IS NOT NULL
+         AND (${interactiveCallerConds})
+       GROUP BY error_class ORDER BY count DESC`
+    ).all();
+    attemptsByErrorClassInteractive = byErrorInteractive.results || [];
+    attemptsInPeriodInteractive = (attemptsByErrorClassInteractive || [])
+      .reduce((n, r) => n + (r.count || 0), 0);
 
     const byUa = await db.prepare(
       `SELECT user_agent, COUNT(*) as count FROM enrichment_attempts
@@ -7277,6 +7488,12 @@ async function handleAdminTraffic(db, env, request, url) {
       discovery_hits_in_period_writing_agents: totalDiscoveryRecentWriting.total,
       enrichments_in_period: enrichmentRecent.total,
       attempts_in_period: attemptsInPeriod,
+      // Added 2026-09-07. attempts_in_period counts every request that reached
+      // /api/enrich/{slug}, including crawlers following the URL printed in
+      // /AGENTS.md. This field counts only callers that are capable of
+      // submitting. Any success-rate or halt-rule percentage belongs over this
+      // denominator, not the one above.
+      attempts_in_period_interactive_agents: attemptsInPeriodInteractive,
     },
     discovery_by_route: discoveryByRoute.results,
     discovery_by_user_agent: discoveryByAgent.results,
@@ -7289,6 +7506,12 @@ async function handleAdminTraffic(db, env, request, url) {
     queries_by_day: queryByDay.results,
     attempts_by_status: attemptsByStatus,
     attempts_by_error_class: attemptsByError,
+    // Added 2026-09-07. attempts_by_error_class is over ALL callers and is kept
+    // for continuity; it is not a measure of agent behaviour. Read these three
+    // before drawing any conclusion from it.
+    attempts_by_caller_class: attemptsByCallerClass,
+    attempts_by_intent: attemptsByIntent,
+    attempts_by_error_class_interactive: attemptsByErrorClassInteractive,
     attempts_by_user_agent: attemptsByUa,
     recent_attempts: recentAttempts,
   });
@@ -8886,7 +9109,14 @@ const _httpHandler = {
           ip: request.headers.get('CF-Connecting-IP') || null,
           referrer: request.headers.get('Referer') || null,
           status_code: brief ? 200 : 404,
-          error_class: brief ? 'get_brief_served' : 'nonprofit_not_found',
+          // 'get_brief_nonprofit_not_found', not 'nonprofit_not_found' (2026-09-07).
+          // The POST path at handleEnrich logs a bare 'nonprofit_not_found' too, so
+          // the two were indistinguishable in enrichment_attempts and any read-vs-write
+          // split had to treat the class as ambiguous. Prefixing it here makes every
+          // row logged from today forward attributable to the method that produced it,
+          // with no schema change. Rows written before today stay ambiguous; there are
+          // 6 of them and the read path buckets them explicitly rather than guessing.
+          error_class: brief ? 'get_brief_served' : 'get_brief_nonprofit_not_found',
           fields_count: brief ? brief.missing_fields.length : 0,
           payload_bytes: 0,
         });
@@ -8934,6 +9164,11 @@ const _httpHandler = {
       }
 
       // Donate page: /donate/{slug} → serve inline HTML (client-side JS reads the slug from URL)
+      // Outbound donate click tracker. Must sit before the donate page match
+      // so /out/<slug> is never swallowed by a broader route later.
+      const outMatch = path.match(/^\/out\/([a-z0-9-]+)$/);
+      if (outMatch) return handleOutboundDonate(env.DB, request, url, outMatch[1]);
+
       const donatePageMatch = path.match(/^\/donate\/([a-z0-9-]+)$/);
       if (donatePageMatch) {
         return new Response(DONATE_PAGE_HTML, {
