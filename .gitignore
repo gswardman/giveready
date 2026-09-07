@@ -41,3 +41,6 @@ npm-debug.log*
 mcp-publisher
 .gstack/
 .tmprun/
+
+# IRS bulk data (316MB of downloaded registry files, regenerable)
+data/irs/

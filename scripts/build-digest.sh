@@ -86,6 +86,23 @@ DH_7D=$(echo "$TRAFFIC7D" | jq -r '.summary.discovery_hits_in_period // "?"')
 TOP_ROUTE=$(echo "$TRAFFIC24" | jq -r '.discovery_by_route[0] | "\(.route) — \(.hits) hits"' 2>/dev/null || echo "(none)")
 TOP_UA=$(echo "$TRAFFIC24" | jq -r '.discovery_by_user_agent[0] | "\(.user_agent) — \(.hits) hits"' 2>/dev/null || echo "(none)")
 
+# Bulk crawlers (excluded from agents_only shares). Amazonbot and PetalBot are
+# reported but never admitted to KNOWN_AGENT_PATTERNS — admitting them would make
+# them 87% of agents_only and break the guide-share metric (T2/A5, 2026-09-05).
+BULK_CRAWLERS=$(echo "$TRAFFIC24" | jq -r '
+  .noise_breakdown // [] |
+  map(select(.user_agent | test("Amazonbot|PetalBot"; "i"))) |
+  map("\(.user_agent | split("/")[0]) \(.hits)") | join(", ")' 2>/dev/null || echo "")
+# Guide share of agents_only (T2 baseline: 1.83% as of 2026-09-05)
+AGENTS_ONLY_24=$(echo "$TRAFFIC24" | jq -r '.summary.discovery_hits_in_period_agents_only // "?"')
+GUIDE_HITS_24=$(echo "$TRAFFIC24" | jq -r '
+  [.discovery_by_route // [] | .[] | select(.route | startswith("/guides/")) | .hits] | add // 0' 2>/dev/null || echo 0)
+if [ "$AGENTS_ONLY_24" != "?" ] && [ "$AGENTS_ONLY_24" -gt 0 ] 2>/dev/null; then
+  GUIDE_SHARE=$(echo "scale=1; $GUIDE_HITS_24 * 100 / $AGENTS_ONLY_24" | bc 2>/dev/null || echo "?")
+else
+  GUIDE_SHARE="?"
+fi
+
 READ_AND_LEFT=$(echo "$FUNNEL24" | jq -r '
   .read_and_left // [] |
   map("  - \(.user_agent) hit \(.route) \(.hits)x, last \(.last_hit) — no submission") | .[]' 2>/dev/null || echo "  - (none)")
@@ -156,6 +173,8 @@ $RECENT_ACT
 - Discovery hits: 24h $DH_24, 7d $DH_7D
 - Top route (24h): \`$TOP_ROUTE\`
 - Top user-agent (24h): $TOP_UA
+- Guide share of agents_only (24h): $GUIDE_HITS_24/$AGENTS_ONLY_24 = ${GUIDE_SHARE}% _(baseline 1.83%, 2026-09-05)_
+- Bulk crawlers (excluded from shares): ${BULK_CRAWLERS:-none in window}
 
 ## Named Crawlers — First Seen Today ($FIRST_SEEN_COUNT)
 

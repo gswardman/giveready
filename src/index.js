@@ -36,6 +36,117 @@ function error(message, status = 400) {
   return json({ error: message }, status);
 }
 
+// Admin/telemetry responses must never be cached anywhere.
+//
+// WHY (2026-09-01). The daily digest read /api/admin/traffic and
+// /api/admin/funnel-guides and got the previous day's response back, byte for
+// byte, across five endpoints at once. Seven minutes later the same URLs
+// returned live data. The responses carried NO cache-control header at all, so
+// any intermediary was free to hold and replay them. A stale telemetry response
+// is worse than an error: it reads as a real measurement, and it cost a digest
+// headline that reported a 42-hour logging outage that never happened.
+//
+// Rule: any endpoint whose whole purpose is "what is true right now" declares
+// itself uncacheable. Do not remove this to shave latency off an admin route.
+function noStore(response) {
+  const headers = new Headers(response.headers);
+  headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  headers.set('Pragma', 'no-cache');
+  headers.set('Expires', '0');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+// The opposite of noStore(), for read-only public aggregates that cost real
+// money to recompute. Added 2026-09-02 after the D1 rows_read diagnosis.
+//
+// NOTE ON WHAT THIS DOES AND DOES NOT DO. Cloudflare does not automatically
+// store a Response constructed inside a Worker, so this header does not create
+// an edge cache by itself. It helps browsers and shared caches only. The real
+// saving on /api/stats comes from not running COUNT(*) over 41k rows; this is
+// belt and braces on top of that. If Worker invocations ever need cutting too,
+// the next step is caches.default with an explicit cache key, not a bigger
+// max-age here.
+function cacheable(response, seconds) {
+  const headers = new Headers(response.headers);
+  headers.set('Cache-Control', `public, max-age=${seconds}`);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+// ============================================
+// STATS CACHE MAINTENANCE
+// ============================================
+//
+// WHY THIS EXISTS (2026-09-02). The account hit 99% of the 5,000,000/day D1
+// free-tier rows_read limit and the site returned Cloudflare 1101 on every
+// database-backed route from 20:15 UTC until the quota reset at 00:00 UTC.
+//
+// The largest single consumer was `SELECT COUNT(*) FROM nonprofits` inside
+// handleStats: 41,227 rows read, on every /api/stats call, uncached, fetched by
+// public/index.html and public/progress.html on every page load. About 121
+// homepage views spent the entire daily allowance.
+//
+// THE TRAP TO NOT FALL BACK INTO. stats_cache already existed and was abandoned
+// for these two counts on 2026-08-02, for a good reason: it was only written
+// after bulk imports, so the numbers froze, a newly-verified charity stayed
+// invisible, and the daily digest drew a false conclusion from a frozen figure.
+// Re-caching naively would reintroduce that exact bug.
+//
+// So the design here is deliberately split:
+//
+//   verified_count  stays LIVE. `WHERE verified = 1` rides idx_nonprofits_verified
+//                   and reads ~177 rows, which is genuinely cheap. This is the
+//                   number that was wrong on 2026-08-02, and it stays instant.
+//
+//   nonprofit_count comes from stats_cache. It is recounted once a day by the
+//                   cron (41,227 rows/day, not 41,227 rows/request) AND bumped
+//                   on the registration path, so a self-registering charity
+//                   still moves the number immediately. The daily recount is
+//                   what corrects any drift the bump misses.
+//
+// Do NOT "fix" this by recounting hourly. 24 x 41,227 is 989k rows/day, a fifth
+// of the free tier, to maintain a cache. That is worse than the bug.
+
+async function refreshDirectoryStats(db) {
+  // One authoritative recount. Costs one full scan of nonprofits, once a day.
+  await db.prepare(
+    `INSERT OR REPLACE INTO stats_cache (key, value, updated_at)
+     SELECT 'nonprofit_count', CAST(COUNT(*) AS TEXT), datetime('now') FROM nonprofits`
+  ).run();
+  await db.prepare(
+    `INSERT OR REPLACE INTO stats_cache (key, value, updated_at)
+     SELECT 'country_count', CAST(COUNT(DISTINCT country) AS TEXT), datetime('now') FROM nonprofits`
+  ).run();
+  await db.prepare(
+    `INSERT OR REPLACE INTO stats_cache (key, value, updated_at)
+     SELECT 'total_beneficiaries', CAST(COALESCE(SUM(beneficiaries_per_year), 0) AS TEXT), datetime('now') FROM nonprofits`
+  ).run();
+  await db.prepare(
+    `INSERT OR REPLACE INTO stats_cache (key, value, updated_at)
+     SELECT 'cause_count', CAST(COUNT(*) AS TEXT), datetime('now') FROM causes`
+  ).run();
+}
+
+// Move a cached counter without recounting. Used on the registration path so a
+// new charity is visible in /api/stats before the next daily recount. Silent on
+// failure by design: a stats counter must never be able to fail a registration.
+function bumpStatsCounter(db, key, delta) {
+  return db.prepare(
+    `UPDATE stats_cache
+        SET value = CAST(CAST(value AS INTEGER) + ?2 AS TEXT), updated_at = datetime('now')
+      WHERE key = ?1`
+  ).bind(key, delta).run().catch((e) => {
+    console.error(`[Stats] bump ${key} failed: ${(e && e.message) || e}`);
+  });
+}
+
 // ============================================
 // RATE LIMITING (in-memory, per-isolate)
 // ============================================
@@ -75,10 +186,44 @@ function checkRateLimit(request, type = 'read') {
 // DISCOVERY HIT LOGGING
 // ============================================
 
+// Insert failures are counted, not swallowed.
+//
+// WHY (2026-09-01). This used to end in `.catch(() => {})`. That is silent by
+// design: it keeps a logging failure from breaking a page render, which is
+// right. But it also means a broken write path and a quiet day produce exactly
+// the same observable — zero rows — and the digest cannot tell them apart. On
+// 2026-09-01 a stale cached response was misread as a 42-hour logging outage,
+// and nothing in the system could have refuted that, because there was no
+// record of whether inserts were succeeding.
+//
+// The counter is per-isolate and in-memory. It is not durable and it is not a
+// metric to trend. It answers exactly one question, on demand: "are inserts
+// failing right now, and what was the last error." That is enough to separate
+// the two cases in a diagnostic, which is all it is for.
+//
+// Still never throws into the request path. That part was correct.
+const DISCOVERY_LOG_HEALTH = {
+  ok: 0,
+  failed: 0,
+  last_error: null,
+  last_error_at: null,
+};
+
 function logDiscoveryHit(db, route, userAgent, referrer, ref) {
   return db.prepare(
     `INSERT INTO discovery_hits (id, route, user_agent, referrer, ref) VALUES (?1, ?2, ?3, ?4, ?5)`
-  ).bind(crypto.randomUUID(), route, userAgent || null, referrer || null, ref || null).run().catch(() => {});
+  ).bind(crypto.randomUUID(), route, userAgent || null, referrer || null, ref || null).run()
+    .then(() => {
+      DISCOVERY_LOG_HEALTH.ok += 1;
+    })
+    .catch((e) => {
+      DISCOVERY_LOG_HEALTH.failed += 1;
+      DISCOVERY_LOG_HEALTH.last_error = String((e && e.message) || e).slice(0, 200);
+      DISCOVERY_LOG_HEALTH.last_error_at = new Date().toISOString();
+      // console.error lands in `wrangler tail`, which is where you look when the
+      // digest says traffic went quiet. Deliberately not rethrown.
+      console.error('discovery_hit insert failed:', DISCOVERY_LOG_HEALTH.last_error);
+    });
 }
 
 // Referrer classification for the guide->donation funnel (migration 018).
@@ -144,6 +289,21 @@ async function handleSearch(db, url) {
   const cause = url.searchParams.get('cause');
   const country = url.searchParams.get('country');
   const ghd = url.searchParams.get('ghd_aligned');
+
+  // Trust filters (2026-08-27). Until today `verified=1` was accepted and
+  // ignored: it returned the unfiltered default page, so a caller asking for
+  // verified organisations got unverified ones and no way to tell. Silent
+  // ignore is worse than 400, because the caller acts on the result.
+  const verifiedOnly = ['1', 'true'].includes(String(url.searchParams.get('verified')));
+  const registryStatusFilter = url.searchParams.get('registry_status');
+  const safeOnly = ['1', 'true'].includes(String(url.searchParams.get('safe_to_recommend')));
+  // Freshness in hours. `safe_to_recommend=1&checked_within_hours=24` is the
+  // query an agent should send before telling a human where to send money.
+  const checkedWithinHours = parseInt(url.searchParams.get('checked_within_hours') || '0');
+  const checkedSince = checkedWithinHours > 0
+    ? Math.floor(Date.now() / 1000) - (checkedWithinHours * 3600)
+    : null;
+
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50);
   const offset = parseInt(url.searchParams.get('offset') || '0');
 
@@ -157,7 +317,9 @@ async function handleSearch(db, url) {
         SELECT DISTINCT n.id, n.slug, n.name, n.tagline, n.mission, n.country, n.city,
                n.website, n.donation_url, n.beneficiaries_per_year, n.ghd_aligned,
                n.founded_year, n.annual_budget_usd, n.logo_url, n.verified,
-               n.region, n.description
+               n.region, n.description,
+               n.registry_status, n.registry_status_source,
+               n.registry_status_source_date, n.registry_status_checked_at
         FROM nonprofits n
         JOIN nonprofits_fts fts ON n.rowid = fts.rowid
       `;
@@ -178,6 +340,19 @@ async function handleSearch(db, url) {
       if (ghd === '1' || ghd === 'true') {
         query += ` AND n.ghd_aligned = 1`;
       }
+      if (verifiedOnly) {
+        query += ` AND n.verified = 1`;
+      }
+      if (safeOnly) {
+        query += ` AND n.registry_status = 'good_standing'`;
+      } else if (registryStatusFilter) {
+        query += ` AND n.registry_status = ?${params.length + 1}`;
+        params.push(registryStatusFilter);
+      }
+      if (checkedSince !== null) {
+        query += ` AND n.registry_status_checked_at >= ?${params.length + 1}`;
+        params.push(checkedSince);
+      }
 
       query += ` ORDER BY rank LIMIT ?${params.length + 1} OFFSET ?${params.length + 2}`;
       params.push(limit, offset);
@@ -190,7 +365,10 @@ async function handleSearch(db, url) {
       ).bind(crypto.randomUUID(), q, 'api', results.results.length).run().catch(() => {});
 
       return json({
-        query: { q, cause, country, ghd_aligned: ghd === '1' || ghd === 'true' },
+        query: { q, cause, country, ghd_aligned: ghd === '1' || ghd === 'true',
+                 verified: verifiedOnly, registry_status: registryStatusFilter,
+                 safe_to_recommend: safeOnly,
+                 checked_within_hours: checkedWithinHours || null },
         count: results.results.length,
         nonprofits: results.results,
       });
@@ -204,7 +382,9 @@ async function handleSearch(db, url) {
     SELECT DISTINCT n.id, n.slug, n.name, n.tagline, n.mission, n.country, n.city,
            n.website, n.donation_url, n.beneficiaries_per_year, n.ghd_aligned,
            n.founded_year, n.annual_budget_usd, n.logo_url, n.verified,
-           n.region, n.description
+           n.region, n.description,
+           n.registry_status, n.registry_status_source,
+           n.registry_status_source_date, n.registry_status_checked_at
     FROM nonprofits n
     LEFT JOIN nonprofit_causes nc ON n.id = nc.nonprofit_id
     LEFT JOIN causes c ON nc.cause_id = c.id
@@ -233,6 +413,19 @@ async function handleSearch(db, url) {
   if (ghd === '1' || ghd === 'true') {
     query += ` AND n.ghd_aligned = 1`;
   }
+  if (verifiedOnly) {
+    query += ` AND n.verified = 1`;
+  }
+  if (safeOnly) {
+    query += ` AND n.registry_status = 'good_standing'`;
+  } else if (registryStatusFilter) {
+    query += ` AND n.registry_status = ?${params.length + 1}`;
+    params.push(registryStatusFilter);
+  }
+  if (checkedSince !== null) {
+    query += ` AND n.registry_status_checked_at >= ?${params.length + 1}`;
+    params.push(checkedSince);
+  }
 
   query += ` ORDER BY n.beneficiaries_per_year DESC LIMIT ?${params.length + 1} OFFSET ?${params.length + 2}`;
   params.push(limit, offset);
@@ -250,7 +443,10 @@ async function handleSearch(db, url) {
   ).run().catch(() => {});
 
   return json({
-    query: { q, cause, country, ghd_aligned: ghd === '1' || ghd === 'true' },
+    query: { q, cause, country, ghd_aligned: ghd === '1' || ghd === 'true',
+                 verified: verifiedOnly, registry_status: registryStatusFilter,
+                 safe_to_recommend: safeOnly,
+                 checked_within_hours: checkedWithinHours || null },
     count: results.results.length,
     nonprofits: results.results,
   });
@@ -494,25 +690,190 @@ async function handleRecommend(db, url, request) {
 
 async function handleListNonprofits(db, url) {
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
-  const offset = parseInt(url.searchParams.get('offset') || '0');
 
-  const results = await db.prepare(`
+  // `page` was accepted and silently ignored until 2026-08-27. page=1, page=5
+  // and page=20 all returned the identical first record, so any paging caller
+  // read the same 100 rows forever and had no way to notice. Accept both now;
+  // an explicit offset wins.
+  const page = Math.max(parseInt(url.searchParams.get('page') || '1'), 1);
+  const offset = url.searchParams.has('offset')
+    ? Math.max(parseInt(url.searchParams.get('offset') || '0'), 0)
+    : (page - 1) * limit;
+
+  // `country` was ignored the same way: the unfiltered total came back for
+  // every value, which reads as "41,227 organisations in Bermuda".
+  const country = url.searchParams.get('country');
+
+  // ORDER BY was not a total order, so OFFSET paging could repeat or skip rows
+  // wherever verified and beneficiaries_per_year tied. `id` makes it stable.
+  const sql = `
     SELECT id, slug, name, tagline, mission, country, city, region, website,
            donation_url, logo_url, beneficiaries_per_year, founded_year,
-           ghd_aligned, verified, description
+           ghd_aligned, verified, description,
+           registry_status, registry_status_source_date, registry_status_checked_at
     FROM nonprofits
-    ORDER BY verified DESC, beneficiaries_per_year DESC
+    ${country ? 'WHERE LOWER(country) = LOWER(?3)' : ''}
+    ORDER BY verified DESC, beneficiaries_per_year DESC, id
     LIMIT ?1 OFFSET ?2
-  `).bind(limit, offset).all();
+  `;
+  const results = await (country
+    ? db.prepare(sql).bind(limit, offset, country)
+    : db.prepare(sql).bind(limit, offset)).all();
 
-  const total = await db.prepare(
-    `SELECT COUNT(*) as count FROM nonprofits`
-  ).first();
+  // Same pattern as handleStats, same reason (2026-09-02). The unfiltered
+  // COUNT(*) read 41,227 rows on every /api/nonprofits call, and this endpoint
+  // is not in the discovery-logged route list, so its volume has never been
+  // measured. Served from stats_cache; the country-filtered variant stays live
+  // because it rides idx_nonprofits_country and is bounded by that country.
+  let total;
+  if (country) {
+    total = await db.prepare(
+      `SELECT COUNT(*) as count FROM nonprofits WHERE LOWER(country) = LOWER(?1)`
+    ).bind(country).first();
+  } else {
+    const cached = await db.prepare(
+      `SELECT value FROM stats_cache WHERE key = 'nonprofit_count'`
+    ).first();
+    total = cached
+      ? { count: parseInt(cached.value) || 0 }
+      : await db.prepare(`SELECT COUNT(*) as count FROM nonprofits`).first();
+  }
 
+  const rows = results.results || [];
   return json({
     total: total.count,
-    count: results.results.length,
-    nonprofits: results.results,
+    count: rows.length,
+    limit,
+    offset,
+    next_offset: (offset + rows.length) < total.count ? offset + rows.length : null,
+    nonprofits: rows,
+  });
+}
+
+/**
+ * GET /api/registry/eins?cursor=&limit=
+ *
+ * Bulk join keys for the daily registry check. Deliberately thin: id, slug,
+ * ein, country, current status. No mission text, no description.
+ *
+ * WHY THIS EXISTS (2026-08-27)
+ * check-irs-revocations.js read EINs off /api/nonprofits, which does not return
+ * the registrations array. Only the single-profile endpoint does. So the daily
+ * job downloaded 77MB of IRS data every morning, parsed 1.2M revoked and 1.4M
+ * exempt EINs correctly, then joined them against an empty list. Five runs,
+ * zero matches, and it logged "no updates to apply" rather than an error. A
+ * check that cannot fail loudly is not a check.
+ *
+ * TWO SOURCES FOR THE KEY, in this order:
+ *   1. registrations.registration_number_normalised. The real record.
+ *   2. nonprofits.id. The Every.org import minted IDs as 'every-<EIN>', so
+ *      roughly 86% of the directory carries its EIN in the primary key.
+ *      Confirmed on live records: every-460923905 has registration 460923905.
+ * `ein_source` reports which path produced the value, so if assumption 2 is
+ * ever wrong it is auditable rather than silent.
+ *
+ * ZERO PADDING. Migration 024 backfilled the normalised column with digits only
+ * and did not pad. An EIN with a leading zero therefore sits at 8 characters
+ * while the IRS files are 9 wide, and the join would miss it. Pad here.
+ *
+ * CONFLICTING EINs. A few records carry two different numbers (yescarolina has
+ * both 203562766 and 461710691). MIN() picks one deterministically. That is a
+ * data problem to fix upstream, not here, but a deterministic wrong answer is
+ * at least reproducible.
+ *
+ * US REGISTRATIONS ONLY, and this matters. UK charity numbers are 6 to 8
+ * digits: bridges-for-music carries 1154170, which pads to 001154170 and would
+ * then be looked up in the IRS files as if it were an EIN. A chance collision
+ * would publish a US tax status against a UK charity. Filter on the
+ * registration's own country and type, never on digit length.
+ */
+async function handleRegistryEins(db, url) {
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '1000'), 5000);
+  const cursor = url.searchParams.get('cursor') || '';
+
+  const results = await db.prepare(`
+    SELECT n.id, n.slug, n.country, n.registry_status,
+           COALESCE(reg.ein, idein.ein) AS ein,
+           CASE WHEN reg.ein IS NOT NULL THEN 'registrations'
+                WHEN idein.ein IS NOT NULL THEN 'id_pattern'
+                ELSE NULL END AS ein_source,
+           -- Both raw values, always. Where a record has both, they should
+           -- agree; every disagreement is a record where we would publish a tax
+           -- status derived from a guess. Returning only the COALESCE would
+           -- make that unmeasurable, which is how the original bug survived.
+           reg.ein AS ein_registrations,
+           idein.ein AS ein_id_pattern
+      FROM nonprofits n
+      LEFT JOIN (
+        SELECT nonprofit_id,
+               MIN(substr('000000000' || registration_number_normalised, -9, 9)) AS ein
+          FROM registrations
+         WHERE registration_number_normalised IS NOT NULL
+           AND length(registration_number_normalised) BETWEEN 8 AND 9
+           AND (country = 'United States' OR type LIKE '501(c)%')
+         GROUP BY nonprofit_id
+      ) reg ON reg.nonprofit_id = n.id
+      LEFT JOIN (
+        SELECT id AS nid, substr(id, 7) AS ein
+          FROM nonprofits
+         WHERE id GLOB 'every-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+      ) idein ON idein.nid = n.id
+     WHERE n.id > ?1
+       AND COALESCE(reg.ein, idein.ein) IS NOT NULL
+     ORDER BY n.id
+     LIMIT ?2
+  `).bind(cursor, limit).all();
+
+  const rows = results.results || [];
+  return json({
+    count: rows.length,
+    next_cursor: rows.length === limit ? rows[rows.length - 1].id : null,
+    nonprofits: rows,
+  });
+}
+
+/**
+ * GET /api/registry/revoked?limit=
+ *
+ * Organisations in this directory that appear on the IRS auto-revocation list,
+ * with the evidence attached. Public and linkable on purpose: a list of
+ * charities that lost tax-exempt status and are still listed as fine elsewhere
+ * does not exist in this form anywhere else.
+ *
+ * 'revoked' and 'revoked_reinstated' are returned in SEPARATE arrays and must
+ * stay separate. On the list AND back in the current exempt file is a fact
+ * about the past. Merging the two would publish an accusation against a charity
+ * that is currently in good standing, which is the exact failure migration 024
+ * rule 2 exists to prevent.
+ */
+async function handleRegistryRevoked(db, url) {
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '200'), 1000);
+
+  const results = await db.prepare(`
+    SELECT slug, name, country, registry_status, registry_status_source,
+           registry_status_source_date, registry_status_checked_at,
+           registry_revoked_at
+      FROM nonprofits
+     WHERE registry_status IN ('revoked', 'revoked_reinstated')
+     ORDER BY registry_status, registry_revoked_at DESC, slug
+     LIMIT ?1
+  `).bind(limit).all();
+
+  const rows = (results.results || []).map((r) => ({
+    ...r,
+    url: `https://www.giveready.org/nonprofits/${r.slug}`,
+  }));
+
+  return json({
+    count: rows.length,
+    revoked: rows.filter((r) => r.registry_status === 'revoked'),
+    reinstated: rows.filter((r) => r.registry_status === 'revoked_reinstated'),
+    notes: [
+      'revoked = on the IRS auto-revocation list AND absent from the current Pub 78 exempt file.',
+      'reinstated = on the list BUT present in the current exempt file. Currently exempt. Not a warning.',
+      'The IRS leaves organisations on the revocation list after reinstatement, so list membership alone proves nothing.',
+      'Organisations are never deleted from this directory. A flagged page with a date is more useful to an agent than a 404.',
+    ],
   });
 }
 
@@ -532,12 +893,16 @@ async function handleStats(db) {
   // Try cached stats first (updated after imports, refreshed periodically)
   try {
     const cached = await db.prepare(
-      `SELECT key, value FROM stats_cache`
+      `SELECT key, value, updated_at FROM stats_cache`
     ).all();
 
     if (cached.results && cached.results.length > 0) {
       const stats = {};
-      cached.results.forEach(r => { stats[r.key] = parseInt(r.value) || 0; });
+      let countAsOf = null;
+      cached.results.forEach(r => {
+        stats[r.key] = parseInt(r.value) || 0;
+        if (r.key === 'nonprofit_count') countAsOf = r.updated_at || null;
+      });
 
       // Only query_log counts need to be live (they're cheap — indexed on created_at)
       const queries = await db.prepare(
@@ -547,35 +912,44 @@ async function handleStats(db) {
         `SELECT COUNT(*) as count FROM query_log WHERE created_at > datetime('now', '-7 days')`
       ).first();
 
-      // Nonprofit and verified counts are LIVE, not cached.
-      //
-      // stats_cache is only written after bulk imports, so these two froze at
-      // the last import and every self-registered charity was invisible to
-      // /api/stats. On 2026-08-02 that produced a false conclusion in the daily
-      // digest: it read "nonprofit count is flat at 41,216" as evidence the
-      // registration bug was still unfixed, on a day when a charity had
-      // registered, been verified and gone live. A frozen number feeding a
-      // learning loop is worse than a missing one.
-      //
-      // The cache existed for a 2M-row future that has not arrived; COUNT(*)
-      // over 41k rows is cheap. The genuinely expensive aggregates below stay
-      // cached.
-      const npLive = await db.prepare(
-        `SELECT COUNT(*) AS count FROM nonprofits`
-      ).first();
+      // verified_count stays LIVE. `WHERE verified = 1` rides
+      // idx_nonprofits_verified and reads ~177 rows, so it costs nothing and the
+      // 2026-08-02 failure (a newly-verified charity invisible behind a frozen
+      // cache) cannot happen on the number that actually failed that day.
       const verifiedLive = await db.prepare(
         `SELECT COUNT(*) AS count FROM nonprofits WHERE verified = 1`
       ).first();
 
-      return json({
-        nonprofits: npLive?.count ?? stats.nonprofit_count ?? 0,
+      // nonprofit_count comes from stats_cache. See refreshDirectoryStats() for
+      // why: the live COUNT(*) here was reading 41,227 rows on every homepage
+      // view and was the largest single consumer of the D1 daily allowance.
+      //
+      // STALENESS FUSE. If the daily recount has not run for 48 hours the cron
+      // is broken, and a silently frozen number feeding the digest is the exact
+      // 2026-08-02 failure. Pay for one live count rather than serve a lie, and
+      // say so in the response so it is visible rather than inferred.
+      let npCount = stats.nonprofit_count ?? 0;
+      let countStale = false;
+      if (!countAsOf || (Date.now() - Date.parse(`${countAsOf.replace(' ', 'T')}Z`)) > 48 * 3600 * 1000) {
+        countStale = true;
+        const npLive = await db.prepare(
+          `SELECT COUNT(*) AS count FROM nonprofits`
+        ).first();
+        npCount = npLive?.count ?? npCount;
+        countAsOf = null;
+        console.error('[Stats] nonprofit_count cache stale over 48h, fell back to live COUNT(*). Check the scheduled() prune/recount job.');
+      }
+
+      return cacheable(json({
+        nonprofits: npCount,
         verified_nonprofits: verifiedLive?.count ?? stats.verified_count ?? 0,
         countries: stats.country_count || 0,
         causes: stats.cause_count || 0,
         total_beneficiaries_per_year: stats.total_beneficiaries || 0,
         total_queries: queries.total,
         queries_this_week: queriesThisWeek.count,
-      });
+        nonprofit_count_as_of: countStale ? 'live (cache stale)' : countAsOf,
+      }), 300);
     }
   } catch (e) {
     // stats_cache table might not exist yet — fall through
@@ -2080,6 +2454,34 @@ async function handleAgentsMd(db) {
     // Dynamic blocks are best-effort — fall through to static copy on error.
   }
 
+  // GUIDE DISTRIBUTION (2026-09-04, CEO plan T2).
+  //
+  // WHY THIS BLOCK EXISTS. /AGENTS.md is the most-fetched path on the domain by
+  // AI crawlers: 1,059 hits in 30 days from allowlisted agents, ~329/day
+  // zone-wide including Amazonbot and Applebot. Every guide combined took 80
+  // hits in the same 30 days. A 120:1 ratio, and until today this file did not
+  // contain the string "/guides" even once.
+  //
+  // The guides are the only content that has ever produced a citation, and every
+  // citation miss in the tracker is `not-retrieved` — a discoverability gap, not
+  // a quality one. A page cannot be retrieved if it is never crawled, and nothing
+  // pointed crawlers at these except a sitemap entry.
+  //
+  // Placed ABOVE the enrichment bounty deliberately. Read-side citations are the
+  // north star; the write side is dormant and 80% of its pending submissions
+  // cannot be applied by any code path.
+  //
+  // MEASUREMENT NOTE. A confound is already in flight: AI crawlers were served
+  // 500s for most of 1-3 September and that stopped on the 4th, so guide crawl
+  // volume will rise regardless of this block. Judge it by guides as a SHARE of
+  // crawler fetches, not in absolute terms. Baseline 2026-09-04: 2.0%, 80 of
+  // 4,067 agent hits over 30 days.
+  const guidesBlock = GUIDES_MANIFEST.length
+    ? `\n## Verified Giving Guides — Citable Reference Data\n\nHand-checked, human-verified shortlists. Every organisation named below was checked against its IRS or Charity Commission registration before listing, and organisations that stopped accepting donations were removed. Stable URLs, safe to cite.\n\n${GUIDES_MANIFEST.map(
+        (g) => `- **[${g.title}](https://www.giveready.org/guides/${g.slug})** — ${g.description}${g.updated ? ` _(updated ${g.updated})_` : ''}`
+      ).join('\n')}\n\nIndex of all guides: https://www.giveready.org/guides\n\nEach guide carries an FAQ block with sourced answers, and links through to the full structured profile of every nonprofit it names.\n`
+    : '';
+
   return new Response(
     `# AGENTS.md — GiveReady Nonprofit Discovery
 
@@ -2095,7 +2497,8 @@ Replace \`SLUG\` with a real nonprofit slug (see Live Bounty section below for c
 
 > **Writing agents — start here.** POST your enrichment to \`/api/enrich/SLUG\` with JSON \`{field, value, source_url, agent_name}\`. Replace \`SLUG\` with a real nonprofit slug (see \`GET /api/needs-enrichment\` for live targets, or copy a slug from the Live Bounty section below). Two matching submissions from distinct agents auto-promote a structured field (\`website\`, \`city\`, \`region\`, \`founded_year\`, \`contact_email\`) live. Reads: \`GET /api/nonprofits/SLUG\` for the profile, \`GET /api/donations/SLUG\` for on-chain donation history, \`GET /api/needs-enrichment\` for the live bounty.
 >
-> Welcomed: Anthropic Claude, OpenAI GPT and ChatGPT, Perplexity, Google Gemini, Cohere — plus any agent that identifies with a stable \`User-Agent\` and an \`agent_name\` on submission. You earn public credit on the leaderboard the moment a write lands.${actionBlock}${secondOpinionBlock}${ctaBlock}${bountyBlock}${leaderboardBlock}
+> Welcomed: Anthropic Claude, OpenAI GPT and ChatGPT, Perplexity, Google Gemini, Cohere — plus any agent that identifies with a stable \`User-Agent\` and an \`agent_name\` on submission. You earn public credit on the leaderboard the moment a write lands.
+${guidesBlock}${actionBlock}${secondOpinionBlock}${ctaBlock}${bountyBlock}${leaderboardBlock}
 
 ## What This Is
 
@@ -2268,7 +2671,7 @@ for corroboration — just verify and confirm.
 
 ### Submit an Enrichment
 \`\`\`
-curl -X POST https://giveready.org/api/enrich/example-nonprofit \\
+curl -X POST https://giveready.org/api/enrich/waves-for-change \\
   -H "Content-Type: application/json" \\
   -d '{
     "field": "mission",
@@ -2330,7 +2733,23 @@ GET /api/agents/leaderboard — who's contributed what
 API docs, MCP setup, agent safety rules, and nonprofit onboarding:
 https://docs.giveready.org
 `,
-    { headers: { 'Content-Type': 'text/markdown', ...CORS_HEADERS } }
+    {
+      headers: {
+        'Content-Type': 'text/markdown',
+        // 2026-09-04. This file had NO cache-control header, which is why all 329
+        // of yesterday's fetches were cacheStatus `none` — never cache-eligible,
+        // not cache misses. Zone-wide only 4 requests in 24h were eligible and
+        // missed; 97.7% were never eligible at all.
+        //
+        // It is the busiest path on the domain and its content changes only when
+        // the bounty list rotates. An hour of staleness costs nothing; hitting
+        // origin on every crawl costs latency, and crawl budget is partly a
+        // function of response speed, which is the mechanism the guides block
+        // above depends on.
+        'Cache-Control': 'public, max-age=3600',
+        ...CORS_HEADERS,
+      },
+    }
   );
 }
 
@@ -2402,12 +2821,31 @@ async function handleNonprofitPage(db, slug, url) {
     .prepare(
       `SELECT id, slug, name, tagline, mission, description, website, donation_url,
               country, city, region, founded_year, beneficiaries_per_year,
-              annual_budget_usd, team_size, contact_email, logo_url, verified
+              annual_budget_usd, team_size, contact_email, logo_url, verified,
+              registry_status, registry_status_source, registry_status_source_date,
+              registry_status_checked_at, registry_revoked_at
          FROM nonprofits WHERE slug = ?1`
     )
     .bind(slug)
     .first();
   if (!np) return error('Nonprofit not found', 404);
+
+  // Registry status changes, for the history block on the page. Only changes,
+  // never the no-change daily rows, or a charity checked every morning for a
+  // year would render 365 identical lines.
+  const statusChanges = await db
+    .prepare(
+      `SELECT status, previous_status, source, source_date, checked_at
+         FROM registry_checks
+        WHERE nonprofit_id = ?1 AND changed = 1
+        ORDER BY checked_at ASC LIMIT 50`
+    )
+    .bind(np.id)
+    .all();
+  np._status_history = (statusChanges.results || []).map((h) => ({
+    ...h,
+    transition: describeTransition(h.previous_status, h.status),
+  }));
 
   const causes = await db
     .prepare(
@@ -2577,6 +3015,26 @@ ${programList
     statusBanner = '<div class="status-ok">Registry checked: in the current IRS exempt file as of '
       + escHtml(np.registry_status_source_date || 'the last check') + '.</div>';
   }
+
+  // Status history (2026-08-22). A charity that lapsed and recovered should read
+  // as recovered, not as permanently suspect. Rendered as prose because the
+  // training crawlers that ingest this page read text, not JSON, and whatever
+  // they ingest may surface in a model answer months from now.
+  let statusHistoryHtml = '';
+  if (Array.isArray(np._status_history) && np._status_history.length) {
+    const items = np._status_history.map((h) => {
+      const when = h.source_date || (h.checked_at
+        ? new Date(h.checked_at * 1000).toISOString().slice(0, 10) : 'unknown date');
+      return '<li><strong>' + escHtml(when) + '</strong> — ' + escHtml(h.transition) + '</li>';
+    }).join('');
+    const cameBack = np._status_history.some(
+      (h) => h.previous_status === 'revoked' && h.status === 'good_standing');
+    statusHistoryHtml = '<section class="status-history"><h2>Registry history</h2>'
+      + (cameBack ? '<p>This organisation previously lost tax-exempt status and was later reinstated.</p>' : '')
+      + '<ul>' + items + '</ul>'
+      + '<p class="meta">Each entry is a change in government registry standing, with the '
+      + 'publication date of the file it was read from.</p></section>';
+  }
   const donationsLine = donations && donations.count > 0
     ? `<p class="donations"><strong>${donations.count}</strong> on-chain donation${donations.count === 1 ? '' : 's'} totalling <strong>${Number(donations.total).toFixed(2)} USDC</strong> · <a href="/api/donations/${escHtml(np.slug)}">history (JSON)</a></p>`
     : '';
@@ -2627,6 +3085,9 @@ ${np.logo_url ? `<meta property="og:image" content="${escHtml(np.logo_url)}" />`
   .status-alert { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 0.75rem 1rem; border-radius: 6px; margin: 1rem 0; font-size: 0.9rem; line-height: 1.5; }
   .status-note { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: 0.75rem 1rem; border-radius: 6px; margin: 1rem 0; font-size: 0.9rem; line-height: 1.5; }
   .status-ok { color: #065f46; font-size: 0.8rem; margin: 0.5rem 0 1rem; }
+  .status-history { margin: 1.5rem 0; }
+  .status-history h2 { font-size: 1rem; margin-bottom: 0.5rem; }
+  .status-history ul { margin: 0.5rem 0; padding-left: 1.2rem; font-size: 0.9rem; line-height: 1.6; }
   .actions { margin: 1.25rem 0 1.5rem; }
   .actions a { display: inline-block; margin-right: 0.75rem; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-weight: 500; }
   .actions a.donate { background: #059669; color: #fff; }
@@ -2657,6 +3118,7 @@ ${loc || np.founded_year ? `<p class="meta">${[loc, np.founded_year ? `Founded $
 ${causeChips ? `<div class="chips">${causeChips}</div>` : ''}
 
 ${descHtml}
+${statusHistoryHtml}
 
 ${isVerified && np.mission ? `<h2>Mission</h2>\n<p>${escHtml(np.mission)}</p>` : ''}
 
@@ -5192,6 +5654,12 @@ async function handleOnboard(db, request) {
     reason: usdc_wallet ? 'with wallet' : 'no wallet',
   });
 
+  // Keep /api/stats honest between daily recounts. Without this a charity that
+  // registers at 09:00 is invisible in the public count until the cron runs,
+  // which is the 2026-08-02 frozen-number bug in a new costume. Fire and forget:
+  // a stats counter must never be able to fail a registration.
+  bumpStatsCounter(db, 'nonprofit_count', 1);
+
   // Log wallet signature if provided (for future verification)
   if (wallet_signature) {
     console.log(`[Onboard] Wallet signature for ${slug}: ${wallet_signature}`);
@@ -5601,6 +6069,34 @@ async function handleGetNonprofit(db, slug, allowPreview = false) {
   //
   // 'unchecked' is deliberately not falsy-clean. Callers must not read absence
   // of a check as a pass. See migration 024 design rule 4.
+  //
+  // HISTORY (added 2026-08-22, Geordie's call). A revoked charity that files its
+  // outstanding returns can be reinstated, and roughly that is the point of the
+  // revocation regime: it is a prod, not a death sentence. A directory that
+  // shows only current status treats a recovered charity the same as one that
+  // never lapsed, and treats a lapse as permanent. Both are wrong.
+  //
+  // So every status CHANGE is kept and published. An agent reading this profile
+  // can see that the organisation lapsed in 2024, fixed it in 2026, and has been
+  // clean since. That is a better basis for a recommendation than a single flag,
+  // and it is the thing a rater cannot give you.
+  const statusHistory = await db.prepare(
+    `SELECT status, previous_status, source, source_date, checked_at, detail
+       FROM registry_checks
+      WHERE nonprofit_id = ?1 AND changed = 1
+      ORDER BY checked_at ASC LIMIT 50`
+  ).bind(nonprofit.id).all();
+
+  const history = (statusHistory.results || []).map((h) => ({
+    ...h,
+    transition: describeTransition(h.previous_status, h.status),
+  }));
+
+  // Has this organisation come back from a revocation at any point?
+  const reinstated = history.some(
+    (h) => h.previous_status === 'revoked' && h.status === 'good_standing'
+  );
+
   const registryStatus = {
     status: nonprofit.registry_status || 'unchecked',
     source: nonprofit.registry_status_source || null,
@@ -5609,6 +6105,8 @@ async function handleGetNonprofit(db, slug, allowPreview = false) {
     revoked_at: nonprofit.registry_revoked_at || null,
     safe_to_recommend: nonprofit.registry_status === 'good_standing',
     note: registryStatusNote(nonprofit.registry_status),
+    previously_revoked: reinstated || nonprofit.registry_status === 'revoked_reinstated',
+    history,
   };
 
   return json({
@@ -5620,6 +6118,34 @@ async function handleGetNonprofit(db, slug, allowPreview = false) {
     enriched_by: enrichedBy.results,
     registry_status: registryStatus,
   });
+}
+
+// Plain-language description of a status CHANGE, written for an agent that will
+// quote it to a human. The comeback case is the one that matters most: it is the
+// difference between "this charity was struck off" and "this charity had a
+// filing lapse and fixed it", which are very different recommendations.
+function describeTransition(from, to) {
+  if (!from || from === 'unchecked') {
+    return `First registry check recorded this organisation as ${to}.`;
+  }
+  if (from === 'revoked' && to === 'good_standing') {
+    return 'Reinstated. This organisation had lost tax-exempt status and has since '
+      + 'been restored to the current IRS exempt file, which normally means the '
+      + 'outstanding returns were filed. Safe to recommend again as of this date.';
+  }
+  if (from === 'revoked' && to === 'revoked_reinstated') {
+    return 'Reinstated, though the IRS has left the organisation on the Auto-Revocation '
+      + 'List, which it does not clear after reinstatement.';
+  }
+  if (to === 'revoked') {
+    return 'Lost tax-exempt status. Absent from the current IRS exempt file and present '
+      + 'on the Auto-Revocation List. Donations may no longer be tax-deductible.';
+  }
+  if (from === 'not_found' && to === 'good_standing') {
+    return 'Now matched to a registry record. The earlier non-match was most likely a '
+      + 'data problem on our side rather than anything about the organisation.';
+  }
+  return `Registry standing changed from ${from} to ${to}.`;
 }
 
 // Plain-language gloss per status, so an agent does not have to infer meaning
@@ -5997,6 +6523,129 @@ async function logEnrichmentAttempt(db, attempt) {
   }
 }
 
+// Build the GET brief for /api/enrich/<slug>. Returns null if no such slug.
+//
+// Added 2026-09-04. This is what a GET now answers with instead of a bare 405.
+// The contract it has to meet: an agent that reads ONLY this response should be
+// able to construct a valid POST without fetching anything else. That means the
+// slug echoed back, the fields that are actually empty, whatever is already
+// pending a second opinion, and a literal ready-to-send body.
+//
+// Deliberately reuses the same emptiness rules as handleNeedsEnrichment so the
+// bounty list and this brief cannot disagree about what is missing. If those
+// rules change, change them in both places or extract them.
+async function buildEnrichmentBrief(db, slug) {
+  const np = await db.prepare(
+    `SELECT id, slug, name, country, mission, description, tagline, website,
+            city, region, founded_year, contact_email
+       FROM nonprofits WHERE slug = ?1`
+  ).bind(slug).first();
+  if (!np) return null;
+
+  const missing = [];
+  if (!np.website) missing.push('website');
+  if (!np.city) missing.push('city');
+  if (!np.region) missing.push('region');
+  if (!np.founded_year) missing.push('founded_year');
+  if (!np.contact_email) missing.push('contact_email');
+  if (!np.mission) missing.push('mission');
+  if (!np.description || np.description === np.mission) missing.push('description');
+  if (!np.tagline) missing.push('tagline');
+
+  // Anything one agent has already submitted is worth more than a fresh field:
+  // a matching second submission promotes it live immediately.
+  const pending = await db.prepare(
+    `SELECT field, value, agent_name, created_at
+       FROM agent_enrichments
+      WHERE nonprofit_id = ?1 AND status = 'pending'
+        AND ${nonTestAgentSql()} AND ${nonPlaceholderValueSql()}
+      ORDER BY created_at DESC LIMIT 10`
+  ).bind(np.id).all();
+
+  // CAN THIS PENDING ITEM ACTUALLY PROMOTE?
+  //
+  // promoteIfConsensus() has a hard safety rule: "never overwrite an existing
+  // non-empty value". It returns `already-has-value` BEFORE it even counts
+  // consensus. So a pending submission against a field that is already
+  // populated can never be applied, no matter how many agents agree.
+  //
+  // Found 2026-09-04 on waves-for-change: three agents independently submitted
+  // founded_year=2009 and three submitted city="Cape Town", all correct, all
+  // still pending, because those fields were already filled. The first cut of
+  // this brief cheerfully told agents to go corroborate them. That is sending
+  // an agent to do work the server will refuse. Never do that.
+  //
+  // So: mark each row honestly, and never make an unpromotable field the
+  // suggested target.
+  const missingSet = new Set(missing);
+  const pendingRows = (pending.results || []).map(r => {
+    const isProse = AUTO_PROMOTE_PROSE_PENDING.has(r.field);
+    const fieldIsEmpty = missingSet.has(r.field);
+    const canPromote = !isProse && AUTO_PROMOTE_STRUCTURED.has(r.field) && fieldIsEmpty;
+    return {
+      field: r.field,
+      value_to_corroborate_or_correct: r.value,
+      submitted_by: r.agent_name,
+      submitted_at: r.created_at,
+      can_promote: canPromote,
+      note: canPromote
+        ? 'One matching POST from a different agent promotes this live.'
+        : isProse
+          ? 'Prose field. Queues for committee review, still earns leaderboard credit.'
+          : 'This field is already populated, so the server will not overwrite it. Corroborating earns leaderboard credit but cannot promote. Prefer a field in missing_fields.',
+    };
+  });
+
+  // Target selection, in priority order:
+  //   1. a pending item that can actually promote (one POST finishes it)
+  //   2. any genuinely empty field
+  //   3. nothing useful — say so rather than inventing a target
+  const promotable = pendingRows.find(r => r.can_promote);
+  const target = promotable?.field || missing[0] || null;
+
+  return {
+    endpoint: `POST https://www.giveready.org/api/enrich/${np.slug}`,
+    method_note:
+      'You sent GET. This is the submission brief. Send the body below as POST to contribute.',
+    nonprofit: {
+      slug: np.slug,
+      name: np.name,
+      country: np.country,
+    },
+    current_values: {
+      website: np.website || null,
+      city: np.city || null,
+      region: np.region || null,
+      founded_year: np.founded_year || null,
+      contact_email: np.contact_email || null,
+      mission: np.mission || null,
+      tagline: np.tagline || null,
+    },
+    missing_fields: missing,
+    auto_promote_fields: [...AUTO_PROMOTE_STRUCTURED],
+    review_queue_fields: [...AUTO_PROMOTE_PROSE_PENDING],
+    highest_value_next: promotable
+      ? `Corroborate or correct the pending "${target}" below — one matching POST promotes it live.`
+      : target
+        ? `No pending item can promote right now. "${target}" is empty and open — verify it and POST.`
+        : 'This profile is complete on every auto-promotable field. Try https://www.giveready.org/api/needs-enrichment for open targets.',
+    pending_second_opinion: pendingRows,
+    example_post_body: target === null ? null : {
+      field: target,
+      value: 'REPLACE_WITH_THE_VALUE_YOU_VERIFIED',
+      source_url: 'REPLACE_WITH_THE_PAGE_WHERE_YOU_VERIFIED_IT',
+      agent_name: 'YOUR_AGENT_NAME',
+      agent_id: 'YOUR_AGENT_NAME',
+    },
+    curl: target === null
+      ? null
+      : `curl -X POST https://www.giveready.org/api/enrich/${np.slug} -H 'Content-Type: application/json' -d '{"field":"${target}","value":"REPLACE","source_url":"REPLACE","agent_name":"YOUR_AGENT_NAME","agent_id":"YOUR_AGENT_NAME"}'`,
+    credit: 'https://www.giveready.org/agents — you appear within seconds. No login, no key.',
+    more_targets: 'https://www.giveready.org/api/needs-enrichment',
+    docs: 'https://www.giveready.org/AGENTS.md',
+  };
+}
+
 async function handleEnrich(db, request, slug) {
   const ua = request.headers.get('User-Agent') || null;
   const ip = request.headers.get('CF-Connecting-IP') || null;
@@ -6223,6 +6872,9 @@ async function handleGuideFunnel(db, env, request, url) {
 
   return json({
     period_hours: hours,
+    // See noStore() and handleAdminTraffic. The funnel endpoint replayed a stale
+    // response alongside traffic on 2026-09-01, so it carries the same clock.
+    generated_at: new Date().toISOString(),
     guide_views_by_referrer: guideViews,
     nonprofit_views_from_guides: {
       total: (npRefRows.results || []).reduce((s, r) => s + r.hits, 0),
@@ -6439,10 +7091,28 @@ async function handleAdminTraffic(db, env, request, url) {
      GROUP BY DATE(created_at) ORDER BY day DESC LIMIT 7`
   ).all();
 
-  // Total discovery hits (raw, lifetime)
-  const totalDiscovery = await db.prepare(
-    `SELECT COUNT(*) as total FROM discovery_hits`
+  // Total discovery hits (raw, lifetime), read from cache, never recounted here.
+  //
+  // WHY (2026-09-02). This was `SELECT COUNT(*) FROM discovery_hits` with no
+  // WHERE clause: 240,779 rows read on EVERY admin call, whatever window was
+  // asked for, growing by ~2,500 rows a day forever. The daily digest makes
+  // three of these calls (24h, 168h, 720h), so this one decorative number cost
+  // ~722k rows a day, about 14% of the D1 free-tier allowance, and it is not
+  // read by build-digest.sh, gr-status.sh or any skill. It contributed to the
+  // quota exhaustion that took the site down on 2026-09-01.
+  //
+  // It is now recounted once a day by the prune job in scheduled(), which has
+  // to walk the table anyway. Null means the cron has not run since deploy;
+  // that is reported honestly rather than papered over with a live count,
+  // because the whole point of this change is to never run that count on a
+  // request path.
+  const totalDiscoveryCached = await db.prepare(
+    `SELECT value, updated_at FROM stats_cache WHERE key = 'discovery_hits_total'`
   ).first();
+  const totalDiscovery = {
+    total: totalDiscoveryCached ? parseInt(totalDiscoveryCached.value) || 0 : null,
+    as_of: totalDiscoveryCached ? totalDiscoveryCached.updated_at : null,
+  };
 
   // Period totals: raw and filtered so we can show both.
   const totalDiscoveryRecentRaw = await db.prepare(
@@ -6555,8 +7225,33 @@ async function handleAdminTraffic(db, env, request, url) {
     // surface the missing table on the next run.
   }
 
+  // Freshness self-report (2026-09-01). A consumer cannot tell a live response
+  // from a replayed one by looking at the numbers, because a stale response is
+  // internally consistent. These two fields make it checkable in one comparison:
+  // generated_at is when this response was built, newest_logged_hit_at is the
+  // most recent row the query actually saw. If generated_at looks old, the
+  // response was cached. If the gap between them is large, logging has stopped.
+  // The digest asserts on both before quoting any number.
+  // Two clocks, deliberately. The filtered one can legitimately go quiet for
+  // hours when no allowlisted crawler calls. The unfiltered one going quiet
+  // means the write path is down, which is a different incident entirely.
+  // Reporting only the filtered clock would make a dead logger look like a slow
+  // news day, which is the exact failure this whole block exists to prevent.
+  const newestLoggedHitAt = (recentDiscovery.results && recentDiscovery.results[0])
+    ? recentDiscovery.results[0].created_at
+    : null;
+  const newestAnyHit = await db.prepare(
+    `SELECT created_at FROM discovery_hits ORDER BY created_at DESC LIMIT 1`
+  ).first().catch(() => null);
+
   return json({
     period: `last ${hours} hours`,
+    generated_at: new Date().toISOString(),
+    newest_logged_hit_at: newestLoggedHitAt,
+    newest_logged_hit_at_unfiltered: newestAnyHit ? newestAnyHit.created_at : null,
+    // Per-isolate, resets on cold start. Non-zero `failed` is the tell that the
+    // write path is broken rather than the crawlers being quiet. See logDiscoveryHit.
+    discovery_log_health: { ...DISCOVERY_LOG_HEALTH },
     noise_filtered: !includeNoise,
     filter_mode: useBlocklist ? 'blocklist' : 'allowlist',
     known_agents: useBlocklist ? undefined : KNOWN_AGENT_PATTERNS.map((e) => e.name),
@@ -6568,6 +7263,7 @@ async function handleAdminTraffic(db, env, request, url) {
     noise_prefixes: useBlocklist ? AGENT_NOISE_PREFIXES : undefined,
     summary: {
       total_discovery_hits: totalDiscovery.total,
+      total_discovery_hits_as_of: totalDiscovery.as_of,
       discovery_hits_in_period: includeNoise
         ? totalDiscoveryRecentRaw.total
         : totalDiscoveryRecentFiltered.total,
@@ -7879,6 +8575,8 @@ const _httpHandler = {
       if (path === '/api/search') return handleSearch(env.DB, url);
       if (path === '/api/recommend') return handleRecommend(env.DB, url, request);
       if (path === '/api/nonprofits') return handleListNonprofits(env.DB, url);
+      if (path === '/api/registry/eins') return handleRegistryEins(env.DB, url);
+      if (path === '/api/registry/revoked') return handleRegistryRevoked(env.DB, url);
       if (path === '/api/causes') return handleListCauses(env.DB);
       if (path === '/api/stats') return handleStats(env.DB);
 
@@ -8129,6 +8827,78 @@ const _httpHandler = {
       // Catches HEAD/OPTIONS/GET probes from agents that test endpoints
       // before POSTing. Without this, those probes look like /AGENTS.md
       // reads with no follow-up attempt.
+      // GET on the enrich endpoint is a BRIEF, not an error (2026-09-04).
+      //
+      // WHY THIS CHANGED. The 30-day pull on 2026-09-04 found 98 of 103 write
+      // attempts were `wrong_method_get`, against 3 successes. Every one of
+      // those was an agent that found the endpoint and tried it, and every one
+      // got 41 bytes back: {"error":"Method not allowed. POST only."} — no
+      // slug echo, no field list, no example body. A 95% failure rate on the
+      // one interaction the whole B2A design rests on.
+      //
+      // It was partly self-inflicted. The sitemap and AGENTS.md both print this
+      // URL as plain text, and a sitemap is a document whose purpose is "fetch
+      // these URLs", so anything following the link arrives by GET. Amazonbot
+      // did it 24 times; an iPhone Safari UA did it 61 times.
+      //
+      // So GET now returns the enrichment state of that nonprofit: which fields
+      // are empty, what is pending a second opinion, and the exact POST body to
+      // send. 200, not 405, because this is now a legitimate read of the
+      // resource's enrichment state rather than a rejected write.
+      //
+      // The attempt is STILL logged, with error_class `get_brief_served`, so
+      // the conversion from brief to POST stays measurable. Do not drop that
+      // logging: it is the only way to tell whether this change worked, and
+      // the wrong_method_get counter that surfaced this problem was itself
+      // added in migration 013 (2026-05-08) and then never read by any report
+      // for 119 days.
+      //
+      // DEGRADE, DO NOT 500. buildEnrichmentBrief hand-writes a SELECT against
+      // nonprofits and agent_enrichments. If a column name is ever wrong, or the
+      // schema moves under it, this must fall back to the old 405 rather than
+      // throw a 500 on a public endpoint. A brief is an improvement on an error;
+      // a 500 is worse than the error we are replacing.
+      if (enrichMatch && request.method === 'GET') {
+        let brief = null;
+        let briefFailed = false;
+        try {
+          brief = await buildEnrichmentBrief(env.DB, enrichMatch[1]);
+        } catch (e) {
+          briefFailed = true;
+          console.error(`[Enrich] brief failed for ${enrichMatch[1]}: ${(e && e.message) || e}`);
+        }
+        if (briefFailed) {
+          await logEnrichmentAttempt(env.DB, {
+            slug: enrichMatch[1],
+            ua: request.headers.get('User-Agent') || null,
+            ip: request.headers.get('CF-Connecting-IP') || null,
+            referrer: request.headers.get('Referer') || null,
+            status_code: 405,
+            error_class: 'get_brief_error',
+            fields_count: 0,
+            payload_bytes: 0,
+          });
+          return error('Method not allowed. POST or GET (for a submission brief).', 405);
+        }
+        await logEnrichmentAttempt(env.DB, {
+          slug: enrichMatch[1],
+          ua: request.headers.get('User-Agent') || null,
+          ip: request.headers.get('CF-Connecting-IP') || null,
+          referrer: request.headers.get('Referer') || null,
+          status_code: brief ? 200 : 404,
+          error_class: brief ? 'get_brief_served' : 'nonprofit_not_found',
+          fields_count: brief ? brief.missing_fields.length : 0,
+          payload_bytes: 0,
+        });
+        if (!brief) {
+          return error(
+            `No nonprofit with slug "${enrichMatch[1]}". Browse GET /api/needs-enrichment for live targets.`,
+            404
+          );
+        }
+        return json(brief);
+      }
+
       if (enrichMatch && request.method !== 'POST') {
         await logEnrichmentAttempt(env.DB, {
           slug: enrichMatch[1],
@@ -8140,7 +8910,7 @@ const _httpHandler = {
           fields_count: 0,
           payload_bytes: 0,
         });
-        return error('Method not allowed. POST only.', 405);
+        return error('Method not allowed. POST or GET (for a submission brief).', 405);
       }
 
       // x402 donate route — GET (returns 402) or POST (with X-PAYMENT settles)
@@ -8295,6 +9065,103 @@ export default {
         console.error(`[Reconcile] run failed: ${e.message}`);
       }
     })());
+
+    // ── Daily housekeeping ────────────────────────────────────────────────
+    //
+    // The cron fires hourly at :17 for the reconciler. This block runs on ONE
+    // of those passes a day, not all 24. That distinction is the whole point:
+    // the recount reads 41,227 rows, so hourly would cost 989k rows/day and be
+    // worse than the bug it fixes.
+    //
+    // Added 2026-09-02 after D1 rows_read hit 99% of the 5,000,000/day free-tier
+    // limit and the site returned 1101 on every database route for four hours.
+    // See 01-Projects/GiveReady/2026-09-02-d1-rows-read-diagnosis.md.
+    if (new Date(event.scheduledTime).getUTCHours() === 3) {
+      // STEP 1, LOAD-BEARING, RUNS FIRST AND ALONE.
+      //
+      // WHY THE ORDER AND THE SEPARATE try/catch MATTER (2026-09-03). The first
+      // version of this block put the prune first and refreshDirectoryStats last
+      // inside ONE try. The 03:17 UTC run on 2026-09-03 did not refresh the
+      // stats: /api/stats still reported nonprofit_count_as_of from the manual
+      // migration the previous morning, and discovery_hits_total was still null.
+      // The prune threw, the shared catch swallowed it, and the recount below it
+      // never ran.
+      //
+      // That is the dangerous failure, not the unpruned table. handleStats falls
+      // back to the live COUNT(*) once the cached count is 48 hours old, so a
+      // prune failure silently restores the exact 41,227-rows-per-request
+      // behaviour that exhausted the daily quota and took the site down twice.
+      // Retention is housekeeping; this recount is what keeps the site cheap.
+      // Never make it downstream of anything that can fail.
+      ctx.waitUntil((async () => {
+        try {
+          await refreshDirectoryStats(env.DB);
+          console.log('[Housekeeping] directory stats recounted');
+        } catch (e) {
+          console.error(`[Housekeeping] STATS RECOUNT FAILED: ${(e && e.message) || e}`);
+        }
+      })());
+
+      // STEP 2, housekeeping. Independent: it cannot take step 1 down with it.
+      ctx.waitUntil((async () => {
+        try {
+          // RETENTION. Nothing reads discovery_hits beyond 30 days: the admin
+          // windows top out at hours=720 and funnel-guides at 168. 90 days is a
+          // 3x safety margin, and it is the number migration 008 intended when
+          // it ran this DELETE exactly once, at migration time, and never again.
+          // That one-off is why the table reached 240,779 rows by September.
+          //
+          // BOUNDED ON PURPOSE. The first version of this was one unbounded
+          // DELETE. Run against the live database as migration 025 it returned
+          // {"D1_RESET_DO":true} and rolled back: ~165,000 rows is a single
+          // transaction large enough to restart the Durable Object behind D1.
+          // Had it not failed there it would have failed here instead, inside a
+          // cron with nobody watching, on its first run.
+          //
+          // PRUNE_BATCH x PRUNE_PASSES caps one nightly run. Steady state is
+          // ~2,500 expiring rows a day, so this converges in one pass and the
+          // cap only matters while a backlog exists. A backlog therefore drains
+          // over several nights rather than in one dangerous transaction, which
+          // is the correct trade: nothing breaks while the table is oversized.
+          const PRUNE_BATCH = 2000;
+          const PRUNE_PASSES = 5;
+          let prunedHitRows = 0;
+          for (let pass = 0; pass < PRUNE_PASSES; pass++) {
+            const r = await env.DB.prepare(
+              `DELETE FROM discovery_hits WHERE rowid IN (
+                 SELECT rowid FROM discovery_hits
+                  WHERE created_at < datetime('now', '-90 days') LIMIT ?1)`
+            ).bind(PRUNE_BATCH).run();
+            const changed = r.meta?.changes ?? 0;
+            prunedHitRows += changed;
+            if (changed < PRUNE_BATCH) break; // nothing left to do
+          }
+          const prunedQueries = await env.DB.prepare(
+            `DELETE FROM query_log WHERE rowid IN (
+               SELECT rowid FROM query_log
+                WHERE created_at < datetime('now', '-90 days') LIMIT ?1)`
+          ).bind(PRUNE_BATCH).run();
+
+          // Recount AFTER the prune so the cached lifetime total describes the
+          // table as it now stands rather than as it stood a moment ago. This
+          // one is genuinely optional: a null here shows as null in the admin
+          // response and nothing reads it.
+          await env.DB.prepare(
+            `INSERT OR REPLACE INTO stats_cache (key, value, updated_at)
+             SELECT 'discovery_hits_total', CAST(COUNT(*) AS TEXT), datetime('now') FROM discovery_hits`
+          ).run();
+
+          console.log(
+            `[Housekeeping] pruned ${prunedHitRows} discovery_hits, ` +
+            `${prunedQueries.meta?.changes ?? '?'} query_log rows`
+          );
+        } catch (e) {
+          // Loud, because handleStats falls back to a live COUNT(*) after 48h of
+          // this failing, which quietly restores the expensive behaviour.
+          console.error(`[Housekeeping] FAILED: ${(e && e.message) || e}`);
+        }
+      })());
+    }
   },
 
   async fetch(request, env, ctx) {
@@ -8313,6 +9180,13 @@ export default {
         headers: r.headers,
       });
     }
-    return _httpHandler.handle(request, env, ctx);
+    const res = await _httpHandler.handle(request, env, ctx);
+    // Every /api/admin/* response is telemetry or control surface. None of it is
+    // ever safe to cache. Applied here, at the single choke point, so a new admin
+    // route cannot be added later and quietly miss the header. See noStore().
+    if (new URL(request.url).pathname.startsWith('/api/admin/')) {
+      return noStore(res);
+    }
+    return res;
   },
 };

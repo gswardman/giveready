@@ -1,0 +1,31 @@
+-- 025-d1-rows-read-fix.sql — SUPERSEDED 2026-09-02, DO NOT RUN.
+--
+-- The original version of this file bundled the seed and a single unbounded
+-- `DELETE FROM discovery_hits WHERE created_at < datetime('now','-90 days')`
+-- covering roughly 165,000 rows. Run against the live database at 07:49 UTC it
+-- returned:
+--
+--   ✘ [ERROR] {"D1_RESET_DO":true}
+--
+-- and rolled back entirely. Two causes, and it does not matter which dominated,
+-- because both had to be fixed:
+--
+--   1. The rows_read quota was already exhausted (site returning 1101 since
+--      07:20 UTC), so nothing that touches D1 succeeds at all.
+--   2. A 165k-row DELETE is one enormous transaction for a D1 Durable Object.
+--      That is a hazard even on an idle, unmetered database.
+--
+-- Bundling the two also meant the cheap, important part (seeding the stats
+-- cache, which is what actually stops the bleeding) could not land without the
+-- expensive, optional part (retention) succeeding too. Wrangler applies a file
+-- as one batch, so a failure anywhere reverts everything.
+--
+-- Split into four independently retryable files, cheapest and most important
+-- first. Run them in order and stop wherever you like:
+--
+--   025a-stats-seed.sql            ~123k reads. THE FIX. Do this one.
+--   025b-discovery-total-seed.sql  ~240k reads. Cosmetic, admin display only.
+--   025c-prune.sql                 Batched retention. Re-run to convergence.
+--   025d-optional-list-index.sql   Optional index, not part of fixes 1 to 3.
+--
+-- See docs/DEPLOY-d1-rows-read-fix-2026-09-02.md.

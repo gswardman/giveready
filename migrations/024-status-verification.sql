@@ -34,7 +34,7 @@
 --    cardinality bias), and here it would mean vouching for a dead charity.
 --
 -- Apply:
---   wrangler d1 execute giveready --remote --file=migrations/024-status-verification.sql
+--   wrangler d1 execute giveready-db --remote --file=migrations/024-status-verification.sql
 
 -- Normalised join key. The directory currently stores the same EIN in multiple
 -- formats: friends-for-youth carries both '942961034' and '94-2961034'. Digits

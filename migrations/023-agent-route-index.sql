@@ -19,9 +19,9 @@
 -- index without touching the table.
 --
 -- Apply:
---   wrangler d1 execute giveready --remote --file=migrations/023-agent-route-index.sql
+--   wrangler d1 execute giveready-db --remote --file=migrations/023-agent-route-index.sql
 -- Verify:
---   wrangler d1 execute giveready --remote --command \
+--   wrangler d1 execute giveready-db --remote --command \
 --     "EXPLAIN QUERY PLAN SELECT user_agent, route, COUNT(*) FROM discovery_hits \
 --      WHERE created_at > 0 AND user_agent IS NOT NULL GROUP BY user_agent, route;"
 --   Expect: USING INDEX idx_discovery_hits_created_ua_route

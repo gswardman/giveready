@@ -33,6 +33,22 @@ LOG="$LOG_DIR/$TODAY.md"
 
 cd "$GR"
 
+# WRANGLER RESOLUTION (2026-08-27)
+# launchd runs this with a minimal PATH, so plain `wrangler` was "command not
+# found" on every successful run and nothing was ever applied. The failure came
+# after the log said the join was OK, so the log looked healthy.
+# Prefer the repo-local binary, then a global install, then npx.
+if [ -x "$GR/node_modules/.bin/wrangler" ]; then
+  WRANGLER="$GR/node_modules/.bin/wrangler"
+elif command -v wrangler >/dev/null 2>&1; then
+  WRANGLER="$(command -v wrangler)"
+elif command -v npx >/dev/null 2>&1; then
+  WRANGLER="npx --yes wrangler"
+else
+  echo "FATAL: no wrangler available (checked node_modules/.bin, PATH, npx)." >&2
+  exit 1
+fi
+
 {
   echo "# Registry check, $TODAY"
   echo ""
@@ -59,8 +75,18 @@ if [ ! -s "$SQL" ]; then
 fi
 
 echo "[2/3] Applying to D1..."
-wrangler d1 execute giveready --remote --file="$SQL" >> "$LOG" 2>&1
-echo "  applied"
+echo "  using: $WRANGLER" >> "$LOG"
+if $WRANGLER d1 execute giveready-db --remote --file="$SQL" >> "$LOG" 2>&1; then
+  echo "  applied"
+  echo "" >> "$LOG"
+  echo "**Applied to D1.**" >> "$LOG"
+else
+  code=$?
+  echo "  APPLY FAILED (exit $code)" | tee -a "$LOG"
+  echo "**Join succeeded but nothing was written to D1.** The statuses on the site" >> "$LOG"
+  echo "are unchanged and still carry their previous checked_at." >> "$LOG"
+  exit $code
+fi
 
 echo "[3/3] Verifying live..."
 {

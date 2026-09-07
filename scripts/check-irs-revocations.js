@@ -112,29 +112,86 @@ function parseIrsFile(text) {
   return eins;
 }
 
+/**
+ * Pull join keys from the public API rather than reading D1 directly, so this
+ * script needs no database credentials and can run anywhere.
+ *
+ * REWRITTEN 2026-08-27. The previous version paged
+ * /api/nonprofits?country=United States&limit=500&page=N and read
+ * `np.registrations` off each row. Three things were wrong with that and all
+ * three failed silently:
+ *
+ *   1. The list endpoint never returned `registrations`. Only the
+ *      single-profile endpoint does. So the inner loop iterated an empty array
+ *      on every row and this function returned [].
+ *   2. `page` was ignored. page=1, page=5 and page=20 all returned the same
+ *      first record.
+ *   3. `limit=500` was capped at 100, so `rows.length < 500` broke the loop
+ *      after one page regardless.
+ *
+ * Result: five consecutive daily runs downloaded 77MB of IRS data, parsed 1.2M
+ * revoked and 1.4M exempt EINs correctly, joined them against nothing, and
+ * logged "no updates to apply". The whole point of a daily check is that it
+ * tells you when something is wrong, so the zero-key case now exits non-zero
+ * instead of reporting a clean run.
+ */
 async function loadDirectoryEins() {
-  // Pull registrations from the public API rather than reading D1 directly, so
-  // this script needs no database credentials and can run anywhere.
   const out = [];
-  let page = 1;
+  let cursor = '';
+  let pages = 0;
+
   for (;;) {
-    const url = `${API_BASE}/api/nonprofits?country=United%20States&limit=500&page=${page}`;
+    const url = `${API_BASE}/api/registry/eins?limit=1000`
+      + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`directory fetch failed: HTTP ${res.status}`);
+
+    if (res.status === 404) {
+      // The endpoint ships with the Worker. If this script runs against a
+      // deployment that predates it, say so plainly rather than falling back to
+      // the broken path and reporting another clean zero.
+      throw new Error(
+        '/api/registry/eins returned 404. Deploy the Worker first '
+        + '(scripts/apply-registry-fix-2026-08-27.py, then wrangler deploy).'
+      );
+    }
+    if (!res.ok) throw new Error(`registry keys fetch failed: HTTP ${res.status}`);
+
     const body = await res.json();
-    const rows = body.nonprofits || body.results || [];
-    if (!rows.length) break;
-    for (const np of rows) {
-      const regs = np.registrations || [];
-      for (const r of regs) {
-        const ein = normaliseEin(r.registration_number);
-        if (ein) out.push({ id: np.id, slug: np.slug, name: np.name, ein });
+    const rows = body.nonprofits || [];
+    for (const r of rows) {
+      // Trust the endpoint's padding but re-normalise anyway: if the column
+      // format changes upstream, a silently unpadded key would just stop
+      // matching and look like "no revocations found".
+      const ein = normaliseEin(r.ein);
+      if (ein) {
+        out.push({ id: r.id, slug: r.slug, name: r.slug, ein, ein_source: r.ein_source });
       }
     }
-    if (rows.length < 500) break;
-    page++;
+
+    pages++;
+    if (!body.next_cursor) break;
+    cursor = body.next_cursor;
+    if (pages > 200) throw new Error('registry keys paging exceeded 200 pages, refusing to loop');
   }
+
   return out;
+}
+
+/** download() with three attempts and 5s / 15s backoff. */
+async function downloadWithRetry(url, dest, attempts = 3) {
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await download(url, dest);
+    } catch (e) {
+      lastErr = e;
+      if (i === attempts) break;
+      const waitMs = i * 10000 - 5000;   // 5s, then 15s
+      console.log(`  attempt ${i}/${attempts} failed (${e.message}), retrying in ${waitMs / 1000}s`);
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+  throw lastErr;
 }
 
 function sqlEscape(s) { return String(s).replace(/'/g, "''"); }
@@ -147,8 +204,12 @@ function sqlEscape(s) { return String(s).replace(/'/g, "''"); }
 
   if (DO_FETCH) {
     console.log('Fetching IRS files...');
-    await download(SOURCES.revocation, revZip);
-    await download(SOURCES.pub78, p78Zip);
+    // Retry with backoff (2026-08-27). Two of the first five daily runs died on
+    // transient irs.gov errors, ECONNRESET on the 25th and ENOTFOUND on the
+    // 26th, and each one failed the entire check. A flaky external download is
+    // ordinary; treating the first failure as fatal is not.
+    await downloadWithRetry(SOURCES.revocation, revZip);
+    await downloadWithRetry(SOURCES.pub78, p78Zip);
     console.log('  downloaded');
   }
 
@@ -191,7 +252,23 @@ function sqlEscape(s) { return String(s).replace(/'/g, "''"); }
 
   console.log('\nLoading GiveReady US registrations...');
   const dir = await loadDirectoryEins();
+  const bySource = dir.reduce((a, r) => {
+    a[r.ein_source || 'unknown'] = (a[r.ein_source || 'unknown'] || 0) + 1; return a;
+  }, {});
   console.log(`  ${dir.length.toLocaleString()} US registration numbers in the directory`);
+  console.log(`  by source: ${Object.entries(bySource).map(([k, v]) => `${k} ${v}`).join(', ') || 'none'}`);
+
+  // SAFETY (2026-08-27): zero join keys is a broken pipeline, not a clean run.
+  // This exact condition held for five days and read as "no updates to apply"
+  // because nothing distinguished "nothing changed" from "nothing was checked".
+  // Same rule as the Pub 78 exit above: refuse, do not degrade.
+  if (dir.length === 0) {
+    console.error('\nREFUSING TO PROCEED. 0 join keys returned by /api/registry/eins.');
+    console.error('Expect roughly 35,000. Zero means the endpoint is missing, the response');
+    console.error('shape changed, or the registrations backfill was rolled back.');
+    console.error('An empty join produces an all-clear report, which is worse than no report.');
+    process.exit(2);
+  }
 
   const results = { revoked: [], revoked_reinstated: [], good_standing: [], not_found: [] };
   for (const row of dir) {
@@ -247,5 +324,5 @@ function sqlEscape(s) { return String(s).replace(/'/g, "''"); }
   fs.writeFileSync(OUT_SQL, lines.join('\n'));
   console.log(`\nWrote ${OUT_SQL} (${lines.length} statements)`);
   console.log('Apply with:');
-  console.log(`  wrangler d1 execute giveready --remote --file=${path.relative(ROOT, OUT_SQL)}`);
+  console.log(`  wrangler d1 execute giveready-db --remote --file=${path.relative(ROOT, OUT_SQL)}`);
 })().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });
