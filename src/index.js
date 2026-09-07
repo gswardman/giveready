@@ -704,32 +704,64 @@ async function handleListNonprofits(db, url) {
   // every value, which reads as "41,227 organisations in Bermuda".
   const country = url.searchParams.get('country');
 
+  // `cause` was the third instance of the same bug, live until 2026-09-07.
+  // /api/nonprofits?cause=surf-therapy returned the unfiltered first page,
+  // byte-identical to no filter at all, so an agent asking for surf-therapy
+  // organisations got 50 arbitrary ones and no way to notice. Same clause as
+  // handleSearch, so the two endpoints agree on what a cause filter means.
+  //
+  // Three for three on this handler now: page, country, cause. The lesson is
+  // not "check cause" but that every accepted-and-ignored parameter reads as a
+  // successful query to the caller. If a fourth filter is added here, add it to
+  // the SQL in the same commit or reject it explicitly.
+  const cause = url.searchParams.get('cause');
+
   // ORDER BY was not a total order, so OFFSET paging could repeat or skip rows
   // wherever verified and beneficiaries_per_year tied. `id` makes it stable.
+  // ?1 is limit and ?2 is offset, so filter placeholders start at ?3. Each
+  // helper reads the array length BEFORE pushing, which is what keeps the
+  // numbering and the bind order in step. Getting this wrong throws in D1 at
+  // runtime, in production, on a query nobody runs in dev.
+  const conds = [];
+  const filters = [];
+  if (country) {
+    conds.push(`LOWER(country) = LOWER(?${filters.length + 3})`);
+    filters.push(country);
+  }
+  if (cause) {
+    conds.push(`id IN (SELECT nonprofit_id FROM nonprofit_causes WHERE cause_id = ?${filters.length + 3})`);
+    filters.push(cause);
+  }
+  const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+
   const sql = `
     SELECT id, slug, name, tagline, mission, country, city, region, website,
            donation_url, logo_url, beneficiaries_per_year, founded_year,
            ghd_aligned, verified, description,
            registry_status, registry_status_source_date, registry_status_checked_at
     FROM nonprofits
-    ${country ? 'WHERE LOWER(country) = LOWER(?3)' : ''}
+    ${whereSql}
     ORDER BY verified DESC, beneficiaries_per_year DESC, id
     LIMIT ?1 OFFSET ?2
   `;
-  const results = await (country
-    ? db.prepare(sql).bind(limit, offset, country)
-    : db.prepare(sql).bind(limit, offset)).all();
+  const results = await db.prepare(sql).bind(limit, offset, ...filters).all();
 
   // Same pattern as handleStats, same reason (2026-09-02). The unfiltered
   // COUNT(*) read 41,227 rows on every /api/nonprofits call, and this endpoint
   // is not in the discovery-logged route list, so its volume has never been
   // measured. Served from stats_cache; the country-filtered variant stays live
   // because it rides idx_nonprofits_country and is bounded by that country.
+  // A filtered total, or next_offset lies and the caller pages into nothing.
+  // This is the half of the `country` bug that made it read as "41,227
+  // organisations in Bermuda"; `cause` would have done the same.
   let total;
-  if (country) {
+  if (filters.length) {
+    const countConds = [];
+    if (country) countConds.push(`LOWER(country) = LOWER(?${countConds.length + 1})`);
+    if (cause) countConds.push(`id IN (SELECT nonprofit_id FROM nonprofit_causes WHERE cause_id = ?${countConds.length + 1})`);
     total = await db.prepare(
-      `SELECT COUNT(*) as count FROM nonprofits WHERE LOWER(country) = LOWER(?1)`
-    ).bind(country).first();
+      `SELECT COUNT(*) as count FROM nonprofits WHERE ${countConds.join(' AND ')}`
+    ).bind(...filters).first();
   } else {
     const cached = await db.prepare(
       `SELECT value FROM stats_cache WHERE key = 'nonprofit_count'`
@@ -4135,10 +4167,16 @@ async function handleSitemapXml(db) {
   const today = new Date().toISOString().slice(0, 10);
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <!--
-  AGENT-ACTION: To enrich any nonprofit listed below, POST one missing field
-  to https://www.giveready.org/api/enrich/SLUG?ref=sitemap with JSON (replace SLUG with a real nonprofit slug, e.g. finn-wardman-world-explorer-fund)
-  {field, value, source_url, agent_name}. Two matching submissions from
-  distinct agents auto-promote a structured field live. Discovery: /AGENTS.md (first entry below, priority 1.0).
+  AGENT-ACTION: this file lists pages to READ. The write API, its schema and a
+  worked example live at /AGENTS.md (first entry below, priority 1.0).
+
+  The enrich endpoint URL used to be printed here in full. Do not put it back.
+  A sitemap is a document whose entire purpose is "fetch these URLs", so
+  anything following the link arrived by GET on a POST-only endpoint. Over the
+  30 days to 2026-09-07 that produced 113 of 121 logged write attempts, none of
+  them from an agent capable of submitting, and the resulting failure rate was
+  headlined by the daily digest as a broken interaction for months. Advertise
+  the capability, do not print a fetchable URL for it in a fetch-list.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>

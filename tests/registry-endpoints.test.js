@@ -201,3 +201,64 @@ test('handleRegistryRevoked: revoked and reinstated stay in separate arrays', as
   assert.ok(Array.isArray(r.__json.reinstated));
   assert.ok(!('nonprofits' in r.__json), 'a merged list would publish an accusation against reinstated charities');
 });
+
+// ---------------------------------------------------------------------------
+// `cause` on /api/nonprofits (2026-09-07)
+//
+// The third accepted-and-ignored filter on this handler, after `page` and
+// `country` above. ?cause=surf-therapy returned the unfiltered first page,
+// byte-identical to no filter at all, so a caller got 50 arbitrary
+// organisations and read them as surf-therapy charities. These tests assert the
+// SQL, because the failure mode is a query that succeeds and returns the wrong
+// rows, which no status code will ever reveal.
+// ---------------------------------------------------------------------------
+
+test('handleListNonprofits: cause reaches the SQL at all', async () => {
+  const { db, calls } = stubDb();
+  await H.handleListNonprofits(db, U('/api/nonprofits?cause=surf-therapy'));
+  assert.match(calls[0].sql, /nonprofit_causes/, 'cause must filter, not be dropped');
+  assert.ok(calls[0].binds.includes('surf-therapy'), 'cause value must be bound');
+});
+
+test('handleListNonprofits: cause and no-cause return different SQL', async () => {
+  const a = stubDb(); await H.handleListNonprofits(a.db, U('/api/nonprofits?limit=50'));
+  const b = stubDb(); await H.handleListNonprofits(b.db, U('/api/nonprofits?cause=surf-therapy&limit=50'));
+  assert.notEqual(a.calls[0].sql, b.calls[0].sql, 'identical SQL is the bug this test exists for');
+});
+
+test('handleListNonprofits: cause filters the total, so next_offset cannot lie', async () => {
+  const { db, calls } = stubDb();
+  await H.handleListNonprofits(db, U('/api/nonprofits?cause=surf-therapy'));
+  const count = calls.find((c) => /COUNT\(\*\)/.test(c.sql));
+  assert.ok(count, 'a filtered query needs a filtered count, not the cached total');
+  assert.match(count.sql, /nonprofit_causes/);
+  assert.ok(count.binds.includes('surf-therapy'));
+});
+
+test('handleListNonprofits: country and cause combine, placeholders stay in step', async () => {
+  const { db, calls } = stubDb();
+  await H.handleListNonprofits(db, U('/api/nonprofits?country=South+Africa&cause=surf-therapy&limit=10'));
+  const rows = calls[0];
+  assertPlaceholders(rows, 'list with country+cause');
+  assert.deepEqual(rows.binds, [10, 0, 'South Africa', 'surf-therapy'],
+    'bind order must match ?1 limit, ?2 offset, ?3 country, ?4 cause');
+  const count = calls.find((c) => /COUNT\(\*\)/.test(c.sql));
+  assertPlaceholders(count, 'count with country+cause');
+  assert.deepEqual(count.binds, ['South Africa', 'surf-therapy']);
+});
+
+test('handleListNonprofits: no filters still uses the cached count', async () => {
+  const { db, calls } = stubDb();
+  await H.handleListNonprofits(db, U('/api/nonprofits?limit=50'));
+  assert.ok(calls.some((c) => /stats_cache/.test(c.sql)),
+    'the unfiltered COUNT(*) over 41,227 rows is what the 2026-09-02 cache exists to avoid');
+});
+
+test('sitemap does not print a fetchable write endpoint', async () => {
+  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+  const i = src.indexOf('AGENT-ACTION: this file lists pages to READ');
+  assert.ok(i > -1, 'sitemap agent comment missing');
+  const block = src.slice(i, i + 900);
+  assert.ok(!/https:\/\/www\.giveready\.org\/api\/enrich\//.test(block),
+    'a sitemap is a fetch-list; a POST-only URL in it generates GETs, not submissions');
+});
