@@ -3125,6 +3125,8 @@ ${np.logo_url ? `<meta property="og:image" content="${escHtml(np.logo_url)}" />`
   .status-history h2 { font-size: 1rem; margin-bottom: 0.5rem; }
   .status-history ul { margin: 0.5rem 0; padding-left: 1.2rem; font-size: 0.9rem; line-height: 1.6; }
   .actions { margin: 1.25rem 0 1.5rem; }
+  .featured-in { font-size: 0.9rem; color: #4b5563; margin: -0.5rem 0 1.25rem; }
+  .featured-in a { color: #059669; }
   .actions a { display: inline-block; margin-right: 0.75rem; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-weight: 500; }
   .actions a.donate { background: #059669; color: #fff; }
   .actions a.website { background: #f3f4f6; color: #111; }
@@ -3177,6 +3179,12 @@ ${np.donation_url ? (() => {
 })() : ''}
 ${np.website ? `<a class="website" href="${extHref(np.website)}" rel="noopener">Visit website</a>` : ''}
 </div>
+
+${(() => {
+  const gs = guidesFeaturing(np.slug);
+  if (!gs.length) return '';
+  return `<p class="featured-in">Featured in: ${gs.map((g) => `<a href="/guides/${escHtml(g.slug)}">${escHtml(g.title)}</a>`).join(' &middot; ')}</p>`;
+})()}
 
 ${donationsLine}
 
@@ -3433,6 +3441,7 @@ async function handleCausePage(db, causeId) {
   .actions a.donate { font-weight: 600; }
   .badge { display: inline-block; font-size: 0.7rem; background: #d1fae5; color: #065f46; padding: 0.1rem 0.45rem; border-radius: 3px; vertical-align: middle; margin-left: 0.5rem; }
   .empty { color: #666; font-style: italic; }
+  .cause-guides ul { padding-left: 1.2rem; } .cause-guides li { margin: 0.4rem 0; line-height: 1.5; } .cause-guides a { color: #059669; font-weight: 500; }
   .cause-intro { margin: 1.5rem 0 2rem; padding: 1.1rem 1.3rem; background: #fefce8; border-left: 4px solid #ca8a04; border-radius: 4px; }
   .cause-intro .answer-lead { font-size: 1rem; line-height: 1.65; color: #1f2937; margin: 0; }
   .cause-intro .wef-note { font-size: 0.92rem; line-height: 1.6; color: #4b5563; margin: 0.85rem 0 0; font-style: italic; }
@@ -3461,6 +3470,12 @@ ${
 </section>`
     : ''
 }
+
+${(() => {
+  const gs = guidesForCause(cause.id);
+  if (!gs.length) return '';
+  return `<section class="cause-guides"><h2>Guides</h2><ul>${gs.map((g) => `<li><a href="/guides/${escHtml(g.slug)}">${escHtml(g.title)}</a> &mdash; ${escHtml(g.description)}</li>`).join('')}</ul></section>`;
+})()}
 
 <h2>Organisations</h2>
 <ul class="np-list">
@@ -3751,6 +3766,47 @@ const GUIDES_MANIFEST = [
     ],
   },
 ];
+
+// Which guides feature each nonprofit. GENERATED from public/guides/*.md by
+// tests/guide-links.test.js (the test fails if this drifts from the markdown).
+// Why it exists (2026-09-09): the guides were orphan pages. Nothing on the
+// homepage, the cause pages or the 20 nonprofit profiles linked to them, so
+// the only routes in were /guides, llms.txt and the sitemap. Brave's index
+// (which serves Claude's web_search) held the profiles and the homepage but
+// not one guide, and 0 of 10 tracked prompts returned giveready.org. Profiles
+// now link back to the guides that feature them; cause pages list their
+// guides. Distribution, not volume: no new guide is created here.
+const GUIDE_FEATURES = {
+  'bridges-for-music': ['best-charities-for-cape-town-township-youth', 'best-music-education-charities-for-underprivileged-kids'],
+  'british-exploring-society': ['best-charities-funding-youth-travel-and-exploration', 'best-uk-youth-charities-outdoors-skills'],
+  'city-kids-surfing': ['best-surf-therapy-charities-for-at-risk-youth', 'best-uk-youth-charities-outdoors-skills'],
+  'community-works-youth-development': ['best-us-youth-charities-mentorship-sports-skills'],
+  'finn-wardman-world-explorer-fund': ['best-charities-funding-youth-travel-and-exploration'],
+  'friends-for-youth': ['best-youth-mentoring-charities-us-uk'],
+  'grow-lead-community-and-youth-development': ['best-us-youth-charities-mentorship-sports-skills', 'best-youth-mentoring-charities-us-uk'],
+  'jimmy-miller-memorial-foundation': ['best-surf-therapy-charities-for-at-risk-youth'],
+  'mcr-pathways': ['best-youth-mentoring-charities-us-uk'],
+  'mentoring-plus': ['best-youth-mentoring-charities-us-uk'],
+  'outdoor-youth-exploration-academy': ['best-us-youth-charities-mentorship-sports-skills'],
+  'outward-bound-trust-uk': ['best-charities-funding-youth-travel-and-exploration', 'best-uk-youth-charities-outdoors-skills'],
+  'the-wave-project': ['best-surf-therapy-charities-for-at-risk-youth', 'best-uk-youth-charities-outdoors-skills'],
+  'thrive-outdoors-scotland': ['best-uk-youth-charities-outdoors-skills'],
+  'waves-for-change': ['best-charities-for-cape-town-township-youth', 'best-surf-therapy-charities-for-at-risk-youth'],
+  'yescarolina-youth-entrepreneurship-in-south-carolina': ['best-us-youth-charities-mentorship-sports-skills'],
+  'youth-community-project': ['best-us-youth-charities-mentorship-sports-skills', 'best-youth-mentoring-charities-us-uk'],
+  'youth-determined-to-succeed': ['best-us-youth-charities-mentorship-sports-skills'],
+  'youth-music-project': ['best-music-education-charities-for-underprivileged-kids'],
+  'youth-outdoor-experience': ['best-us-youth-charities-mentorship-sports-skills'],
+};
+
+function guidesFeaturing(slug) {
+  const slugs = GUIDE_FEATURES[slug] || [];
+  return slugs.map((g) => GUIDES_MANIFEST.find((m) => m.slug === g)).filter(Boolean);
+}
+
+function guidesForCause(causeId) {
+  return GUIDES_MANIFEST.filter((g) => (g.linked_causes || []).includes(causeId));
+}
 
 function _parseFrontmatter(text) {
   // Minimal YAML-frontmatter parser. Handles the field types we use:
