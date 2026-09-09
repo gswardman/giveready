@@ -6236,7 +6236,32 @@ function registryStatusNote(status) {
 const ENRICHABLE_FIELDS = new Set([
   'mission', 'description', 'tagline', 'website', 'city', 'region',
   'founded_year', 'contact_email', 'programme', 'impact_metric',
+  // donation_url (2026-09-09): where /out/<slug> sends a donor. It is the one
+  // field that moves money, so it NEVER auto-promotes (deliberately absent from
+  // AUTO_PROMOTE_STRUCTURED): submissions queue and a human applies them via
+  // /api/admin/enrichments/{id}/apply. Validated by validDonationUrl() on the
+  // way in and again at apply time.
+  'donation_url',
 ]);
+
+// A donation URL must be an absolute https URL on the charity's own domain,
+// never on giveready.org (registration stamps our donate page there and /out
+// would loop). Returns the cleaned URL or null. Path case and fragment are
+// kept: hosted checkouts (Enthuse, Donorfy, Squarespace give.*) use both.
+function validDonationUrl(raw) {
+  if (!raw || typeof raw !== 'string' || raw.length > 500) return null;
+  let u;
+  try { u = new URL(raw.trim()); } catch (_e) { return null; }
+  if (u.protocol !== 'https:') return null;
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(u.hostname)) return null;
+  if (/(^|\.)giveready\.org$/i.test(u.hostname)) return null;
+  if (u.username || u.password) return null;
+  u.hostname = u.hostname.toLowerCase();
+  for (const key of [...u.searchParams.keys()]) {
+    if (key.startsWith('utm_') || key === 'fbclid' || key === 'gclid' || key === 'ref') u.searchParams.delete(key);
+  }
+  return u.toString();
+}
 
 // SQL filter fragments used on PUBLIC surfaces only (AGENTS.md bounty list,
 // /api/agents/leaderboard). Lifetime stats and edge logging stay unfiltered
@@ -6759,6 +6784,11 @@ async function handleEnrich(db, request, slug) {
   for (const f of fields) {
     if (!f.field || !f.value) continue;
     if (!ENRICHABLE_FIELDS.has(f.field)) continue;
+    if (f.field === 'donation_url') {
+      const clean = validDonationUrl(f.value);
+      if (!clean) continue;
+      f.value = clean;
+    }
 
     const id = crypto.randomUUID();
 
@@ -6819,6 +6849,7 @@ async function handleEnrich(db, request, slug) {
 
     const applied = promoResult.promoted;
     submissions.push({
+      id,
       field: f.field,
       field_type: isProse ? 'prose' : (AUTO_PROMOTE_STRUCTURED.has(f.field) ? 'structured' : 'other'),
       status: applied ? 'applied' : 'pending',
@@ -7680,6 +7711,11 @@ async function handleAdminEnrichmentApply(db, env, request, id) {
   // we only re-validate the column comes from a trusted enum.
   if (!ENRICHABLE_FIELDS.has(enrichment.field)) {
     return error(`Field '${enrichment.field}' is not in the enrichable allowlist`, 400);
+  }
+  // Re-validate at apply time: the row could predate the validator, and this
+  // value becomes a 302 target for donors.
+  if (enrichment.field === 'donation_url' && !validDonationUrl(enrichment.value)) {
+    return error('donation_url must be an absolute https URL on the charity\'s own domain', 400);
   }
 
   await db.prepare(
