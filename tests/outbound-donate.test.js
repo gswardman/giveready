@@ -218,3 +218,20 @@ test('the redirect is noindex and uncacheable', async () => {
   assert.match(res.headers.get('X-Robots-Tag'), /noindex/);
   assert.match(res.headers.get('Cache-Control'), /no-store/);
 });
+
+// 2026-09-09: the profile-page and listing Donate buttons must go through /out
+// (or /donate/<slug> when the stored URL is GiveReady's own page). Before this
+// they linked the charity directly and the funnel could not see the click.
+test('profile and listing Donate buttons route through /out, never the raw charity URL', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+  assert.ok(!src.includes('href="${extHref(n.donation_url)}" rel="noopener">Donate'), 'listing links the charity directly');
+  assert.ok(!src.includes('let dHref = extHref(np.donation_url);'), 'profile links the charity directly');
+  assert.ok(src.includes('`/out/${escHtml(np.slug)}`'), 'profile Donate goes through /out');
+  assert.ok(src.includes('href="/out/${escHtml(n.slug)}"'), 'listing Donate goes through /out');
+  assert.ok(src.includes("user_agent NOT LIKE 'GiveReady-Smoketest/%'"), 'funnel excludes the smoke test');
+});
+
+test('nonprofit pages no longer link a per-slug /AGENTS.md URL', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+  assert.ok(!src.includes('href="/AGENTS.md?from=np'), 'per-slug manifest link still present');
+});

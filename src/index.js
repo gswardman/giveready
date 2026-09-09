@@ -2937,7 +2937,7 @@ async function handleNonprofitPage(db, slug, url) {
 
   const descHtml = desc
     ? `<p class="prose">${escHtml(desc)}</p>`
-    : `<p class="prose-stub"><em>This profile is awaiting a description.</em> If you work with ${escHtml(np.name)}, <a href="/onboard">claim this listing</a>. AI agents: see <a href="/AGENTS.md?from=np&amp;slug=${escHtml(np.slug)}">/AGENTS.md</a> for the enrichment protocol.</p>`;
+    : `<p class="prose-stub"><em>This profile is awaiting a description.</em> If you work with ${escHtml(np.name)}, <a href="/onboard">claim this listing</a>. AI agents: see <a href="/AGENTS.md">/AGENTS.md</a> for the enrichment protocol.</p>`;
 
   const loc = [np.city, np.region, np.country].filter(Boolean).join(', ');
 
@@ -3160,13 +3160,20 @@ ${isVerified && np.mission ? `<h2>Mission</h2>\n<p>${escHtml(np.mission)}</p>` :
 
 <div class="actions">
 ${np.donation_url ? (() => {
-  let dHref = extHref(np.donation_url);
+  // Every off-site Donate click goes through /out/<slug> so it is logged as
+  // donate_click_out and leaves with UTMs (utm_content = the guide). Until
+  // 2026-09-09 this button linked the charity's URL directly with a bare
+  // ?ref=guide-x appended, which the charity could not read and GiveReady could
+  // not see: 99 guide-referred profile views in the week to 2026-09-09 and not
+  // one measurable click. A donation_url stamped with GiveReady's own donate
+  // page (registration does this) links there instead, ref preserved, because
+  // /out would only bounce it back to the website.
   const ref = url && url.searchParams.get('ref');
-  if (ref && /^guide-[a-z0-9-]+$/.test(ref)) {
-    const sep = np.donation_url.includes('?') ? '&amp;' : '?';
-    dHref += sep + 'ref=' + escHtml(ref);
-  }
-  return `<a class="donate" href="${dHref}" rel="noopener">Donate</a>`;
+  const refOk = ref && /^guide-[a-z0-9-]{1,80}$/.test(ref) ? ref : null;
+  const onSite = /^https?:\/\/(www\.)?giveready\.org\//i.test(np.donation_url);
+  const base = onSite ? `/donate/${escHtml(np.slug)}` : `/out/${escHtml(np.slug)}`;
+  const dHref = base + (refOk ? `?ref=${escHtml(refOk)}` : '');
+  return `<a class="donate" href="${dHref}" rel="noopener nofollow">Donate</a>`;
 })() : ''}
 ${np.website ? `<a class="website" href="${extHref(np.website)}" rel="noopener">Visit website</a>` : ''}
 </div>
@@ -3176,7 +3183,7 @@ ${donationsLine}
 ${isVerified ? programsHtml : ''}
 
 <div class="agent-callout">
-  <strong>Are you an AI agent?</strong> ${hasMeaningfulDescription ? 'You can submit corrections to this description, or improve other fields.' : 'This profile is awaiting a description.'} See <a href="/AGENTS.md?from=np&amp;slug=${escHtml(np.slug)}">/AGENTS.md</a> for the enrichment protocol, or call the <a href="/.well-known/mcp.json">MCP server</a> directly. Profile JSON: <a href="/api/nonprofits/${escHtml(np.slug)}">/api/nonprofits/${escHtml(np.slug)}</a>.
+  <strong>Are you an AI agent?</strong> ${hasMeaningfulDescription ? 'You can submit corrections to this description, or improve other fields.' : 'This profile is awaiting a description.'} See <a href="/AGENTS.md">/AGENTS.md</a> for the enrichment protocol, or call the <a href="/.well-known/mcp.json">MCP server</a> directly. Profile JSON: <a href="/api/nonprofits/${escHtml(np.slug)}">/api/nonprofits/${escHtml(np.slug)}</a>.
 </div>
 
 ${provenanceList.length > 0 ? `<h2>Field provenance</h2>
@@ -3372,7 +3379,12 @@ async function handleCausePage(db, causeId) {
             const founded = n.founded_year ? `Founded ${n.founded_year}` : '';
             const meta = [loc, founded, reach].filter(Boolean).join(' &middot; ');
             const verifiedBadge = n.verified ? '<span class="badge">Verified</span>' : '';
-            const donate = n.donation_url ? `<a class="donate" href="${extHref(n.donation_url)}" rel="noopener">Donate</a>` : '';
+            // Through /out so the click is logged and carries UTMs (see the profile page).
+            const donate = n.donation_url
+              ? (/^https?:\/\/(www\.)?giveready\.org\//i.test(n.donation_url)
+                ? `<a class="donate" href="/donate/${escHtml(n.slug)}" rel="noopener">Donate</a>`
+                : `<a class="donate" href="/out/${escHtml(n.slug)}" rel="noopener nofollow">Donate</a>`)
+              : '';
             const profile = `<a class="profile" href="/nonprofits/${escHtml(n.slug)}">Profile</a>`;
             return `
           <li class="np">
@@ -6999,6 +7011,7 @@ async function handleGuideFunnel(db, env, request, url) {
     db.prepare(
       `SELECT slug, reason, COUNT(*) as hits FROM onboarding_events
        WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)
+         AND (user_agent IS NULL OR user_agent NOT LIKE 'GiveReady-Smoketest/%')
        GROUP BY slug, reason ORDER BY hits DESC LIMIT 25`
     ).bind(sinceArg).all().catch(() => ({ results: [] })),
   ]);
@@ -8088,6 +8101,12 @@ function agentNameFor(ua) {
 // Order matters. First match wins.
 function routeClassFor(route) {
   if (!route) return 'other';
+  // Read agents-manifest counts before 2026-09-09 with care: every nonprofit
+  // page linked /AGENTS.md?from=np&slug=<slug>, one distinct URL per nonprofit,
+  // and the query string is not stored, so a full-directory crawl logged one
+  // manifest hit per page. GPTBot on 2026-09-08: 3,435 nonprofit hits, 3,435
+  // manifest hits. The per-slug link is gone; the class now measures direct
+  // fetches only.
   if (route === '/AGENTS.md' || route === '/agents.md') return 'agents-manifest';
   if (route === '/llms.txt') return 'llms';
   if (route === '/sitemap.xml') return 'sitemap';
