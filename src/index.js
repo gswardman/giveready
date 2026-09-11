@@ -7082,7 +7082,7 @@ async function handleGuideFunnel(db, env, request, url) {
   hours = Math.min(hours, 2160);
   const sinceArg = `-${hours} hours`;
 
-  const [guideRows, npRefRows, donateRows, donations, clickOutRows, clickOutTotals] = await Promise.all([
+  const [guideRows, npRefRows, donateRows, donations, clickOutRows, clickOutTotals, clickOutHumanUAs] = await Promise.all([
     db.prepare(
       `SELECT referrer, COUNT(*) as hits FROM discovery_hits
        WHERE route LIKE '/guides/%' AND created_at > datetime('now', ?1)
@@ -7133,6 +7133,17 @@ async function handleGuideFunnel(db, env, request, url) {
        FROM onboarding_events
        WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)`
     ).bind(sinceArg).first().catch(() => null),
+    // Who the surviving "human" clicks are. Added 2026-09-11 after the bot
+    // filter left 78 clicks in 7d that were still one-per-slug, alphabetical,
+    // every.org: a crawler with a browser UA. Without this the residual cannot
+    // be diagnosed except through /api/admin/traffic, which is too expensive.
+    db.prepare(
+      `SELECT user_agent, COUNT(*) as hits, COUNT(DISTINCT slug) as slugs
+       FROM onboarding_events
+       WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)
+         AND NOT (${CLICK_OUT_BOT_SQL})
+       GROUP BY user_agent ORDER BY hits DESC LIMIT 10`
+    ).bind(sinceArg).all().catch(() => ({ results: [] })),
   ]);
 
   const guideViews = { ai_assistant: 0, search: 0, internal: 0, other: 0, none: 0, total: 0 };
@@ -7174,6 +7185,9 @@ async function handleGuideFunnel(db, env, request, url) {
       bot_hits_excluded: clickOutTotals ? (clickOutTotals.bot_hits || 0) : null,
       raw_hits: clickOutTotals ? (clickOutTotals.raw_hits || 0) : null,
       by_slug_and_ref: clickOutRows.results || [],
+      // hits and distinct slugs per surviving UA. A UA with hits ~= slugs
+      // walking a listing is a crawler the filter missed, whatever it calls itself.
+      human_by_user_agent: clickOutHumanUAs.results || [],
     },
     donations_in_period_context: donations,
     notes: [
