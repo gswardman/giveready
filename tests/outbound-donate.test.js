@@ -228,10 +228,22 @@ test('profile and listing Donate buttons route through /out, never the raw chari
   assert.ok(!src.includes('let dHref = extHref(np.donation_url);'), 'profile links the charity directly');
   assert.ok(src.includes('`/out/${escHtml(np.slug)}`'), 'profile Donate goes through /out');
   assert.ok(src.includes('href="/out/${escHtml(n.slug)}"'), 'listing Donate goes through /out');
-  assert.ok(src.includes("user_agent NOT LIKE 'GiveReady-Smoketest/%'"), 'funnel excludes the smoke test');
+  assert.ok(src.includes("user_agent LIKE 'GiveReady-Smoketest/%'") && src.includes('NOT (${CLICK_OUT_BOT_SQL})'), 'funnel excludes the smoke test');
 });
 
 test('nonprofit pages no longer link a per-slug /AGENTS.md URL', () => {
   const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
   assert.ok(!src.includes('href="/AGENTS.md?from=np'), 'per-slug manifest link still present');
+});
+
+// 2026-09-11: the funnel's click-out count was a crawler counter with a
+// 25-row cap. Bots are excluded from both the rows and an uncapped total.
+test('funnel click-outs exclude bot user agents and count humans uncapped', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+  assert.ok(src.includes('const CLICK_OUT_BOT_SQL'), 'bot predicate exists');
+  assert.ok(src.includes("user_agent LIKE '%bot%'"), 'generic bot marker excluded');
+  assert.ok(src.includes("user_agent LIKE 'GiveReady-Smoketest/%'"), 'smoke test still excluded');
+  assert.ok(src.includes('as human_hits'), 'uncapped human total query exists');
+  assert.ok(src.includes('bot_hits_excluded'), 'bot count is reported alongside');
+  assert.ok(!src.includes("total: (clickOutRows.results || []).reduce((n, r) => n + (r.hits || 0), 0),\n      by_slug_and_ref"), 'total is no longer the capped row sum');
 });

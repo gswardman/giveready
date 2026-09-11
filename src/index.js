@@ -7060,6 +7060,19 @@ async function handleOutboundDonate(db, request, url, slug) {
 // through to nonprofit profiles, and does anything reach the donate path?
 // Phase 1 is page-view attribution only; per-donation ref linkage is a separate
 // eng-reviewed change if this shows real traffic.
+// UA predicate for /out clicks that are not a person. Shared by the funnel row
+// query and its uncapped totals so the two can never disagree. '%bot%' covers
+// Amazonbot, PetalBot, GPTBot, ClaudeBot, bingbot, Applebot and the rest;
+// the others are scripts and headless fetchers. SQLite LIKE is case-insensitive.
+const CLICK_OUT_BOT_SQL = [
+  "user_agent IS NULL", "user_agent = ''",
+  "user_agent LIKE 'GiveReady-Smoketest/%'",
+  "user_agent LIKE '%bot%'", "user_agent LIKE '%crawl%'", "user_agent LIKE '%spider%'",
+  "user_agent LIKE '%curl/%'", "user_agent LIKE '%wget%'", "user_agent LIKE '%python%'",
+  "user_agent LIKE '%aiohttp%'", "user_agent LIKE '%node%'", "user_agent LIKE '%Go-http%'",
+  "user_agent LIKE '%HeadlessChrome%'", "user_agent LIKE '%http-client%'",
+].join(' OR ');
+
 async function handleGuideFunnel(db, env, request, url) {
   const authFail = checkAdminAuth(env, request);
   if (authFail) return authFail;
@@ -7069,7 +7082,7 @@ async function handleGuideFunnel(db, env, request, url) {
   hours = Math.min(hours, 2160);
   const sinceArg = `-${hours} hours`;
 
-  const [guideRows, npRefRows, donateRows, donations, clickOutRows] = await Promise.all([
+  const [guideRows, npRefRows, donateRows, donations, clickOutRows, clickOutTotals] = await Promise.all([
     db.prepare(
       `SELECT referrer, COUNT(*) as hits FROM discovery_hits
        WHERE route LIKE '/guides/%' AND created_at > datetime('now', ?1)
@@ -7095,12 +7108,31 @@ async function handleGuideFunnel(db, env, request, url) {
     // all of them. Before this existed the funnel stopped at the donate-page
     // view and the only completion metric was on-chain settlement, which no
     // real donor has ever used.
+    //
+    // 2026-09-11: crawlers count too. Two days after the listing Donate buttons
+    // went through /out, the 24h reading was 54 clicks across 25 alphabetically
+    // adjacent slugs at 2-3 hits each, all ref=direct, all to every.org: a
+    // crawler walking /nonprofits and following every Donate button (robots.txt
+    // disallows /out/, which Amazonbot ignores). Only the smoke test was being
+    // excluded, and `total` was the sum of the 25 capped rows, so it was a floor
+    // that could never exceed 75. Now: bot UAs are excluded from the rows AND
+    // total is an uncapped COUNT over human UAs, with the bot count alongside so
+    // the exclusion itself is visible. onboarding_events is small, so the LIKE
+    // chain is cheap here (unlike discovery_hits, see /api/admin/traffic).
     db.prepare(
       `SELECT slug, reason, COUNT(*) as hits FROM onboarding_events
        WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)
-         AND (user_agent IS NULL OR user_agent NOT LIKE 'GiveReady-Smoketest/%')
+         AND NOT (${CLICK_OUT_BOT_SQL})
        GROUP BY slug, reason ORDER BY hits DESC LIMIT 25`
     ).bind(sinceArg).all().catch(() => ({ results: [] })),
+    db.prepare(
+      `SELECT
+         SUM(CASE WHEN ${CLICK_OUT_BOT_SQL} THEN 0 ELSE 1 END) as human_hits,
+         SUM(CASE WHEN ${CLICK_OUT_BOT_SQL} THEN 1 ELSE 0 END) as bot_hits,
+         COUNT(*) as raw_hits
+       FROM onboarding_events
+       WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)`
+    ).bind(sinceArg).first().catch(() => null),
   ]);
 
   const guideViews = { ai_assistant: 0, search: 0, internal: 0, other: 0, none: 0, total: 0 };
@@ -7134,7 +7166,13 @@ async function handleGuideFunnel(db, env, request, url) {
     // utm_content. What happens after the click is in the charity's analytics,
     // not ours, which is why the UTMs exist.
     donate_click_out: {
-      total: (clickOutRows.results || []).reduce((n, r) => n + (r.hits || 0), 0),
+      // Uncapped, human UAs only. Falls back to the row sum if the totals
+      // query failed, and says so.
+      total: clickOutTotals ? (clickOutTotals.human_hits || 0)
+        : (clickOutRows.results || []).reduce((n, r) => n + (r.hits || 0), 0),
+      total_is_uncapped: !!clickOutTotals,
+      bot_hits_excluded: clickOutTotals ? (clickOutTotals.bot_hits || 0) : null,
+      raw_hits: clickOutTotals ? (clickOutTotals.raw_hits || 0) : null,
       by_slug_and_ref: clickOutRows.results || [],
     },
     donations_in_period_context: donations,
@@ -7143,6 +7181,7 @@ async function handleGuideFunnel(db, env, request, url) {
       'ai_assistant = Referer from perplexity.ai, chatgpt.com, claude.ai, copilot, gemini, you.com, phind, poe.',
       'from_guide_ref counts donate-page views carrying ?ref=guide-<slug>.',
       'donations_in_period_context is all settled donations, NOT yet linked to referral rows.',
+      'donate_click_out.total is an uncapped count over human user agents since 2026-09-11; bot_hits_excluded is what the crawler filter removed. by_slug_and_ref stays capped at 25 rows.',
       'donations_in_period_context counts the on-chain x402 rail ONLY. 0 of 41,227 nonprofits have a wallet, so it cannot see a donation made on a charity own site. donate_click_out is the honest completion metric for the redirect path.',
     ],
   });
