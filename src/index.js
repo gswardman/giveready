@@ -7073,6 +7073,23 @@ const CLICK_OUT_BOT_SQL = [
   "user_agent LIKE '%HeadlessChrome%'", "user_agent LIKE '%http-client%'",
 ].join(' OR ');
 
+// Behavioural predicate for /out clicks, 2026-09-15. The string filter above
+// missed a walker with a plain Chrome desktop UA that clicked Donate on every
+// listed charity in alphabetical order, twice each: 541 click-outs on 09-13,
+// 938 on 09-14, zero excluded, against 15 donate-page views. The UA rotates
+// (three Chrome strings in one day), so any string match lags it. A person does
+// not click Donate on more than 20 different charities in a week; a UA that
+// does is a crawler whatever it calls itself. Same ?1 window as the outer
+// query, so the rule is judged on the period being reported. There is no IP
+// column on onboarding_events (by design, see migration 020), so UA is the
+// only key available; a shared human UA would need 21 distinct charities'
+// donors in one window to trip this, which is far above today's traffic.
+const CLICK_OUT_WALKER_MIN_SLUGS = 20;
+const CLICK_OUT_WALKER_SQL =
+  `user_agent IN (SELECT user_agent FROM onboarding_events
+     WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)
+     GROUP BY user_agent HAVING COUNT(DISTINCT slug) > ${CLICK_OUT_WALKER_MIN_SLUGS})`;
+
 async function handleGuideFunnel(db, env, request, url) {
   const authFail = checkAdminAuth(env, request);
   if (authFail) return authFail;
@@ -7082,7 +7099,7 @@ async function handleGuideFunnel(db, env, request, url) {
   hours = Math.min(hours, 2160);
   const sinceArg = `-${hours} hours`;
 
-  const [guideRows, npRefRows, donateRows, donations, clickOutRows, clickOutTotals, clickOutHumanUAs] = await Promise.all([
+  const [guideRows, npRefRows, donateRows, donations, clickOutRows, clickOutTotals, clickOutHumanUAs, clickOutWalkerUAs] = await Promise.all([
     db.prepare(
       `SELECT referrer, COUNT(*) as hits FROM discovery_hits
        WHERE route LIKE '/guides/%' AND created_at > datetime('now', ?1)
@@ -7119,16 +7136,24 @@ async function handleGuideFunnel(db, env, request, url) {
     // total is an uncapped COUNT over human UAs, with the bot count alongside so
     // the exclusion itself is visible. onboarding_events is small, so the LIKE
     // chain is cheap here (unlike discovery_hits, see /api/admin/traffic).
+    //
+    // 2026-09-15: the walker predicate (CLICK_OUT_WALKER_SQL) is applied after
+    // the string filter, and its exclusions are counted separately so the
+    // digest can see both instruments working.
     db.prepare(
       `SELECT slug, reason, COUNT(*) as hits FROM onboarding_events
        WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)
          AND NOT (${CLICK_OUT_BOT_SQL})
+         AND NOT (${CLICK_OUT_WALKER_SQL})
        GROUP BY slug, reason ORDER BY hits DESC LIMIT 25`
     ).bind(sinceArg).all().catch(() => ({ results: [] })),
     db.prepare(
       `SELECT
-         SUM(CASE WHEN ${CLICK_OUT_BOT_SQL} THEN 0 ELSE 1 END) as human_hits,
-         SUM(CASE WHEN ${CLICK_OUT_BOT_SQL} THEN 1 ELSE 0 END) as bot_hits,
+         SUM(CASE WHEN (${CLICK_OUT_BOT_SQL}) THEN 0
+                  WHEN (${CLICK_OUT_WALKER_SQL}) THEN 0 ELSE 1 END) as human_hits,
+         SUM(CASE WHEN (${CLICK_OUT_BOT_SQL}) THEN 1 ELSE 0 END) as bot_hits,
+         SUM(CASE WHEN (${CLICK_OUT_BOT_SQL}) THEN 0
+                  WHEN (${CLICK_OUT_WALKER_SQL}) THEN 1 ELSE 0 END) as walker_hits,
          COUNT(*) as raw_hits
        FROM onboarding_events
        WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)`
@@ -7137,11 +7162,24 @@ async function handleGuideFunnel(db, env, request, url) {
     // filter left 78 clicks in 7d that were still one-per-slug, alphabetical,
     // every.org: a crawler with a browser UA. Without this the residual cannot
     // be diagnosed except through /api/admin/traffic, which is too expensive.
+    // Since 2026-09-15 this lists UAs that survive BOTH filters, so a row here
+    // with slugs approaching CLICK_OUT_WALKER_MIN_SLUGS is the next walker.
     db.prepare(
       `SELECT user_agent, COUNT(*) as hits, COUNT(DISTINCT slug) as slugs
        FROM onboarding_events
        WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)
          AND NOT (${CLICK_OUT_BOT_SQL})
+         AND NOT (${CLICK_OUT_WALKER_SQL})
+       GROUP BY user_agent ORDER BY hits DESC LIMIT 10`
+    ).bind(sinceArg).all().catch(() => ({ results: [] })),
+    // The walkers themselves, named, so the exclusion is auditable from the
+    // response rather than taken on trust.
+    db.prepare(
+      `SELECT user_agent, COUNT(*) as hits, COUNT(DISTINCT slug) as slugs
+       FROM onboarding_events
+       WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)
+         AND NOT (${CLICK_OUT_BOT_SQL})
+         AND (${CLICK_OUT_WALKER_SQL})
        GROUP BY user_agent ORDER BY hits DESC LIMIT 10`
     ).bind(sinceArg).all().catch(() => ({ results: [] })),
   ]);
@@ -7183,6 +7221,12 @@ async function handleGuideFunnel(db, env, request, url) {
         : (clickOutRows.results || []).reduce((n, r) => n + (r.hits || 0), 0),
       total_is_uncapped: !!clickOutTotals,
       bot_hits_excluded: clickOutTotals ? (clickOutTotals.bot_hits || 0) : null,
+      // 2026-09-15: clicks from a UA that hit Donate on more than
+      // walker_min_slugs distinct charities in this window. Reported apart from
+      // bot_hits_excluded so the two filters are separately auditable.
+      walker_hits_excluded: clickOutTotals ? (clickOutTotals.walker_hits || 0) : null,
+      walker_min_slugs: CLICK_OUT_WALKER_MIN_SLUGS,
+      walker_user_agents: clickOutWalkerUAs.results || [],
       raw_hits: clickOutTotals ? (clickOutTotals.raw_hits || 0) : null,
       by_slug_and_ref: clickOutRows.results || [],
       // hits and distinct slugs per surviving UA. A UA with hits ~= slugs
@@ -7196,6 +7240,7 @@ async function handleGuideFunnel(db, env, request, url) {
       'from_guide_ref counts donate-page views carrying ?ref=guide-<slug>.',
       'donations_in_period_context is all settled donations, NOT yet linked to referral rows.',
       'donate_click_out.total is an uncapped count over human user agents since 2026-09-11; bot_hits_excluded is what the crawler filter removed. by_slug_and_ref stays capped at 25 rows.',
+      'Since 2026-09-15 a UA that clicked Donate on more than walker_min_slugs distinct charities in the period is excluded as a walker; walker_hits_excluded and walker_user_agents show what that removed.',
       'donations_in_period_context counts the on-chain x402 rail ONLY. 0 of 41,227 nonprofits have a wallet, so it cannot see a donation made on a charity own site. donate_click_out is the honest completion metric for the redirect path.',
     ],
   });
