@@ -7082,9 +7082,17 @@ const CLICK_OUT_BOT_SQL = [
 // does is a crawler whatever it calls itself. Same ?1 window as the outer
 // query, so the rule is judged on the period being reported. There is no IP
 // column on onboarding_events (by design, see migration 020), so UA is the
-// only key available; a shared human UA would need 21 distinct charities'
-// donors in one window to trip this, which is far above today's traffic.
-const CLICK_OUT_WALKER_MIN_SLUGS = 20;
+// only key available.
+// Threshold history: 20 on first deploy (2026-09-15 09:09), which caught 951
+// of 970 clicks in 24h but left one Chrome string at 19 hits on 19 slugs,
+// alphabetical, plus 12/11 and 6/6 strings in 7d. The scraper rotates through
+// ten-plus browser UAs and each one walks a slice under 100 charities, so a
+// high bar lets each slice through until it crosses. Lowered to 5 the same
+// morning: a person clicks Donate on one to three charities in a week. A
+// shared human UA would need six distinct charities' donors in one window to
+// trip this; today's real click-outs run at about five a week in total.
+// Revisit when real 7d click-outs pass 50.
+const CLICK_OUT_WALKER_MIN_SLUGS = 5;
 const CLICK_OUT_WALKER_SQL =
   `user_agent IN (SELECT user_agent FROM onboarding_events
      WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)

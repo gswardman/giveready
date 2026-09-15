@@ -252,9 +252,9 @@ test('funnel click-outs exclude bot user agents and count humans uncapped', () =
 // charity, alphabetically, twice each (541 then 938 a day), and the string
 // filter passed all of it. A UA that hits more than 20 distinct charities in
 // the window is excluded behaviourally, and the exclusion is reported.
-test('funnel click-outs exclude a UA that walks more than 20 distinct charities', () => {
+test('funnel click-outs exclude a UA that walks more than 5 distinct charities', () => {
   const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
-  assert.ok(src.includes('const CLICK_OUT_WALKER_MIN_SLUGS = 20'), 'walker threshold is 20 distinct slugs');
+  assert.ok(src.includes('const CLICK_OUT_WALKER_MIN_SLUGS = 5'), 'walker threshold is 5 distinct slugs');
   assert.ok(src.includes('HAVING COUNT(DISTINCT slug) > ${CLICK_OUT_WALKER_MIN_SLUGS}'), 'walker predicate is per-UA distinct-slug count');
   assert.ok(src.includes('AND NOT (${CLICK_OUT_WALKER_SQL})'), 'walker predicate applied to the row query');
   assert.ok(src.includes('WHEN (${CLICK_OUT_WALKER_SQL}) THEN 0 ELSE 1 END) as human_hits'), 'human total excludes walkers');
