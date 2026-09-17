@@ -226,6 +226,65 @@ function logDiscoveryHit(db, route, userAgent, referrer, ref) {
     });
 }
 
+// ============================================
+// TRAFFIC ROLLUP (migration 026, added 2026-09-17)
+// ============================================
+//
+// Counts EVERY request. logDiscoveryHit above counts twenty routes, which on
+// 2026-09-17 turned out to be 4.0% of a day's edge requests (1,831 of 45,610 by
+// Cloudflare's count, 16,992 of 78,550 over 7d). Every share the digest printed
+// was against that subset. See migrations/026-traffic-rollup.sql for the full
+// account, including the 40,000-request burst on 2026-09-16 that none of the
+// reporting could see.
+//
+// Two counters, not rows. An upsert bumps an existing row, so a burst touches
+// the same handful of rows repeatedly and the table does not grow. This is the
+// opposite of discovery_hits, which has twice been the reason the site went down.
+//
+// Same failure discipline as logDiscoveryHit: counted, never thrown into the
+// request path. A traffic counter must never be able to take a page down.
+const TRAFFIC_ROLLUP_HEALTH = {
+  ok: 0,
+  failed: 0,
+  last_error: null,
+  last_error_at: null,
+};
+
+function recordTraffic(db, route, userAgent, country) {
+  // UTC hour bucket. Matches the datetime('now') convention used everywhere
+  // else in this schema, so a bucket joins cleanly against created_at windows.
+  const bucket = new Date().toISOString().slice(0, 13);
+  const routeClass = routeClassFor(route);
+  // agentTypeFor returns null for anything outside KNOWN_AGENT_PATTERNS. That
+  // null is the honest answer and it is the figure the digest calls
+  // "unattributed", so it gets its own class rather than being dropped. Bulk
+  // crawlers (Amazonbot, PetalBot) are deliberately NOT special-cased here:
+  // they are excluded from agents_only in the digest by a separate rule, and
+  // this table's job is the complete denominator, not the curated one.
+  const agentClass = agentTypeFor(userAgent) || 'unattributed';
+  const cc = (country && /^[A-Z]{2}$/.test(country)) ? country : 'XX';
+
+  return db.batch([
+    db.prepare(
+      `INSERT INTO traffic_rollup (bucket, route_class, agent_class, hits) VALUES (?1, ?2, ?3, 1)
+         ON CONFLICT(bucket, route_class, agent_class) DO UPDATE SET hits = hits + 1`
+    ).bind(bucket, routeClass, agentClass),
+    db.prepare(
+      `INSERT INTO traffic_geo (bucket, country, hits) VALUES (?1, ?2, 1)
+         ON CONFLICT(bucket, country) DO UPDATE SET hits = hits + 1`
+    ).bind(bucket, cc),
+  ])
+    .then(() => {
+      TRAFFIC_ROLLUP_HEALTH.ok += 1;
+    })
+    .catch((e) => {
+      TRAFFIC_ROLLUP_HEALTH.failed += 1;
+      TRAFFIC_ROLLUP_HEALTH.last_error = String((e && e.message) || e).slice(0, 200);
+      TRAFFIC_ROLLUP_HEALTH.last_error_at = new Date().toISOString();
+      console.error('traffic_rollup upsert failed:', TRAFFIC_ROLLUP_HEALTH.last_error);
+    });
+}
+
 // Referrer classification for the guide->donation funnel (migration 018).
 // Kept in code (not stored) so the AI-assistant list can grow without re-tagging rows.
 function classifyReferrer(referrer) {
@@ -7092,10 +7151,21 @@ const CLICK_OUT_BOT_SQL = [
 // shared human UA would need six distinct charities' donors in one window to
 // trip this; today's real click-outs run at about five a week in total.
 // Revisit when real 7d click-outs pass 50.
+//
+// 2026-09-16: the walker set is now judged over a FIXED lookback (?2, 30d),
+// not the reported window. With N=5 judged inside each window, the 24h read
+// (20) came out above the 7d read (18): a UA that walks four slugs a day never
+// trips the rule in 24h but does in 7d, so the shorter window was the leakier
+// one. The 24h survivors were nine browser strings at 1 to 5 slugs each, all
+// one-per-slug to every.org on obscure listings, several claiming Chrome 99,
+// 110 and 119. Judging every window against the same 30d set makes 24h a
+// subset of 7d by construction, and a UA that walked 500 slugs last week stays
+// excluded today even if it only clicked twice.
 const CLICK_OUT_WALKER_MIN_SLUGS = 5;
+const CLICK_OUT_WALKER_LOOKBACK_HOURS = 720;
 const CLICK_OUT_WALKER_SQL =
   `user_agent IN (SELECT user_agent FROM onboarding_events
-     WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)
+     WHERE step = 'donate_click_out' AND created_at > datetime('now', ?2)
      GROUP BY user_agent HAVING COUNT(DISTINCT slug) > ${CLICK_OUT_WALKER_MIN_SLUGS})`;
 
 async function handleGuideFunnel(db, env, request, url) {
@@ -7106,6 +7176,8 @@ async function handleGuideFunnel(db, env, request, url) {
   if (!Number.isFinite(hours) || hours < 1) hours = 168;
   hours = Math.min(hours, 2160);
   const sinceArg = `-${hours} hours`;
+  // Walker set is judged over the fixed lookback, never the reported window.
+  const walkerSinceArg = `-${CLICK_OUT_WALKER_LOOKBACK_HOURS} hours`;
 
   const [guideRows, npRefRows, donateRows, donations, clickOutRows, clickOutTotals, clickOutHumanUAs, clickOutWalkerUAs] = await Promise.all([
     db.prepare(
@@ -7154,7 +7226,7 @@ async function handleGuideFunnel(db, env, request, url) {
          AND NOT (${CLICK_OUT_BOT_SQL})
          AND NOT (${CLICK_OUT_WALKER_SQL})
        GROUP BY slug, reason ORDER BY hits DESC LIMIT 25`
-    ).bind(sinceArg).all().catch(() => ({ results: [] })),
+    ).bind(sinceArg, walkerSinceArg).all().catch(() => ({ results: [] })),
     db.prepare(
       `SELECT
          SUM(CASE WHEN (${CLICK_OUT_BOT_SQL}) THEN 0
@@ -7165,7 +7237,7 @@ async function handleGuideFunnel(db, env, request, url) {
          COUNT(*) as raw_hits
        FROM onboarding_events
        WHERE step = 'donate_click_out' AND created_at > datetime('now', ?1)`
-    ).bind(sinceArg).first().catch(() => null),
+    ).bind(sinceArg, walkerSinceArg).first().catch(() => null),
     // Who the surviving "human" clicks are. Added 2026-09-11 after the bot
     // filter left 78 clicks in 7d that were still one-per-slug, alphabetical,
     // every.org: a crawler with a browser UA. Without this the residual cannot
@@ -7179,7 +7251,7 @@ async function handleGuideFunnel(db, env, request, url) {
          AND NOT (${CLICK_OUT_BOT_SQL})
          AND NOT (${CLICK_OUT_WALKER_SQL})
        GROUP BY user_agent ORDER BY hits DESC LIMIT 10`
-    ).bind(sinceArg).all().catch(() => ({ results: [] })),
+    ).bind(sinceArg, walkerSinceArg).all().catch(() => ({ results: [] })),
     // The walkers themselves, named, so the exclusion is auditable from the
     // response rather than taken on trust.
     db.prepare(
@@ -7189,7 +7261,7 @@ async function handleGuideFunnel(db, env, request, url) {
          AND NOT (${CLICK_OUT_BOT_SQL})
          AND (${CLICK_OUT_WALKER_SQL})
        GROUP BY user_agent ORDER BY hits DESC LIMIT 10`
-    ).bind(sinceArg).all().catch(() => ({ results: [] })),
+    ).bind(sinceArg, walkerSinceArg).all().catch(() => ({ results: [] })),
   ]);
 
   const guideViews = { ai_assistant: 0, search: 0, internal: 0, other: 0, none: 0, total: 0 };
@@ -7234,6 +7306,9 @@ async function handleGuideFunnel(db, env, request, url) {
       // bot_hits_excluded so the two filters are separately auditable.
       walker_hits_excluded: clickOutTotals ? (clickOutTotals.walker_hits || 0) : null,
       walker_min_slugs: CLICK_OUT_WALKER_MIN_SLUGS,
+      // 2026-09-16: the walker set is built over this fixed lookback and applied
+      // to whatever window is reported, so 24h is always a subset of 7d.
+      walker_lookback_hours: CLICK_OUT_WALKER_LOOKBACK_HOURS,
       walker_user_agents: clickOutWalkerUAs.results || [],
       raw_hits: clickOutTotals ? (clickOutTotals.raw_hits || 0) : null,
       by_slug_and_ref: clickOutRows.results || [],
@@ -7248,7 +7323,7 @@ async function handleGuideFunnel(db, env, request, url) {
       'from_guide_ref counts donate-page views carrying ?ref=guide-<slug>.',
       'donations_in_period_context is all settled donations, NOT yet linked to referral rows.',
       'donate_click_out.total is an uncapped count over human user agents since 2026-09-11; bot_hits_excluded is what the crawler filter removed. by_slug_and_ref stays capped at 25 rows.',
-      'Since 2026-09-15 a UA that clicked Donate on more than walker_min_slugs distinct charities in the period is excluded as a walker; walker_hits_excluded and walker_user_agents show what that removed.',
+      'Since 2026-09-15 a UA that clicked Donate on more than walker_min_slugs distinct charities is excluded as a walker; walker_hits_excluded and walker_user_agents show what that removed. Since 2026-09-16 the walker set is judged over walker_lookback_hours, not the reported period, so a short window cannot let a slow walker through.',
       'donations_in_period_context counts the on-chain x402 rail ONLY. 0 of 41,227 nonprofits have a wallet, so it cannot see a donation made on a charity own site. donate_click_out is the honest completion metric for the redirect path.',
     ],
   });
@@ -7383,6 +7458,15 @@ async function handleAdminTraffic(db, env, request, url) {
               WHEN route = '/sitemap.xml' THEN 'sitemap'
               WHEN route = '/mcp' OR route LIKE '/mcp/%' THEN 'mcp'
               WHEN route LIKE '/guides%' THEN 'guides'
+              -- Mirrors routeClassFor(). Added 2026-09-17 with migration 026.
+              -- None of these four can match a stored discovery_hits row (the
+              -- routes have never been in the logging allowlist), so this
+              -- changes no historical figure. It is here so the two taxonomies
+              -- stay one taxonomy. Order matters: exact '/nonprofits' first.
+              WHEN route = '/' THEN 'home'
+              WHEN route = '/nonprofits' THEN 'nonprofits-list'
+              WHEN route LIKE '/out%' THEN 'out'
+              WHEN route LIKE '/search%' THEN 'search'
               WHEN route LIKE '/nonprofits%' THEN 'nonprofits'
               WHEN route LIKE '/causes%' THEN 'causes'
               WHEN route LIKE '/donate%' THEN 'donate'
@@ -7699,6 +7783,54 @@ async function handleAdminTraffic(db, env, request, url) {
     `SELECT created_at FROM discovery_hits ORDER BY created_at DESC LIMIT 1`
   ).first().catch(() => null);
 
+  // ── TRAFFIC ROLLUP (migration 026, added 2026-09-17) ──────────────────────
+  //
+  // The denominator. Everything above this line is computed over discovery_hits,
+  // which logs twenty routes; on 2026-09-17 that was 4.0% of a day's requests.
+  // These fields are what the shares above should be read against, and
+  // `discovery_logged_share_pct` states that fraction outright so a consumer
+  // cannot mistake the subset for the site.
+  //
+  // Cheap by construction: a range scan on the leading key of a table with tens
+  // of rows a day, not a scan of the 225k-row hits table. Three small queries.
+  // Wrapped so that a missing migration 026 degrades to nulls instead of
+  // breaking the endpoint the whole digest depends on, the same way the
+  // enrichment_attempts block above handles migration 013.
+  const sinceBucket = new Date(Date.now() - hours * 3600 * 1000).toISOString().slice(0, 13);
+  let trafficRollup = null;
+  try {
+    const [byRouteClass, byAgentClass, byCountry] = await Promise.all([
+      db.prepare(
+        `SELECT route_class, SUM(hits) AS hits FROM traffic_rollup
+          WHERE bucket >= ?1 GROUP BY route_class ORDER BY hits DESC`
+      ).bind(sinceBucket).all(),
+      db.prepare(
+        `SELECT agent_class, SUM(hits) AS hits FROM traffic_rollup
+          WHERE bucket >= ?1 GROUP BY agent_class ORDER BY hits DESC`
+      ).bind(sinceBucket).all(),
+      db.prepare(
+        `SELECT country, SUM(hits) AS hits FROM traffic_geo
+          WHERE bucket >= ?1 GROUP BY country ORDER BY hits DESC LIMIT 20`
+      ).bind(sinceBucket).all(),
+    ]);
+    const totalRequests = (byRouteClass.results || []).reduce((n, r) => n + (r.hits || 0), 0);
+    trafficRollup = {
+      since_bucket: sinceBucket,
+      // Null, never 0, before the counter has covered the whole window. A zero
+      // here would read as "no traffic"; the truth on the first day after
+      // deploy is "not measured for the earlier part of this window". The digest
+      // must not compute a share against a partial window.
+      total_requests: totalRequests,
+      by_route_class: byRouteClass.results || [],
+      by_agent_class: byAgentClass.results || [],
+      by_country: byCountry.results || [],
+      // Per-isolate, same contract as discovery_log_health.
+      health: { ...TRAFFIC_ROLLUP_HEALTH },
+    };
+  } catch (_e) {
+    // Migration 026 not applied yet.
+  }
+
   return json({
     period: `last ${hours} hours`,
     generated_at: new Date().toISOString(),
@@ -7738,7 +7870,17 @@ async function handleAdminTraffic(db, env, request, url) {
       // submitting. Any success-rate or halt-rule percentage belongs over this
       // denominator, not the one above.
       attempts_in_period_interactive_agents: attemptsInPeriodInteractive,
+      // Added 2026-09-17 with migration 026. THE DENOMINATOR. Every other
+      // figure in this summary counts only the twenty allowlisted routes.
+      // On the day this shipped that was 1,831 of 45,610 requests. Null until
+      // migration 026 is applied, and null is the honest answer: it means not
+      // measured, which is not the same as zero.
+      edge_requests_in_period: trafficRollup ? trafficRollup.total_requests : null,
+      discovery_logged_share_pct: (trafficRollup && trafficRollup.total_requests > 0)
+        ? Math.round((totalDiscoveryRecentRaw.total / trafficRollup.total_requests) * 1000) / 10
+        : null,
     },
+    traffic_rollup: trafficRollup,
     discovery_by_route: discoveryByRoute.results,
     discovery_by_user_agent: discoveryByAgent.results,
     // Added 2026-08-22. Replaces manual cross-referencing of the two fields above.
@@ -8310,6 +8452,22 @@ function routeClassFor(route) {
   if (route === '/sitemap.xml') return 'sitemap';
   if (route === '/mcp' || route.startsWith('/mcp/')) return 'mcp';
   if (route.startsWith('/guides')) return 'guides';
+  // Added 2026-09-17 with migration 026. These four classes are unreachable in
+  // historical discovery_hits data: none of these routes has ever been in the
+  // logging allowlist, so no stored row can carry them and no past figure is
+  // reclassified by adding them. They exist for traffic_rollup, which counts
+  // every request. Keep the SQL CASE in handleAdminTraffic identical.
+  //
+  // '/nonprofits' exactly (the directory listing and its ?page=N pagination,
+  // query strings are not stored) is separated from '/nonprofits/<slug>'
+  // deliberately. Conflating them is what would hide a paginated directory walk
+  // inside the profile-page count, and a paginated walk is the leading
+  // explanation for the 2026-09-16 burst. This branch must stay ABOVE the
+  // startsWith('/nonprofits') branch below it.
+  if (route === '/') return 'home';
+  if (route === '/nonprofits') return 'nonprofits-list';
+  if (route.startsWith('/out')) return 'out';
+  if (route.startsWith('/search')) return 'search';
   if (route.startsWith('/nonprofits')) return 'nonprofits';
   if (route.startsWith('/causes')) return 'causes';
   if (route.startsWith('/donate')) return 'donate';
@@ -9641,9 +9799,25 @@ export default {
              SELECT 'discovery_hits_total', CAST(COUNT(*) AS TEXT), datetime('now') FROM discovery_hits`
           ).run();
 
+          // Rollup retention (migration 026, added 2026-09-17). Bounded by
+          // construction rather than by traffic: tens of rows a day, so 400 days
+          // is roughly 20k rows and there is no scenario where this needs
+          // batching the way discovery_hits does. Kept long on purpose, because
+          // the whole point of a counter is that year-over-year comparison stays
+          // cheap. Buckets are 'YYYY-MM-DDTHH', so a string compare against a
+          // formatted cutoff is the correct range test.
+          const rollupCutoff = new Date(Date.now() - 400 * 86400 * 1000).toISOString().slice(0, 13);
+          const prunedRollup = await env.DB.prepare(
+            `DELETE FROM traffic_rollup WHERE bucket < ?1`
+          ).bind(rollupCutoff).run().catch(() => null);
+          await env.DB.prepare(
+            `DELETE FROM traffic_geo WHERE bucket < ?1`
+          ).bind(rollupCutoff).run().catch(() => null);
+
           console.log(
             `[Housekeeping] pruned ${prunedHitRows} discovery_hits, ` +
-            `${prunedQueries.meta?.changes ?? '?'} query_log rows`
+            `${prunedQueries.meta?.changes ?? '?'} query_log rows, ` +
+            `${prunedRollup?.meta?.changes ?? 0} traffic_rollup rows`
           );
         } catch (e) {
           // Loud, because handleStats falls back to a live COUNT(*) after 48h of
@@ -9655,6 +9829,28 @@ export default {
   },
 
   async fetch(request, env, ctx) {
+    // TRAFFIC ROLLUP (migration 026, added 2026-09-17). Counted here, at the
+    // same single choke point the noStore() comment below describes, and for
+    // the same reason: a route added later cannot quietly miss it.
+    //
+    // This is deliberately ABOVE the HEAD rewrite so a HEAD is counted once as
+    // itself. The rewrite re-enters _httpHandler.handle(), not fetch(), so
+    // there is no double count.
+    //
+    // waitUntil, never awaited: the counter must not add latency to a page and
+    // must not be able to fail one. recordTraffic swallows its own errors into
+    // TRAFFIC_ROLLUP_HEALTH.
+    try {
+      ctx.waitUntil(recordTraffic(
+        env.DB,
+        new URL(request.url).pathname,
+        request.headers.get('User-Agent'),
+        request.cf && request.cf.country
+      ));
+    } catch (e) {
+      console.error('recordTraffic dispatch failed:', (e && e.message) || e);
+    }
+
     // HEAD support: rewrite HEAD→GET, run the normal handler, then strip the
     // body before returning. This makes 2026-style discovery clients (which
     // HEAD before GET) see well-known and other discovery routes correctly.

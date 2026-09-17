@@ -261,3 +261,21 @@ test('funnel click-outs exclude a UA that walks more than 5 distinct charities',
   assert.ok(src.includes('walker_hits_excluded'), 'walker exclusion count is reported');
   assert.ok(src.includes('walker_user_agents'), 'walker UAs are named in the response');
 });
+
+// 2026-09-16: with the walker judged inside each reported window, 24h read 20
+// click-outs against 18 in 7d, because a UA walking four slugs a day never
+// trips N=5 in 24h but does in 7d. The walker set is now built over a fixed
+// 30d lookback (?2) and applied to every window, so 24h is a subset of 7d.
+test('funnel walker set is judged over a fixed 30d lookback, not the reported window', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+  assert.ok(src.includes('const CLICK_OUT_WALKER_LOOKBACK_HOURS = 720'), 'lookback is 720h');
+  const walkerSql = src.slice(src.indexOf('const CLICK_OUT_WALKER_SQL'), src.indexOf('async function handleGuideFunnel'));
+  assert.ok(walkerSql.includes("datetime('now', ?2)"), 'walker subquery binds the lookback arg, not the window arg');
+  assert.ok(!walkerSql.includes("datetime('now', ?1)"), 'walker subquery no longer uses the reported window');
+  const funnel = src.slice(src.indexOf('async function handleGuideFunnel'), src.indexOf('GET /api/admin/guide-crawl'));
+  const walkerQueries = funnel.split('CLICK_OUT_WALKER_SQL').length - 1;
+  assert.ok(walkerQueries >= 4, 'walker predicate is used in the four click-out queries');
+  const twoArgBinds = (funnel.match(/\.bind\(sinceArg, walkerSinceArg\)/g) || []).length;
+  assert.equal(twoArgBinds, 4, 'every query that uses the walker predicate binds both args');
+  assert.ok(src.includes('walker_lookback_hours: CLICK_OUT_WALKER_LOOKBACK_HOURS'), 'lookback is reported in the response');
+});
