@@ -156,11 +156,30 @@ git push origin main
 git push origin "$DEPLOY_TAG"
 
 # 8. Run any pending migrations
+#
+# --yes added 2026-09-17. `wrangler d1 execute --remote` asks for confirmation
+# on every file, and this loop runs EVERY file in migrations/ on EVERY deploy,
+# so a routine deploy meant sitting through a dozen identical prompts. The flag
+# is documented as "Answer yes to any prompts".
+#
+# Safe to automate here, and only here, because of what these files are: the
+# schema changes are CREATE TABLE/INDEX IF NOT EXISTS, the seeds are
+# INSERT OR REPLACE, and the one destructive file (025c-prune.sql) deletes only
+# rows older than 90 days in bounded 5,000-row batches. Re-running the set is
+# the designed behaviour, not an accident being tolerated.
+#
+# The two `read -p` prompts elsewhere in this script are deliberately NOT
+# automated. The one at "Continue anyway?" is the check that stops a .env or a
+# key file being committed to a public repo, and this repo sits beside .secrets/
+# holding live admin and model API tokens. It fires only when a staged filename
+# looks sensitive, so on a normal deploy it costs nothing and on an abnormal one
+# it is the only thing standing between a slip and a published credential.
+# Do not "fix" it by piping `yes` into this script.
 echo "[7/8] Running migrations..."
 for migration in migrations/*.sql; do
   [ -f "$migration" ] && {
     echo "  Running $migration..."
-    wrangler d1 execute giveready-db --file="$migration" --remote 2>/dev/null || echo "  (already applied or skipped)"
+    wrangler d1 execute giveready-db --file="$migration" --remote --yes 2>/dev/null || echo "  (already applied or skipped)"
   }
 done
 

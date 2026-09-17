@@ -7814,12 +7814,33 @@ async function handleAdminTraffic(db, env, request, url) {
       ).bind(sinceBucket).all(),
     ]);
     const totalRequests = (byRouteClass.results || []).reduce((n, r) => n + (r.hits || 0), 0);
+
+    // PARTIAL-WINDOW GUARD (2026-09-17, same day, after the first live reading).
+    //
+    // The first call after deploy returned discovery_logged_share_pct = 288.9%.
+    // The counter had been live 27 minutes and was being divided into a 60-minute
+    // discovery_hits count, so the "subset" was three times its own denominator.
+    // The comment here already promised a null before the counter covered the
+    // window; the code did not implement it, and the 07:07 digest would have
+    // printed 288.9% as a finding.
+    //
+    // A share is only meaningful when the counter covers the whole window. The
+    // earliest bucket in the table is what decides that, and it is one indexed
+    // lookup on a table of tens of rows. This condition is permanent, not
+    // first-day scaffolding: it is also what protects the number after any gap
+    // in which the counter was not writing.
+    const earliest = await db.prepare(`SELECT MIN(bucket) AS b FROM traffic_rollup`).first();
+    const earliestBucket = (earliest && earliest.b) ? earliest.b : null;
+    const coversFullWindow = !!(earliestBucket && earliestBucket <= sinceBucket);
+
     trafficRollup = {
       since_bucket: sinceBucket,
-      // Null, never 0, before the counter has covered the whole window. A zero
-      // here would read as "no traffic"; the truth on the first day after
-      // deploy is "not measured for the earlier part of this window". The digest
-      // must not compute a share against a partial window.
+      earliest_bucket: earliestBucket,
+      // False means the counter started after this window did, so total_requests
+      // below is a partial count and no share may be computed from it.
+      covers_full_window: coversFullWindow,
+      // The raw count for the buckets that DO exist. Always honest about what it
+      // is; read it together with covers_full_window, never alone.
       total_requests: totalRequests,
       by_route_class: byRouteClass.results || [],
       by_agent_class: byAgentClass.results || [],
@@ -7875,10 +7896,17 @@ async function handleAdminTraffic(db, env, request, url) {
       // On the day this shipped that was 1,831 of 45,610 requests. Null until
       // migration 026 is applied, and null is the honest answer: it means not
       // measured, which is not the same as zero.
-      edge_requests_in_period: trafficRollup ? trafficRollup.total_requests : null,
-      discovery_logged_share_pct: (trafficRollup && trafficRollup.total_requests > 0)
-        ? Math.round((totalDiscoveryRecentRaw.total / trafficRollup.total_requests) * 1000) / 10
+      // Null in BOTH of two different cases, deliberately: migration 026 absent,
+      // or the counter does not yet span this window. Both mean "not measured",
+      // which is the same instruction to the reader: do not quote a share.
+      // traffic_rollup.covers_full_window below distinguishes them.
+      edge_requests_in_period: (trafficRollup && trafficRollup.covers_full_window)
+        ? trafficRollup.total_requests
         : null,
+      discovery_logged_share_pct:
+        (trafficRollup && trafficRollup.covers_full_window && trafficRollup.total_requests > 0)
+          ? Math.round((totalDiscoveryRecentRaw.total / trafficRollup.total_requests) * 1000) / 10
+          : null,
     },
     traffic_rollup: trafficRollup,
     discovery_by_route: discoveryByRoute.results,
