@@ -1,0 +1,11 @@
+-- SUPERSEDED 2026-09-21. Do not run. Do not move up a directory.
+--
+-- This was the staged version, held back because the EIN could not be confirmed
+-- from the Cowork sandbox. It has since been confirmed against two IRS source
+-- documents (Notice CP575E and Letter 947) read directly from the Powered by Finn
+-- vault, and the live migration now sits at ../028-wef-ein.sql with the full
+-- provenance recorded in its header.
+--
+-- Left as a tombstone rather than deleted because the sandbox cannot remove files
+-- in this tree. Nothing here runs: deploy.sh globs migrations/*.sql and does not
+-- descend into subdirectories. Safe to delete by hand from the Mac.

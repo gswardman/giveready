@@ -6,6 +6,13 @@
  * https://giveready.org
  */
 
+import {
+  handleIssueChallenge,
+  handleVerifyChallenge,
+} from './wallet-proof.js';
+import { handlePayable } from './payable.js';
+import { walletProofPageHTML } from './wallet-proof-page.js';
+
 // CORS. Dashboard auth is same-origin (giveready.org/dashboard → giveready.org/api/*),
 // so Allow-Credentials is unnecessary and was incompatible with Allow-Origin: * anyway.
 // Public endpoints (MCP, widget.js, nonprofit search) stay wildcard-open.
@@ -2825,7 +2832,7 @@ GET /api/agents/leaderboard — who's contributed what
 
 ## Tell Us What You Found — Moltbook
 
-GiveReady runs a field journal on Moltbook at m/giveready (https://www.moltbook.com/m/giveready), posted by u/givereadybot. If something about the API, the enrichment rules, or the donation flow was confusing, broken, or worth flagging — post it there. Real findings and bug reports get read daily.
+GiveReady runs a field journal on Moltbook at m/giveready (https://www.moltbook.com/m/giveready), posted by u/givereadybot. If something about the API, the enrichment rules, or the donation flow was confusing, broken, or worth flagging — post it there. Real findings and bug reports get read every week, and we reply there.
 
 \`\`\`
 curl -X POST https://www.moltbook.com/api/v1/posts \\
@@ -9392,7 +9399,7 @@ const _httpHandler = {
         return handleVerifyRegistration(env.DB, env, url);
       }
 
-      if (path === '/mcp' || path === '/mcp/sse' || path === '/.well-known/ai-plugin.json' || path === '/.well-known/mcp.json' || path === '/.well-known/mcp' || path === '/.well-known/mcp/server-card.json' || path === '/llms.txt' || path === '/agents.md' || path === '/AGENTS.md' || path === '/causes' || path === '/guides' || path === '/sitemap.xml' || path.startsWith('/causes/') || path.startsWith('/guides/') || path.startsWith('/nonprofits/') || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/') || path.startsWith('/donate/')) {
+      if (path === '/mcp' || path === '/mcp/sse' || path === '/.well-known/ai-plugin.json' || path === '/.well-known/mcp.json' || path === '/.well-known/mcp' || path === '/.well-known/mcp/server-card.json' || path === '/llms.txt' || path === '/agents.md' || path === '/AGENTS.md' || path === '/causes' || path === '/guides' || path === '/sitemap.xml' || path.startsWith('/causes/') || path.startsWith('/guides/') || path.startsWith('/nonprofits/') || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/') || path.startsWith('/donate/') || path.startsWith('/api/wallet-proof/') || (path.startsWith('/api/nonprofits/') && path.endsWith('/payable')) || path.startsWith('/wallet-proof/')) {
         const ua = request.headers.get('User-Agent');
         const referrer = (request.headers.get('Referer') || '').slice(0, 300) || null;
         let refParam = url.searchParams.get('ref');
@@ -9470,6 +9477,48 @@ const _httpHandler = {
 
       // Public agent leaderboard
       if (path === '/api/agents/leaderboard') return handleAgentLeaderboard(env.DB);
+
+      // Wallet ownership proof (2026-09-21). GET issues a challenge, POST verifies
+      // it. Offline message signing only: no transaction is ever constructed here
+      // and no private key is ever accepted.
+      // Donor-agent payability check (2026-09-21). Answers the recipient-exists /
+      // wallet-control / linkage questions in the order an agent actually runs
+      // them, with provenance, and says no when the answer is no.
+      if (path.startsWith('/api/nonprofits/') && path.endsWith('/payable')) {
+        const pSlug = decodeURIComponent(
+          path.slice('/api/nonprofits/'.length, path.length - '/payable'.length),
+        );
+        if (!pSlug) return json({ error: 'slug_required' }, 400);
+        const r = await handlePayable(env.DB, pSlug);
+        return json(r.body, r.status);
+      }
+
+      // Signing UI for the wallet proof. Served as HTML because the CLI's
+      // sign-offchain-message uses the SIMD-0009 envelope, which our raw-bytes
+      // verifier will not match. The wallet extension's signMessage() does.
+      if (path.startsWith('/wallet-proof/')) {
+        const uiSlug = decodeURIComponent(path.slice('/wallet-proof/'.length)).replace(/\/+$/, '');
+        if (!uiSlug) return json({ error: 'slug_required' }, 400);
+        return new Response(walletProofPageHTML(uiSlug), {
+          headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex' },
+        });
+      }
+
+      if (path.startsWith('/api/wallet-proof/')) {
+        const wpSlug = decodeURIComponent(path.slice('/api/wallet-proof/'.length)).replace(/\/+$/, '');
+        if (!wpSlug) return json({ error: 'slug_required' }, 400);
+        if (request.method === 'GET') {
+          const r = await handleIssueChallenge(env.DB, wpSlug);
+          return json(r.body, r.status);
+        }
+        if (request.method === 'POST') {
+          let wpBody = {};
+          try { wpBody = await request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
+          const r = await handleVerifyChallenge(env.DB, wpSlug, wpBody.signature);
+          return json(r.body, r.status);
+        }
+        return json({ error: 'method_not_allowed', allowed: ['GET', 'POST'] }, 405);
+      }
       if (path === '/agents') return handleAgentLeaderboardHTML();
 
       // Self-learning endpoints (2026-04-16)
