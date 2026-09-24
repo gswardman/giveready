@@ -260,18 +260,32 @@
     .live-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.6s ease-in-out infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
     @media (prefers-reduced-motion: reduce) { .live-pill .dot { animation: none; } }
-    .ai-count { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 24px 0 18px; }
-    .ai-count-num { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; color: var(--accent); font-variant-numeric: tabular-nums; }
-    .ai-count-label { color: var(--muted); max-width: 420px; line-height: 1.4; }
-    .ai-feed { list-style: none; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
-    .ai-feed li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
-    .ai-feed li:last-child { border-bottom: none; }
-    .ai-feed .who { font-weight: 600; }
-    .ai-feed .when { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .ai-feed a { color: var(--text); }
+    .ai-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 26px 0 18px; }
+    .ai-tile { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 18px; }
+    .ai-tile b { display: block; font-size: 34px; font-weight: 800; letter-spacing: -0.02em; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .ai-tile span { display: block; color: var(--muted); font-size: 14px; margin-top: 6px; line-height: 1.4; }
+    .ai-bars { margin: 8px 0 26px; }
+    .ai-bar { display: grid; grid-template-columns: 110px 1fr 70px; gap: 12px; align-items: center; margin: 7px 0; font-size: 14px; }
+    .ai-bar .track { height: 10px; background: var(--surface-hover); border-radius: 5px; overflow: hidden; }
+    .ai-bar .fill { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+    .ai-bar .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
+    .ai-lookup { border: 1px solid var(--accent-border); background: var(--accent-dim); border-radius: var(--radius); padding: 20px; }
+    .ai-lookup h3 { font-size: 18px; margin-bottom: 12px; }
+    #ai-lookup-form { display: flex; gap: 10px; flex-wrap: wrap; }
+    #ai-lookup-q { flex: 1 1 220px; font: inherit; padding: 11px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); }
+    #ai-lookup-form button { border: none; cursor: pointer; font: inherit; font-weight: 600; }
+    .ai-picks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .ai-picks button { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-light); background: var(--card); color: var(--text); cursor: pointer; }
+    .ai-result { margin-top: 12px; font-size: 15px; line-height: 1.5; }
+    .ai-result b { color: var(--accent); }
+    .ai-result a { color: var(--accent); font-weight: 600; }
+    .ai-latest { margin-top: 18px; font-size: 14px; color: var(--muted); }
+    .ai-latest a { color: var(--text); }
     .ai-note { color: var(--muted); font-size: 13px; margin-top: 10px; }
     .final-cta .btn-primary { background: var(--cta-text); color: var(--cta-bg); }
     @media (max-width: 720px) {
+      .ai-tiles { grid-template-columns: 1fr; }
+      .ai-bar { grid-template-columns: 90px 1fr 60px; }
       .cs-stats { grid-template-columns: 1fr; }
       .check-card { padding: 22px 16px; }
     }
@@ -318,7 +332,7 @@
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-num" id="stat-ai-week">&hellip;</span>
-        <span class="hero-meta-label">AI visits to charity pages this week</span>
+        <span class="hero-meta-label">visits from AI companies this month</span>
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-num">$0</span>
@@ -332,11 +346,27 @@
 <section class="section" id="ai-traffic">
   <div class="wrap">
     <span class="tag">AI traffic, live</span>
-    <h2>Right now, AI is reading GiveReady's charity profiles</h2>
-    <p class="lead">When ChatGPT, Claude or Perplexity look up charities, they read pages like ours. Whatever your GiveReady profile says is what they learn about you. If it's thin or out of date, so is their answer.</p>
-    <div class="ai-count"><span class="ai-count-num" id="ai-week-big">&nbsp;</span><span class="ai-count-label">AI visits to charity pages on GiveReady in the last 7 days, from OpenAI, Anthropic and Perplexity</span></div>
-    <ul class="ai-feed" id="ai-feed"><li class="muted">Loading the latest AI visits...</li></ul>
-    <p class="ai-note">Counted from GiveReady's own server logs. Updated every time you load this page.</p>
+    <h2>AI reads GiveReady around the clock</h2>
+    <p class="lead">ChatGPT, Claude, Perplexity, Gemini, Copilot, Siri and Alexa all answer from pages their companies' bots have read. This is how often those bots read GiveReady.</p>
+    <div class="ai-tiles">
+      <div class="ai-tile"><b id="ai-month">&hellip;</b><span>visits from AI companies in the last 30 days</span></div>
+      <div class="ai-tile"><b id="ai-rate">&hellip;</b><span>on average, an AI or search bot reads a page on GiveReady</span></div>
+      <div class="ai-tile"><b id="ai-profiles">&hellip;</b><span>charity profiles read by AI this month</span></div>
+    </div>
+    <div class="ai-bars" id="ai-bars" aria-label="Visits by company, last 30 days"></div>
+
+    <div class="ai-lookup">
+      <h3>Did AI read your charity this month?</h3>
+      <form id="ai-lookup-form" autocomplete="off">
+        <input id="ai-lookup-q" placeholder="Your charity's name" aria-label="Your charity's name" />
+        <button type="submit" class="btn btn-primary">Check</button>
+      </form>
+      <div id="ai-lookup-picks" class="ai-picks"></div>
+      <div id="ai-lookup-result" class="ai-result" role="status"></div>
+    </div>
+
+    <p class="ai-latest" id="ai-latest"></p>
+    <p class="ai-note">Counted from GiveReady's own server logs: bots from OpenAI, Anthropic, Perplexity, Google, Microsoft, Apple, Amazon and Meta. Includes the bots that train AI models and the ones that fetch pages to answer questions live. SEO tools and unknown visitors are not counted.</p>
   </div>
 </section>
 
@@ -532,8 +562,8 @@
     if (el3 && d.causes) el3.textContent = d.causes;
   }).catch(function() {});
 
-  // Live AI traffic: /api/ai-traffic is one cached row, refreshed every 3 hours
-  // from GiveReady's own logs (OpenAI, Anthropic, Perplexity; charity, cause and guide pages).
+  // Live AI traffic: /api/ai-traffic is cached server-side (7-day feed every
+  // 3 hours, 30-day company totals once a day). One cached row per page view.
   (function() {
     var SMALLW = { 'for': 1, 'and': 1, 'of': 1, 'the': 1, 'in': 1, 'on': 1, 'to': 1, 'a': 1 }, UP = { 'us': 'US', 'uk': 'UK', 'usa': 'USA', 'sa': 'SA', 'ngo': 'NGO' };
     function title(slug) {
@@ -546,34 +576,105 @@
     }
     function what(route) {
       var m;
-      if ((m = route.match(/^\/nonprofits\/([^\/?#]+)/))) return 'the profile of ' + title(m[1]);
       if ((m = route.match(/^\/causes\/([^\/?#]+)/))) return 'the ' + title(m[1]).toLowerCase() + ' cause page';
       if ((m = route.match(/^\/guides\/([^\/?#]+)/))) return 'the guide "' + title(m[1]) + '"';
       return null;
     }
-    function ago(ts) {
-      var t = Date.parse(String(ts).replace(' ', 'T') + 'Z'), m = Math.max(0, Math.round((Date.now() - t) / 60000));
-      if (isNaN(t)) return '';
-      if (m < 60) return m <= 1 ? 'just now' : m + ' min ago';
-      var h = Math.round(m / 60); if (h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
-      var d = Math.round(h / 24); return d + (d === 1 ? ' day ago' : ' days ago');
+    function minsAgo(ts) { var t = Date.parse(String(ts).replace(' ', 'T') + 'Z'); return isNaN(t) ? null : Math.max(0, Math.round((Date.now() - t) / 60000)); }
+    function ago(m) {
+      if (m < 60) return m <= 1 ? 'just now' : m + ' minutes ago';
+      var h = Math.round(m / 60); return h + (h === 1 ? ' hour ago' : ' hours ago');
+    }
+    function fmt(n) { return Number(n).toLocaleString('en-GB'); }
+    function set(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; }
+    function rate(n7) {
+      if (!n7) return null;
+      var sec = 604800 / n7;
+      if (sec < 45) return 'Every ' + Math.max(1, Math.round(sec)) + ' seconds';
+      if (sec < 90) return 'Every minute';
+      if (sec < 3600) return 'Every ' + Math.round(sec / 60) + ' minutes';
+      return null;
     }
     fetch('/api/ai-traffic').then(function(r) { return r.json(); }).then(function(d) {
-      if (!d || !d.total) throw new Error('none');
-      var n = Number(d.total).toLocaleString('en-GB');
-      ['ai-week-big', 'stat-ai-week'].forEach(function(id) { var el = document.getElementById(id); if (el) el.textContent = n; });
-      var pill = document.getElementById('live-pill-text'); if (pill) pill.textContent = n + ' AI visits to charity pages this week';
-      var feed = document.getElementById('ai-feed'); feed.innerHTML = '';
-      (d.recent || []).filter(function(e) { return what(e.route || ''); }).slice(0, 6).forEach(function(e) {
-        var li = document.createElement('li'), l = document.createElement('span'), r = document.createElement('span'), a = document.createElement('a'), b = document.createElement('span');
-        b.className = 'who'; b.textContent = e.vendor;
-        l.appendChild(b); l.appendChild(document.createTextNode(' read '));
-        a.href = e.route; a.textContent = what(e.route); l.appendChild(a);
-        r.className = 'when'; r.textContent = ago(e.last_hit);
-        li.appendChild(l); li.appendChild(r); feed.appendChild(li);
+      var mo = d.month || {};
+      if (mo.total) {
+        set('ai-month', fmt(mo.total)); set('stat-ai-week', fmt(mo.total));
+        set('live-pill-text', fmt(mo.total) + ' visits from AI companies this month');
+      }
+      if (mo.profiles_read) set('ai-profiles', fmt(mo.profiles_read));
+      var rt = rate(d.bot_visits_7d); if (rt) set('ai-rate', rt);
+      var bars = document.getElementById('ai-bars');
+      var cos = Object.keys(mo.by_company || {}).map(function(k) { return [k, mo.by_company[k]]; })
+        .filter(function(x) { return x[1] > 0; }).sort(function(a, b) { return b[1] - a[1]; });
+      var max = cos.length ? cos[0][1] : 1;
+      cos.forEach(function(x) {
+        var row = document.createElement('div'); row.className = 'ai-bar'; row.title = x[0] + ': ' + fmt(x[1]) + ' visits in 30 days';
+        var name = document.createElement('span'); name.textContent = x[0];
+        var track = document.createElement('div'); track.className = 'track';
+        var fill = document.createElement('div'); fill.className = 'fill'; fill.style.width = Math.max(1, Math.round(100 * x[1] / max)) + '%';
+        track.appendChild(fill);
+        var n = document.createElement('span'); n.className = 'n'; n.textContent = fmt(x[1]);
+        row.appendChild(name); row.appendChild(track); row.appendChild(n); bars.appendChild(row);
       });
-    }).catch(function() {
-      var feed = document.getElementById('ai-feed'); if (feed) feed.innerHTML = '<li>The live AI traffic feed is updating. Check back in a few minutes.</li>';
+      var latest = (d.recent || []).filter(function(e) { var m = minsAgo(e.last_hit); return what(e.route || '') && m !== null && m < 2880; })[0];
+      if (latest) {
+        var p = document.getElementById('ai-latest'), a = document.createElement('a');
+        p.appendChild(document.createTextNode('Latest: ' + latest.vendor + ' read '));
+        a.href = latest.route; a.textContent = what(latest.route); p.appendChild(a);
+        p.appendChild(document.createTextNode(', ' + ago(minsAgo(latest.last_hit)) + '.'));
+      }
+    }).catch(function() {});
+
+    // "Did AI read your charity this month?"
+    var form = document.getElementById('ai-lookup-form'); if (!form) return;
+    var picks = document.getElementById('ai-lookup-picks'), out = document.getElementById('ai-lookup-result');
+    function prefill(np) {
+      var f = document.getElementById('check-form'); if (!f) return;
+      if (f.elements['name'] && !f.elements['name'].value) f.elements['name'].value = np.name || '';
+      if (f.elements['website'] && !f.elements['website'].value && np.website) f.elements['website'].value = np.website;
+    }
+    function show(np) {
+      picks.innerHTML = ''; out.textContent = 'Checking...';
+      fetch('/api/ai-traffic/profile?slug=' + encodeURIComponent(np.slug)).then(function(r) { return r.json(); }).then(function(d) {
+        out.innerHTML = '';
+        var p = document.createElement('p'), b = document.createElement('b'), a = document.createElement('a');
+        if (d.visits == null) { p.textContent = 'We could not check right now. Try again in a minute.'; out.appendChild(p); return; }
+        if (d.visits > 0) {
+          p.appendChild(document.createTextNode('Yes. AI read ' + np.name + '’s GiveReady profile '));
+          b.textContent = d.visits + (d.visits === 1 ? ' time' : ' times'); p.appendChild(b);
+          p.appendChild(document.createTextNode(' in the last 30 days. Is it telling them the right things? '));
+        } else {
+          p.appendChild(document.createTextNode('Not in the last 30 days. AI hasn’t read ' + np.name + '’s GiveReady profile yet, so it is learning about you from somewhere else. '));
+        }
+        a.href = '#check'; a.textContent = 'Get your free AI Visibility Audit'; p.appendChild(a);
+        a.addEventListener('click', function() { prefill(np); });
+        out.appendChild(p); prefill(np);
+      }).catch(function() { out.textContent = 'We could not check right now. Try again in a minute.'; });
+    }
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var q = document.getElementById('ai-lookup-q').value.trim();
+      if (q.length < 3) { out.textContent = 'Type at least three letters of your charity’s name.'; return; }
+      picks.innerHTML = ''; out.textContent = 'Searching 41,000 charities...';
+      fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=5').then(function(r) { return r.json(); }).then(function(d) {
+        var list = (d.nonprofits || []).slice(0, 5);
+        if (!list.length) {
+          out.innerHTML = '';
+          var p = document.createElement('p'), a = document.createElement('a');
+          p.textContent = 'We couldn’t find that name in our directory. The audit will still tell you what AI says about you. ';
+          a.href = '#check'; a.textContent = 'Get your free AI Visibility Audit'; p.appendChild(a); out.appendChild(p);
+          var f = document.getElementById('check-form'); if (f && f.elements['name'] && !f.elements['name'].value) f.elements['name'].value = q;
+          return;
+        }
+        if (list.length === 1) return show(list[0]);
+        out.textContent = 'Which one is yours?';
+        list.forEach(function(np) {
+          var bt = document.createElement('button'); bt.type = 'button';
+          bt.textContent = np.name + (np.city ? ', ' + np.city : '') + (np.country ? ' (' + np.country + ')' : '');
+          bt.addEventListener('click', function() { show(np); });
+          picks.appendChild(bt);
+        });
+      }).catch(function() { out.textContent = 'Search is busy. Try again in a minute.'; });
     });
   })();
 
