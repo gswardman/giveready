@@ -1,0 +1,25 @@
+id	bucket	prompt
+sa-youth-1-orig	stable SA (Perplexity)	What's a reputable South African charity supporting township youth?
+sa-youth-1-v1	stable SA (Perplexity)	Which trustworthy charities in South Africa work with young people living in townships?
+sa-youth-1-v2	stable SA (Perplexity)	I want to give to an organisation helping kids in South African townships. Which ones are credible?
+sa-youth-1-v3	stable SA (Perplexity)	Can you suggest a well-run nonprofit that supports young people in South Africa's townships?
+sa-youth-2-orig	stable SA (Perplexity)	Where can I donate to help young people in Cape Town townships?
+sa-youth-2-v1	stable SA (Perplexity)	How can I give money to support teenagers in the townships around Cape Town?
+sa-youth-2-v2	stable SA (Perplexity)	I'm looking for a charity that helps youth in Cape Town's townships. Where should my donation go?
+sa-youth-2-v3	stable SA (Perplexity)	Suggest some places to donate that directly help young people growing up in Cape Town townships.
+uk-youth-1-orig	stable UK (ChatGPT)	What's a good youth charity in the UK that helps disadvantaged kids get into the outdoors?
+uk-youth-1-v1	stable UK (ChatGPT)	Which UK charities get children from poorer backgrounds out into nature and outdoor activities?
+uk-youth-1-v2	stable UK (ChatGPT)	I'd like to support a British charity that takes underprivileged young people outdoors. Any recommendations?
+uk-youth-1-v3	stable UK (ChatGPT)	Name a UK nonprofit giving disadvantaged kids access to outdoor adventure.
+uk-youth-3-orig	stable UK (ChatGPT)	Recommend a UK registered charity working with at-risk teenagers in coastal towns.
+uk-youth-3-v1	stable UK (ChatGPT)	Which registered charities in the UK support vulnerable teenagers in seaside towns?
+uk-youth-3-v2	stable UK (ChatGPT)	I'm looking for a UK charity helping at-risk young people in coastal communities. What would you suggest?
+uk-youth-3-v3	stable UK (ChatGPT)	Is there a registered charity working with troubled teenagers in towns along the UK coast?
+us-youth-1-orig	flickering	What are some legitimate US youth mentorship charities I can donate to?
+us-youth-1-v1	flickering	Which American mentoring charities for young people are trustworthy enough to donate to?
+us-youth-1-v2	flickering	I want to fund youth mentoring in the US. Which nonprofits are legit?
+us-youth-1-v3	flickering	Can you recommend reputable US nonprofits that pair kids with mentors?
+surf-1-orig	flickering	Are there any charities that use surfing as a form of therapy for at-risk young people?
+surf-1-v1	flickering	Which charities run surf therapy programmes for vulnerable young people?
+surf-1-v2	flickering	Are there nonprofits that help at-risk kids through surfing?
+surf-1-v3	flickering	I've heard surfing is used as therapy for troubled youth. Which charities do this?

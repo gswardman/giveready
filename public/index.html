@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GiveReady — A free donation page for your charity</title>
-  <meta name="description" content="A free directory of 41,000+ nonprofits and a zero-fee donation page for charities. Find a verified cause to support, or get your charity online in minutes." />
-  <meta property="og:title" content="GiveReady — A free donation page for your charity" />
-  <meta property="og:description" content="One link. Every payment method. Zero platform fees. Like Linktree, but for donations." />
+  <title>GiveReady: get your charity named by AI</title>
+  <meta name="description" content="Free AI visibility check for charities: see what ChatGPT, Claude and Perplexity say about your charity, who they name instead, and three fixes. Plus a verified profile AI agents can read." />
+  <meta property="og:title" content="GiveReady: get your charity named by AI" />
+  <meta property="og:description" content="When someone asks AI about your cause, does it name you? Free AI check for charities." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://giveready.org" />
   <meta name="twitter:card" content="summary" />
@@ -230,6 +230,38 @@
       .phone-frame { max-width: 320px; }
       .phone-frame iframe { height: 500px; }
     }
+
+    /* ---- 2026-09-24 AI-check home page ---- */
+    .cs-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 28px 0; }
+    .cs-stat { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+    .cs-num { display: block; font-size: 32px; font-weight: 800; letter-spacing: -0.02em; color: var(--accent); }
+    .cs-label { display: block; margin-top: 6px; color: var(--muted); font-size: 14px; line-height: 1.4; }
+    .cs-body p { color: var(--text); line-height: 1.65; margin-bottom: 14px; max-width: 680px; }
+    .cs-body code, .cs-note code { font-family: var(--mono); font-size: 0.9em; background: var(--accent-dim); padding: 1px 5px; border-radius: 4px; }
+    .cs-note { color: var(--muted) !important; font-size: 13px; }
+    .sample { margin-top: 28px; border-left: 3px solid var(--accent); padding: 4px 0 4px 16px; max-width: 680px; }
+    .sample-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
+    .sample p { margin-top: 6px; line-height: 1.6; color: var(--text); }
+    .check-card { max-width: 560px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; }
+    #check-form { display: grid; gap: 14px; margin-top: 20px; }
+    #check-form label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; color: var(--text); }
+    #check-form .opt { font-weight: 400; color: var(--muted); }
+    #check-form input { font: inherit; font-weight: 400; padding: 11px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); width: 100%; }
+    #check-form input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    #check-form button { justify-self: start; border: none; cursor: pointer; font: inherit; font-weight: 600; }
+    .form-msg { font-size: 14px; min-height: 1.2em; }
+    .form-msg.ok { color: var(--accent); }
+    .form-msg.err { color: #dc2626; }
+    .card-icon { font-weight: 800; }
+    .card a { color: var(--accent); }
+    .final-cta { text-align: center; }
+    .final-cta h2 { margin-bottom: 20px; }
+    .final-cta .btn-primary { background: var(--cta-text); color: var(--cta-bg); }
+    @media (max-width: 720px) {
+      .cs-stats { grid-template-columns: 1fr; }
+      .check-card { padding: 22px 16px; }
+    }
+
   </style>
 </head>
 <body>
@@ -240,274 +272,166 @@
     <span class="nav-tag">free</span>
   </div>
   <div class="nav-right">
-    <a href="#how" class="nav-link">How It Works</a>
-    <a href="#proof" class="nav-link">Who Uses It</a>
+    <a href="#how" class="nav-link">How it works</a>
+    <a href="#case-study" class="nav-link">Case study</a>
+    <a href="#agents" class="nav-link">For agents</a>
     <a href="https://docs.giveready.org/introduction" class="nav-link">About</a>
     <a href="https://docs.giveready.org" class="nav-link" target="_blank">Docs</a>
     <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode">
       <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
-    <a href="/onboard" class="nav-cta">Claim your page</a>
+    <a href="#check" class="nav-cta">Free AI check</a>
   </div>
 </nav>
 
 <!-- ===== HERO ===== -->
 <div class="hero">
   <div class="hero-inner">
-    <h1>Your charity is already here. Claim it.</h1>
-    <p class="hero-sub">41,000+ nonprofits. Free donation page. Zero fees. AI agents recommend your charity to donors worldwide. Claim yours in minutes.</p>
+    <h1>When someone asks AI about your cause, does it name you?</h1>
+    <p class="hero-sub">Donors and applicants now ask ChatGPT, Claude and Perplexity where to give and where to apply. GiveReady checks what AI says about your charity, shows you who it names instead, and gives AI agents a verified profile to read. Free for charities.</p>
     <div class="hero-cta">
-      <a href="/onboard" class="btn btn-primary">Claim your page</a>
-      <a href="/donate/finn-wardman-world-explorer-fund" class="btn btn-ghost">See it live</a>
+      <a href="#check" class="btn btn-primary">Get your free AI check</a>
+      <a href="#case-study" class="btn btn-ghost">Read the case study</a>
     </div>
     <div class="hero-meta">
       <div class="hero-meta-item">
         <span class="hero-meta-num" id="stat-nonprofits">41,000+</span>
-        <span class="hero-meta-label">nonprofits</span>
+        <span class="hero-meta-label">nonprofits listed</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-num" id="stat-causes">29</span>
+        <span class="hero-meta-label">cause areas</span>
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-num">$0</span>
-        <span class="hero-meta-label">fees &mdash; ever</span>
-      </div>
-      <div class="hero-meta-item">
-        <span class="hero-meta-num">8,000+</span>
-        <span class="hero-meta-label">AI crawler hits/month</span>
+        <span class="hero-meta-label">for charities</span>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ===== WHAT WE'RE LEARNING ===== -->
-<div class="learning-strip">
-  <div class="wrap-inner">
-    <div class="left">
-      <span class="pill">What we're learning</span>
-      <div class="text">We publish frozen snapshots of how the project has evolved, hypothesis through pivot. <span class="muted-inline">Latest: 2026-05-24 pivot.</span></div>
-    </div>
-    <a href="/progress" class="cta">Read /progress &rarr;</a>
-  </div>
-</div>
-
-<!-- ===== SEE IT IN ACTION ===== -->
-<div class="phone-section">
-  <span class="tag">See it in action</span>
-  <h2>This is what donors see</h2>
-  <p>A real donation page. The Finn Wardman World Explorer Fund.</p>
-  <div class="phone-frame">
-    <iframe src="/donate/finn-wardman-world-explorer-fund" title="Donate page preview"></iframe>
-  </div>
-  <a href="/donate/finn-wardman-world-explorer-fund" class="phone-link" target="_blank">Open full page &rarr;</a>
-</div>
-
-<!-- ===== WHAT YOU GET ===== -->
-<div class="section" id="features">
+<!-- ===== CASE STUDY ===== -->
+<section class="section" id="case-study">
   <div class="wrap">
-    <span class="tag">What you get</span>
-    <h2>Everything a charity needs to take donations online.</h2>
-    <p class="lead">No developer. No monthly fees. No payment processor taking a cut. Multi-sig governance built in.</p>
-    <div class="cards">
-      <div class="card">
-        <div class="card-icon">&#128279;</div>
-        <h3>One link for everything</h3>
-        <p>Your page at giveready.org/donate/your-charity. Share it anywhere &mdash; Instagram bio, email footer, event posters, WhatsApp groups. Donors see your mission and give instantly.</p>
+    <span class="tag">Case study</span>
+    <h2>$10,000 a month in free Google Ads. ChatGPT sent the applicants.</h2>
+    <p class="lead">The Finn Wardman World Explorer Fund gives grants of $5,000 to $10,000 to young people aged 18 to 26. It has a Google Ad Grant worth $10,000 a month. Here is where its applicants actually came from, late August to late September 2026.</p>
+    <div class="cs-stats">
+      <div class="cs-stat">
+        <span class="cs-num">4 of 7</span>
+        <span class="cs-label">applicants came from ChatGPT</span>
       </div>
-      <div class="card">
-        <div class="card-icon">&#128179;</div>
-        <h3>Every payment method</h3>
-        <p>Credit card via MoonPay. Banking apps like Revolut and Coinbase. Crypto wallets like Phantom. Your donors choose how to give. You receive directly &mdash; no intermediary.</p>
+      <div class="cs-stat">
+        <span class="cs-num">15.8%</span>
+        <span class="cs-label">of visitors from ChatGPT applied</span>
       </div>
-      <div class="card">
-        <div class="card-icon">&#128274;</div>
-        <h3>Trustees stay in control</h3>
-        <p>Multi-sig custody via Squads Protocol. Multiple trustees must approve withdrawals. Full on-chain audit trail. The governance your regulator expects, built into the infrastructure.</p>
+      <div class="cs-stat">
+        <span class="cs-num">$10.89</span>
+        <span class="cs-label">spent on Google Ads, 0 applicants</span>
       </div>
+    </div>
+    <div class="cs-body">
+      <p>ChatGPT started sending applicants before the Fund changed anything. Nobody asked it to. Someone asked for a grant to travel, train or study, and it named the Fund.</p>
+      <p>So the Fund made its site easy for AI to read: a plain-text <code>llms.txt</code>, answers to common questions marked up as structured data, and AI crawlers allowed in. The other three applicants came from Instagram, Google search and a direct visit.</p>
+      <p class="cs-note">Sources: Google Analytics 4 (the <code>apply_submit</code> event by source) and the Fund's Applications sheet, 22 August to 23 September 2026; Google Ads spend to 21 September 2026. Small numbers, early days. We'll publish the next six weeks here too.</p>
     </div>
   </div>
-</div>
-
-<!-- ===== AI DISCOVERY ===== -->
-<div class="section" id="ai">
-  <div class="wrap" style="text-align: center;">
-    <span class="tag">AI-powered discovery</span>
-    <h2>AI agents recommend your charity to donors.</h2>
-    <p class="lead" style="max-width: 540px; margin: 0 auto 28px;">When someone asks Claude, ChatGPT, or any AI assistant "where can I donate to help young people?" &mdash; your charity shows up. GiveReady is the only donation platform that makes nonprofits discoverable by AI agents. Your page is indexed via MCP server, llms.txt, and agents.md &mdash; the new standards for AI-readable content.</p>
-    <div class="cards" style="grid-template-columns: 1fr 1fr 1fr;">
-      <div class="card" style="text-align: center;">
-        <div class="card-icon">&#129302;</div>
-        <h3>AI finds you</h3>
-        <p>Indexed for Claude, ChatGPT, Copilot, and every AI assistant that follows MCP or llms.txt standards.</p>
-      </div>
-      <div class="card" style="text-align: center;">
-        <div class="card-icon">&#127758;</div>
-        <h3>Always discoverable</h3>
-        <p>Your charity is searchable by cause, country, and keyword. AI agents recommend you to donors who would never have found you otherwise.</p>
-      </div>
-      <div class="card" style="text-align: center;">
-        <div class="card-icon">&#9889;</div>
-        <h3>Donate via AI</h3>
-        <p>Your donors give through their AI assistant &mdash; open standards (MCP, agents.md, OpenAPI), fiat or crypto rails, zero extra work for the charity. One prompt, one tap.</p>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ===== TRY IT NOW (donor-side AI demo) ===== -->
-<div class="section" id="try-it">
-  <div class="wrap" style="text-align: center;">
-    <span class="tag">Try it now</span>
-    <h2>Give via AI to a real charity in our directory.</h2>
-    <p class="lead" style="max-width: 540px; margin: 0 auto 8px;">No setup. No account on our side. Open one of these AI tools and you can ask about, compare, and give to nonprofits in chat. Demo charity below &mdash; the same flow works for every claimed page on GiveReady.</p>
-    <div class="try-it-card">
-      <div class="try-it-charity">
-        <div class="try-it-charity-name">Finn Wardman World Explorer Fund</div>
-        <div class="try-it-charity-sub">Adventure grants for young explorers &middot; Bermuda Community Foundation</div>
-      </div>
-      <div class="try-it-buttons">
-        <a class="try-it-btn" href="https://chatgpt.com/g/g-6a016ba2fee8819185a8f5490f9955ea-giveready?q=I%20want%20to%20give%20to%20Finn%20Wardman%20World%20Explorer%20Fund%20via%20GiveReady%20%28https%3A%2F%2Fgiveready.org%2Fdonate%2Ffinn-wardman-world-explorer-fund%29." target="_blank" rel="noopener">
-          <span class="try-it-btn-logo gpt">G</span>
-          Open in ChatGPT
-        </a>
-        <a class="try-it-btn" href="https://claude.ai/new?q=I%20want%20to%20give%20to%20Finn%20Wardman%20World%20Explorer%20Fund%20via%20GiveReady%20%28https%3A%2F%2Fgiveready.org%2Fdonate%2Ffinn-wardman-world-explorer-fund%29." target="_blank" rel="noopener">
-          <span class="try-it-btn-logo claude">C</span>
-          Open in Claude
-        </a>
-        <a class="try-it-btn" href="https://gemini.google.com/app?q=I%20want%20to%20give%20to%20Finn%20Wardman%20World%20Explorer%20Fund%20via%20GiveReady%20%28https%3A%2F%2Fgiveready.org%2Fdonate%2Ffinn-wardman-world-explorer-fund%29." target="_blank" rel="noopener">
-          <span class="try-it-btn-logo gemini">&#10024;</span>
-          Open in Gemini
-        </a>
-      </div>
-      <div class="try-it-foot">
-        Or see the donate page directly: <a href="/donate/finn-wardman-world-explorer-fund">/donate/finn-wardman-world-explorer-fund</a>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ===== ZERO FEES ===== -->
-<div class="section" id="fees">
-  <div class="wrap fees-section">
-    <span class="tag">Zero platform fees</span>
-    <h2>We don't take a cut. Ever.</h2>
-    <p class="lead">Other platforms charge 3&ndash;8% on every donation. We charge nothing. Banking app and wallet donations are completely free. Card donations have standard MoonPay processing (~4.5%).</p>
-    <div class="fees-compare">
-      <div class="fees-card others">
-        <div class="fees-card-label">Other platforms</div>
-        <div class="fees-card-num">3&ndash;8%</div>
-        <div class="fees-card-note">+ monthly fees</div>
-      </div>
-      <div class="fees-card ours">
-        <div class="fees-card-label">GiveReady</div>
-        <div class="fees-card-num">0%</div>
-        <div class="fees-card-note">100% to the charity</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ===== GOVERNANCE ===== -->
-<div class="section" id="governance">
-  <div class="wrap">
-    <span class="tag">Charity governance</span>
-    <h2>Trustees stay in control. Donors don't notice.</h2>
-    <p class="lead">The number one concern we hear from charity trustees: "Who controls the wallet?" GiveReady solves this with multi-signature custody powered by Squads Protocol on Solana.</p>
-    <div class="cards" style="grid-template-columns: 1fr 1fr; margin-top: 24px;">
-      <div class="card">
-        <div class="card-icon">&#128274;</div>
-        <h3>Multi-sig custody</h3>
-        <p>Charity funds are held in a Squads vault that requires multiple trustees to approve any withdrawal. No single person can move money. Same controls your Charity Commission expects, built into the wallet itself.</p>
-      </div>
-      <div class="card">
-        <div class="card-icon">&#128203;</div>
-        <h3>Full audit trail</h3>
-        <p>Every donation and every withdrawal is recorded on-chain. Trustees, auditors, and regulators can verify fund movements independently. No spreadsheets. No trust-me accounting.</p>
-      </div>
-    </div>
-    <div style="margin-top: 24px;">
-      <p class="lead">Donors experience a simple, one-tap donation. Behind the scenes, the charity maintains proper financial controls &mdash; threshold approvals, trustee oversight, and transparent fund management. The governance layer is invisible to donors but critical for compliance.</p>
-    </div>
-  </div>
-</div>
+</section>
 
 <!-- ===== HOW IT WORKS ===== -->
-<div class="section" id="how">
+<section class="section" id="how">
   <div class="wrap">
-    <span class="tag">How it works</span>
-    <h2>Live in minutes. Free forever.</h2>
-    <div class="steps">
-      <div class="step">
-        <span class="step-num">1</span>
-        <div>
-          <div class="step-name">Find &amp; claim your page</div>
-          <div class="step-desc">Search 41,000+ nonprofits. Your charity is probably already listed. Claim it, check the details, and you're live in two minutes.</div>
-        </div>
+    <span class="tag">How the free check works</span>
+    <h2>Three steps. No login.</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="card-icon">1</div>
+        <h3>Tell us your charity</h3>
+        <p>Name, website and an email. That's all we need.</p>
       </div>
-      <div class="step">
-        <span class="step-num">2</span>
-        <div>
-          <div class="step-name">Choose how to get paid</div>
-          <div class="step-desc">Crypto, credit card, or bank transfer. Pick what works for you. Your donation page goes live at giveready.org/donate/your-charity.</div>
-        </div>
+      <div class="card">
+        <div class="card-icon">2</div>
+        <h3>We ask the AI engines</h3>
+        <p>We put the questions your donors and applicants ask to ChatGPT, Claude and Perplexity, and record who gets named and which pages they read.</p>
       </div>
-      <div class="step">
-        <span class="step-num">3</span>
-        <div>
-          <div class="step-name">AI agents find you</div>
-          <div class="step-desc">Your charity becomes discoverable by Claude, ChatGPT, and every AI assistant. When donors ask "where should I give?" &mdash; your charity shows up.</div>
-        </div>
+      <div class="card">
+        <div class="card-icon">3</div>
+        <h3>You get a one-page report</h3>
+        <p>What AI says about you, who it names instead, and three fixes you can make yourself. Then claim your free GiveReady profile so agents read facts you control.</p>
+      </div>
+    </div>
+    <div class="sample">
+      <span class="sample-label">From a real check this week</span>
+      <p>Perplexity named a Cape Town youth music charity in 5 of 6 questions. But its own website was a source in only 1 of them. On the question about funding young musicians to study abroad, nobody was named at all. That gap is fixable with one page.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FORM ===== -->
+<section class="section" id="check">
+  <div class="wrap">
+    <div class="check-card">
+      <span class="tag">Free AI check</span>
+      <h2>See what AI says about your charity</h2>
+      <p class="lead">Your report arrives by email within a few working days. Free, no account, no card.</p>
+      <form id="check-form" novalidate>
+        <label>Charity name<input name="name" required autocomplete="organization" /></label>
+        <label>Website<input name="website" type="url" placeholder="https://" /></label>
+        <label>Your email<input name="email" type="email" required autocomplete="email" /></label>
+        <label>Registration number <span class="opt">(optional: Charity Commission, EIN or similar)</span><input name="reg" /></label>
+        <button type="submit" class="btn btn-primary">Send me my AI check</button>
+        <p class="form-msg" id="check-msg" role="status"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOR AGENTS ===== -->
+<section class="section" id="agents">
+  <div class="wrap">
+    <span class="tag">Built for AI agents</span>
+    <h2>A charity directory that agents read first</h2>
+    <p class="lead">GiveReady is written for machines as much as people. Agents can search 41,000+ nonprofit profiles by cause, country and keyword, check registration, and cite our cause guides. Perplexity and ChatGPT already do.</p>
+    <div class="cards">
+      <div class="card">
+        <h3>MCP server</h3>
+        <p>Search, verify and look up nonprofits from Claude, ChatGPT or any MCP client. <a href="https://docs.giveready.org">Docs</a></p>
+      </div>
+      <div class="card">
+        <h3>llms.txt and agents.md</h3>
+        <p>Plain-text maps of the directory for crawlers and agents. <a href="/llms.txt">llms.txt</a> &middot; <a href="/agents.md">agents.md</a></p>
+      </div>
+      <div class="card">
+        <h3>Cause guides</h3>
+        <p>Short, sourced guides to the charities working on one cause in one place. <a href="/guides">Browse the guides</a></p>
       </div>
     </div>
   </div>
-</div>
+</section>
 
-<!-- ===== SOCIAL PROOF ===== -->
-<div class="section" id="proof">
-  <div class="wrap proof-section">
-    <span class="tag">Who uses GiveReady</span>
-    <h2>Built with real nonprofits</h2>
-    <div class="proof-stats">
-      <div>
-        <div class="proof-stat-num" id="stat-nonprofits-2">41,000+</div>
-        <div class="proof-stat-label">Nonprofits listed</div>
-      </div>
-      <div>
-        <div class="proof-stat-num">0%</div>
-        <div class="proof-stat-label">Platform fees</div>
-      </div>
-      <div>
-        <div class="proof-stat-num">100%</div>
-        <div class="proof-stat-label">To the charity</div>
-      </div>
-    </div>
-    <div class="proof-logos">
-      <span class="proof-chip">City Kids Surfing</span>
-      <span class="proof-chip">Finn Wardman WEF</span>
-      <span class="proof-chip">Waves for Change</span>
-      <span class="proof-chip">Surfers Not Street Children</span>
-    </div>
-  </div>
-</div>
-
-<!-- ===== STORY ===== -->
-<div class="section">
-  <div class="wrap story-section">
+<!-- ===== WHY IT'S FREE ===== -->
+<section class="section" id="why">
+  <div class="wrap">
     <span class="tag">Why it's free</span>
     <h2>Built in memory of Finn</h2>
-    <p>GiveReady was built by Geordie Wardman after his son Finn died in 2023 at age 20. Finn was a freeride skier, a surfer, and the kind of person who said yes before he'd figured out the logistics. The Finn Wardman World Explorer Fund was created in his memory. GiveReady exists to make sure small charities like Finn's fund can be found by anyone, anywhere &mdash; including AI agents. It's free because charging fees on charitable donations defeats the purpose.</p>
+    <p class="lead">GiveReady was built by Geordie Wardman after his son Finn died in 2023 at age 20. Finn was a freeride skier, a surfer, and the kind of person who said yes before he'd figured out the logistics. The Finn Wardman World Explorer Fund was created in his memory. GiveReady exists so small charities like Finn's fund can be found by anyone, anywhere, including AI agents. Listing and the AI check are free for charities.</p>
   </div>
-</div>
+</section>
 
 <!-- ===== FINAL CTA ===== -->
-<div class="final-cta" id="cta">
-  <h2>Your charity is already here.</h2>
-  <p>41,000+ nonprofits listed. Claim your page, verify your info, and start receiving donations. Zero fees.</p>
-  <a href="/onboard" class="btn-cta">Claim your page &rarr;</a>
-  <a href="/donate/finn-wardman-world-explorer-fund" class="cta-sub">See it in action &rarr;</a>
-</div>
+<section class="section final-cta">
+  <div class="wrap">
+    <h2>Find out if AI knows your charity.</h2>
+    <a href="#check" class="btn btn-primary">Get your free AI check</a>
+  </div>
+</section>
+
 
 <footer>
   <div class="footer-links">
-    <a href="/onboard">Get Started</a>
+    <a href="#check">Free AI check</a>
+    <a href="/onboard">Claim your profile</a>
     <a href="/guides">Guides</a>
     <a href="/causes">Causes</a>
     <a href="https://docs.giveready.org/introduction">About</a>
@@ -547,6 +471,37 @@
     if (el2) el2.textContent = fmt;
     if (el3 && d.causes) el3.textContent = d.causes;
   }).catch(function() {});
+
+  // Free AI check form -> /api/charity/claim-request (no login, no email send)
+  (function() {
+    var f = document.getElementById('check-form');
+    if (!f) return;
+    var msg = document.getElementById('check-msg');
+    f.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var name = f.elements['name'].value.trim(), email = f.elements['email'].value.trim(), site = f.elements['website'].value.trim(), reg = f.elements['reg'].value.trim();
+      msg.className = 'form-msg';
+      if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        msg.textContent = 'Please add your charity name and a valid email.'; msg.classList.add('err'); return;
+      }
+      var btn = f.querySelector('button'); btn.disabled = true; msg.textContent = 'Sending...';
+      fetch('/api/charity/claim-request', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email,
+          charity_registration_number: reg || name,
+          message: 'ai-check | name: ' + name + ' | website: ' + (site || '-') + ' | reg: ' + (reg || '-')
+        })
+      }).then(function(r) {
+        if (r.status === 204 || r.ok) {
+          f.reset(); msg.textContent = 'Got it. Your AI check will arrive by email within a few working days.'; msg.classList.add('ok');
+        } else { throw new Error(r.status); }
+      }).catch(function() {
+        msg.textContent = 'That didn’t go through. Email geordie@testventures.net and we’ll run it by hand.'; msg.classList.add('err');
+      }).then(function() { btn.disabled = false; });
+    });
+  })();
+
 </script>
 
 </body>

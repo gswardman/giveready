@@ -97,8 +97,24 @@ let MESSAGE = null;
 })();
 
 $('go').onclick = async () => {
-  const provider = window.phantom?.solana || window.solflare || window.backpack || window.solana;
-  if (!provider) { $('status').innerHTML = '<span class="bad">No Solana wallet extension found.</span>'; return; }
+  // Brave ships its own Solana provider under a different global, and some
+  // extensions inject late. Check broadly and, on failure, say what WAS found —
+  // "no wallet extension" is useless when the real cause is a phone-held key or
+  // a private window with extensions disabled.
+  const provider = window.phantom?.solana || window.solflare || window.backpack
+                || window.braveSolana || window.glow || window.solana;
+  if (!provider) {
+    const seen = ['phantom','solflare','backpack','braveSolana','glow','solana','ethereum']
+      .filter(k => k in window);
+    $('status').innerHTML =
+      '<span class="bad">No Solana wallet provider in this browser.</span><br>' +
+      '<span style="font-size:13px;color:#5b6672">Providers detected: ' +
+      (seen.length ? seen.join(', ') : 'none') + '.<br>' +
+      'If your key is on a phone, open this page inside your wallet app\\'s built-in browser. ' +
+      'If it is in a keypair file, use <code>scripts/sign-wallet-proof.mjs</code> instead — ' +
+      'neither route needs an extension here.</span>';
+    return;
+  }
   $('go').disabled = true;
   $('status').textContent = 'Waiting for the wallet…';
   try {

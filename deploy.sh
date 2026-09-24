@@ -6,33 +6,37 @@ set -euo pipefail
 # Usage:
 #   ./deploy.sh "commit message here"     Full deploy: git + wrangler + MCP
 #   ./deploy.sh --skip-mcp "message"      Skip MCP registry publish
+#   ./deploy.sh --skip-tests "message"    Skip the test gate (emergencies only)
 #   ./deploy.sh --dry-run "message"       Show what would happen, change nothing
 #   ./deploy.sh --rollback                Reset to the previous deploy tag
 #
 # What it does:
 #   1. Check for uncommitted changes
 #   2. Stage all tracked + new files (respects .gitignore)
-#   3. Commit with your message
-#   4. Tag with timestamp (for rollback)
-#   5. Push to GitHub
-#   6. Deploy to Cloudflare (wrangler deploy)
-#   7. Publish MCP server to registry
-#   8. Verify live endpoints
+#   3. Run the test suite; abort before committing if it fails
+#   4. Commit with your message
+#   5. Tag with timestamp (for rollback)
+#   6. Push to GitHub
+#   7. Deploy to Cloudflare (wrangler deploy)
+#   8. Publish MCP server to registry
+#   9. Verify live endpoints
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 DRY_RUN=false
 SKIP_MCP=false
+SKIP_TESTS=false
 ROLLBACK=false
 MESSAGE=""
 
 for arg in "$@"; do
   case $arg in
-    --dry-run)   DRY_RUN=true ;;
-    --skip-mcp)  SKIP_MCP=true ;;
-    --rollback)  ROLLBACK=true ;;
-    *)           MESSAGE="$arg" ;;
+    --dry-run)    DRY_RUN=true ;;
+    --skip-mcp)   SKIP_MCP=true ;;
+    --skip-tests) SKIP_TESTS=true ;;
+    --rollback)   ROLLBACK=true ;;
+    *)            MESSAGE="$arg" ;;
   esac
 done
 
@@ -82,7 +86,7 @@ echo "=== GiveReady Deploy ==="
 echo ""
 
 # 1. Prerequisites
-echo "[1/8] Checking prerequisites..."
+echo "[1/10] Checking prerequisites..."
 command -v wrangler >/dev/null 2>&1 || { echo "Error: wrangler not found. Run: npm install -g wrangler"; exit 1; }
 command -v git >/dev/null 2>&1 || { echo "Error: git not found."; exit 1; }
 
@@ -90,11 +94,11 @@ command -v git >/dev/null 2>&1 || { echo "Error: git not found."; exit 1; }
 rm -f .git/index.lock
 
 # 3. Install deps
-echo "[2/8] Installing dependencies..."
+echo "[2/10] Installing dependencies..."
 npm install --silent 2>/dev/null
 
 # 4. Stage everything (respects .gitignore)
-echo "[3/8] Staging files..."
+echo "[3/10] Staging files..."
 git add -A
 
 # Show what's staged
@@ -111,7 +115,7 @@ echo "$STAGED" | sed 's/^/  /'
 
 # 5. Safety check — no secrets
 echo ""
-echo "[4/8] Checking for sensitive files..."
+echo "[4/10] Checking for sensitive files..."
 SECRETS=$(git diff --cached --name-only | grep -iE "\.env|secret|token|credential|\.pem|\.key" | grep -v ".gitignore" || true)
 if [ -n "$SECRETS" ]; then
   echo "  WARNING: These files look sensitive:"
@@ -127,12 +131,42 @@ else
   echo "  Clean."
 fi
 
+# 5b. Contract tests — a lesson with a test is a contract, a lesson without one is a note
+#
+# Added 2026-09-22. tests/ has existed since April and nothing ran it on the way out, so
+# every assertion in there was decorative. agent-contract.test.js in particular locks in
+# learnings that have only held so far because nobody happened to break them: the working
+# POST example in the first 500 bytes of /AGENTS.md (2026-05-17), the guides block that T2
+# is measured on (2026-09-05), and the absence of the per-slug AGENTS.md link that inflated
+# agents-manifest to 47% for weeks (2026-09-09).
+#
+# This gate runs BEFORE the commit, so a failure costs nothing: nothing is staged into
+# history, nothing is pushed, nothing reaches Cloudflare. --skip-tests exists for a genuine
+# emergency and prints loudly, because a deploy that routinely skips its tests is a deploy
+# with no tests.
+echo ""
+echo "[5/10] Running tests..."
+if [ "$SKIP_TESTS" = true ]; then
+  echo "  SKIPPED via --skip-tests. Nothing is verifying the agent contract on this deploy."
+else
+  if npm test; then
+    echo "  Tests passed."
+  else
+    echo ""
+    echo "  TESTS FAILED. Nothing has been committed, pushed or deployed."
+    echo "  Fix the failure, or re-run with --skip-tests if this is an emergency."
+    git reset HEAD . >/dev/null 2>&1
+    exit 1
+  fi
+fi
+
 # 6. Tag + Commit
 DEPLOY_TAG="deploy-$(date +%Y%m%d-%H%M%S)"
 echo ""
-echo "[5/8] Committing: $MESSAGE"
+echo "[6/10] Committing: $MESSAGE"
 
 if [ "$DRY_RUN" = true ]; then
+  echo "  [dry run] Would run: npm test (gate)"
   echo "  [dry run] Would commit with message: $MESSAGE"
   echo "  [dry run] Would tag: $DEPLOY_TAG"
   echo "  [dry run] Would push to origin/main"
@@ -151,7 +185,7 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 git tag "$DEPLOY_TAG"
 
 # 7. Push
-echo "[6/8] Pushing to GitHub..."
+echo "[7/10] Pushing to GitHub..."
 git push origin main
 git push origin "$DEPLOY_TAG"
 
@@ -175,7 +209,7 @@ git push origin "$DEPLOY_TAG"
 # looks sensitive, so on a normal deploy it costs nothing and on an abnormal one
 # it is the only thing standing between a slip and a published credential.
 # Do not "fix" it by piping `yes` into this script.
-echo "[7/8] Running migrations..."
+echo "[8/10] Running migrations..."
 for migration in migrations/*.sql; do
   [ -f "$migration" ] && {
     echo "  Running $migration..."
@@ -184,7 +218,7 @@ for migration in migrations/*.sql; do
 done
 
 # 9. Deploy to Cloudflare
-echo "[8/9] Deploying to Cloudflare..."
+echo "[9/10] Deploying to Cloudflare..."
 wrangler deploy
 
 # 9b. IndexNow ping — push URLs to Bing/Yandex so Perplexity (Bing-backed)
@@ -200,14 +234,14 @@ fi
 
 # 10. MCP registry
 if [ "$SKIP_MCP" = false ]; then
-  echo "[9/9] Publishing MCP server..."
+  echo "[10/10] Publishing MCP server..."
   if [ -d "mcp-server" ] && command -v mcp-publisher >/dev/null 2>&1; then
     (cd mcp-server && mcp-publisher publish 2>/dev/null) || echo "  MCP publish skipped (not logged in or error)"
   else
     echo "  Skipped (mcp-publisher not found or no mcp-server dir)"
   fi
 else
-  echo "[9/9] Skipping MCP publish (--skip-mcp)"
+  echo "[10/10] Skipping MCP publish (--skip-mcp)"
 fi
 
 # 10. Verify
