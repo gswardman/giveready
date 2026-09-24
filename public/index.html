@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GiveReady: get your charity named by AI</title>
-  <meta name="description" content="Free AI visibility check for charities: see what ChatGPT, Claude and Perplexity say about your charity, who they name instead, and three fixes. Plus a verified profile AI agents can read." />
-  <meta property="og:title" content="GiveReady: get your charity named by AI" />
-  <meta property="og:description" content="When someone asks AI about your cause, does it name you? Free AI check for charities." />
+  <title>GiveReady: the charity directory AI reads</title>
+  <meta name="description" content="GiveReady is the charity directory AI reads. Get a free AI Visibility Audit: your score, who ChatGPT, Claude and Perplexity name instead of you, and how to fix it." />
+  <meta property="og:title" content="GiveReady: the charity directory AI reads" />
+  <meta property="og:description" content="AI is looking for charities. Is it finding yours? Free AI Visibility Audit for charities." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://giveready.org" />
   <meta name="twitter:card" content="summary" />
@@ -256,6 +256,20 @@
     .card a { color: var(--accent); }
     .final-cta { text-align: center; }
     .final-cta h2 { margin-bottom: 20px; }
+    .live-pill { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: 999px; padding: 6px 14px; margin-bottom: 18px; text-decoration: none; }
+    .live-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+    @media (prefers-reduced-motion: reduce) { .live-pill .dot { animation: none; } }
+    .ai-count { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 24px 0 18px; }
+    .ai-count-num { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .ai-count-label { color: var(--muted); max-width: 420px; line-height: 1.4; }
+    .ai-feed { list-style: none; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+    .ai-feed li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .ai-feed li:last-child { border-bottom: none; }
+    .ai-feed .who { font-weight: 600; }
+    .ai-feed .when { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .ai-feed a { color: var(--text); }
+    .ai-note { color: var(--muted); font-size: 13px; margin-top: 10px; }
     .final-cta .btn-primary { background: var(--cta-text); color: var(--cta-bg); }
     @media (max-width: 720px) {
       .cs-stats { grid-template-columns: 1fr; }
@@ -272,27 +286,30 @@
     <span class="nav-tag">free</span>
   </div>
   <div class="nav-right">
-    <a href="#how" class="nav-link">How it works</a>
+    <a href="#ai-traffic" class="nav-link">AI traffic</a>
+    <a href="#how" class="nav-link">The audit</a>
+    <a href="#join" class="nav-link">Join free</a>
     <a href="#case-study" class="nav-link">Case study</a>
-    <a href="#agents" class="nav-link">For agents</a>
+    <a href="#agents" class="nav-link">For developers</a>
     <a href="https://docs.giveready.org/introduction" class="nav-link">About</a>
     <a href="https://docs.giveready.org" class="nav-link" target="_blank">Docs</a>
     <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode">
       <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
-    <a href="#check" class="nav-cta">Free AI check</a>
+    <a href="#check" class="nav-cta">Free AI audit</a>
   </div>
 </nav>
 
 <!-- ===== HERO ===== -->
 <div class="hero">
   <div class="hero-inner">
-    <h1>When someone asks AI about your cause, does it name you?</h1>
-    <p class="hero-sub">Donors and applicants now ask ChatGPT, Claude and Perplexity where to give and where to apply. GiveReady checks what AI says about your charity, shows you who it names instead, and gives AI agents a verified profile to read. Free for charities.</p>
+    <a href="#ai-traffic" class="live-pill" id="live-pill"><span class="dot"></span><span id="live-pill-text">Live AI traffic on GiveReady</span></a>
+    <h1>AI is looking for charities. Is it finding yours?</h1>
+    <p class="hero-sub">GiveReady is the charity directory AI reads. Get a free AI Visibility Audit: your score, who AI names instead of you, and how to fix it.</p>
     <div class="hero-cta">
-      <a href="#check" class="btn btn-primary">Get your free AI check</a>
-      <a href="#case-study" class="btn btn-ghost">Read the case study</a>
+      <a href="#check" class="btn btn-primary">Get my free audit</a>
+      <a href="#ai-traffic" class="btn btn-ghost">See the AI traffic</a>
     </div>
     <div class="hero-meta">
       <div class="hero-meta-item">
@@ -300,8 +317,8 @@
         <span class="hero-meta-label">nonprofits listed</span>
       </div>
       <div class="hero-meta-item">
-        <span class="hero-meta-num" id="stat-causes">29</span>
-        <span class="hero-meta-label">cause areas</span>
+        <span class="hero-meta-num" id="stat-ai-week">&hellip;</span>
+        <span class="hero-meta-label">AI visits to charity pages this week</span>
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-num">$0</span>
@@ -310,6 +327,18 @@
     </div>
   </div>
 </div>
+
+<!-- ===== LIVE AI TRAFFIC ===== -->
+<section class="section" id="ai-traffic">
+  <div class="wrap">
+    <span class="tag">AI traffic, live</span>
+    <h2>Right now, AI is reading GiveReady's charity profiles</h2>
+    <p class="lead">When ChatGPT, Claude or Perplexity look up charities, they read pages like ours. Whatever your GiveReady profile says is what they learn about you. If it's thin or out of date, so is their answer.</p>
+    <div class="ai-count"><span class="ai-count-num" id="ai-week-big">&nbsp;</span><span class="ai-count-label">AI visits to charity pages on GiveReady in the last 7 days, from OpenAI, Anthropic and Perplexity</span></div>
+    <ul class="ai-feed" id="ai-feed"><li class="muted">Loading the latest AI visits...</li></ul>
+    <p class="ai-note">Counted from GiveReady's own server logs. Updated every time you load this page.</p>
+  </div>
+</section>
 
 <!-- ===== CASE STUDY ===== -->
 <section class="section" id="case-study">
@@ -332,9 +361,10 @@
       </div>
     </div>
     <div class="cs-body">
-      <p>ChatGPT started sending applicants before the Fund changed anything. Nobody asked it to. Someone asked for a grant to travel, train or study, and it named the Fund.</p>
-      <p>So the Fund made its site easy for AI to read: a plain-text <code>llms.txt</code>, answers to common questions marked up as structured data, and AI crawlers allowed in. The other three applicants came from Instagram, Google search and a direct visit.</p>
-      <p class="cs-note">Sources: Google Analytics 4 (the <code>apply_submit</code> event by source) and the Fund's Applications sheet, 22 August to 23 September 2026; Google Ads spend to 21 September 2026. Small numbers, early days. We'll publish the next six weeks here too.</p>
+      <p>Nobody asked ChatGPT to recommend the Fund. Young people asked it where to find money to travel, train or study, and it named the Fund. They were the best visitors the site had all month: 15.8% of them applied.</p>
+      <p>The free ad grant, over the same weeks: 72 ads shown, 4 clicks, no applications.</p>
+      <p><b>That's the shift GiveReady is built for.</b> Your next donor, volunteer or applicant is asking an AI. GiveReady tells you what it answers, keeps a verified profile of you in the directory AI reads, and tracks whether you're named, month after month.</p>
+      <p class="cs-note">Data: the Fund's Google Analytics, application records and Google Ads account, 22 August to 23 September 2026.</p>
     </div>
   </div>
 </section>
@@ -342,28 +372,58 @@
 <!-- ===== HOW IT WORKS ===== -->
 <section class="section" id="how">
   <div class="wrap">
-    <span class="tag">How the free check works</span>
-    <h2>Three steps. No login.</h2>
+    <span class="tag">The free AI Visibility Audit</span>
+    <h2>What you get</h2>
     <div class="cards">
       <div class="card">
         <div class="card-icon">1</div>
-        <h3>Tell us your charity</h3>
-        <p>Name, website and an email. That's all we need.</p>
+        <h3>Your AI Visibility Score</h3>
+        <p>A score out of 100, split into five parts: how often AI finds you, how early it names you, whether it cites your site, whether it trusts you, and how ready your website is.</p>
       </div>
       <div class="card">
         <div class="card-icon">2</div>
-        <h3>We ask the AI engines</h3>
-        <p>We put the questions your donors and applicants ask to ChatGPT, Claude and Perplexity, and record who gets named and which pages they read.</p>
+        <h3>Who AI names instead of you</h3>
+        <p>We ask ChatGPT, Claude and Perplexity around 20 questions your donors, the people you help and funders really ask, and show you which charities they name.</p>
       </div>
       <div class="card">
         <div class="card-icon">3</div>
-        <h3>You get a one-page report</h3>
-        <p>What AI says about you, who it names instead, and three fixes you can make yourself. Then claim your free GiveReady profile so agents read facts you control.</p>
+        <h3>Your fixes, written for you</h3>
+        <p>Critical issues first, each with how to fix it. Plus a ready-to-upload llms.txt, the structured data for your site, and the questions your site should answer.</p>
       </div>
     </div>
     <div class="sample">
       <span class="sample-label">From a real check this week</span>
-      <p>Perplexity named a Cape Town youth music charity in 5 of 6 questions. But its own website was a source in only 1 of them. On the question about funding young musicians to study abroad, nobody was named at all. That gap is fixable with one page.</p>
+      <p>A Cape Town youth music charity was named by Perplexity in 10 of 15 answers about its cause, but not one of those answers cited the charity's own website. AI was learning about it entirely from other people's pages. That's fixable.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== JOIN ===== -->
+<section class="section" id="join">
+  <div class="wrap">
+    <span class="tag">Join GiveReady, free</span>
+    <h2>What your charity gets</h2>
+    <p class="lead">The audit shows you where you stand. Joining keeps you there.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="card-icon">1</div>
+        <h3>A verified profile AI reads</h3>
+        <p>Your page in the directory ChatGPT, Claude and Perplexity read every day, with the facts you choose and links to your website and donate page.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">2</div>
+        <h3>Your score, every month</h3>
+        <p>We re-run your audit monthly: are you named more often than last month, and against which charities?</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">3</div>
+        <h3>A place in our cause guides</h3>
+        <p>We feature verified charities in GiveReady's cause guides, the pages AI engines quote when people ask where to give.</p>
+      </div>
+    </div>
+    <div class="sample">
+      <span class="sample-label">Rather we did the fixes?</span>
+      <p>We can make the changes on your website, write the answer pages AI quotes, and get you listed where AI looks for your cause. Ask about it when your audit arrives.</p>
     </div>
   </div>
 </section>
@@ -372,15 +432,15 @@
 <section class="section" id="check">
   <div class="wrap">
     <div class="check-card">
-      <span class="tag">Free AI check</span>
-      <h2>See what AI says about your charity</h2>
-      <p class="lead">Your report arrives by email within a few working days. Free, no account, no card.</p>
+      <span class="tag">Free AI Visibility Audit</span>
+      <h2>How does your charity measure up?</h2>
+      <p class="lead">Your full audit arrives by email as a PDF within a few working days. Free, no account, no card.</p>
       <form id="check-form" novalidate>
         <label>Charity name<input name="name" required autocomplete="organization" /></label>
         <label>Website<input name="website" type="url" placeholder="https://" /></label>
         <label>Your email<input name="email" type="email" required autocomplete="email" /></label>
         <label>Registration number <span class="opt">(optional: Charity Commission, EIN or similar)</span><input name="reg" /></label>
-        <button type="submit" class="btn btn-primary">Send me my AI check</button>
+        <button type="submit" class="btn btn-primary">Get my free audit</button>
         <p class="form-msg" id="check-msg" role="status"></p>
       </form>
     </div>
@@ -390,9 +450,9 @@
 <!-- ===== FOR AGENTS ===== -->
 <section class="section" id="agents">
   <div class="wrap">
-    <span class="tag">Built for AI agents</span>
-    <h2>A charity directory that agents read first</h2>
-    <p class="lead">GiveReady is written for machines as much as people. Agents can search 41,000+ nonprofit profiles by cause, country and keyword, check registration, and cite our cause guides. Perplexity and ChatGPT already do.</p>
+    <span class="tag">For developers and AI builders</span>
+    <h2>A charity directory built for AI to read</h2>
+    <p class="lead">GiveReady is written for machines as much as people. AI assistants and the tools built on them can search 41,000+ nonprofit profiles by cause, country and keyword, check registration, and cite our cause guides. Perplexity and ChatGPT already do.</p>
     <div class="cards">
       <div class="card">
         <h3>MCP server</h3>
@@ -400,7 +460,7 @@
       </div>
       <div class="card">
         <h3>llms.txt and agents.md</h3>
-        <p>Plain-text maps of the directory for crawlers and agents. <a href="/llms.txt">llms.txt</a> &middot; <a href="/agents.md">agents.md</a></p>
+        <p>Plain-text maps of the directory for AI tools. <a href="/llms.txt">llms.txt</a> &middot; <a href="/agents.md">agents.md</a></p>
       </div>
       <div class="card">
         <h3>Cause guides</h3>
@@ -415,22 +475,22 @@
   <div class="wrap">
     <span class="tag">Why it's free</span>
     <h2>Built in memory of Finn</h2>
-    <p class="lead">GiveReady was built by Geordie Wardman after his son Finn died in 2023 at age 20. Finn was a freeride skier, a surfer, and the kind of person who said yes before he'd figured out the logistics. The Finn Wardman World Explorer Fund was created in his memory. GiveReady exists so small charities like Finn's fund can be found by anyone, anywhere, including AI agents. Listing and the AI check are free for charities.</p>
+    <p class="lead">GiveReady was built by Geordie Wardman after his son Finn died in 2023 at age 20. Finn was a freeride skier, a surfer, and the kind of person who said yes before he'd figured out the logistics. The Finn Wardman World Explorer Fund was created in his memory. GiveReady exists so small charities like Finn's fund can be found by anyone, anywhere, including through AI. Listing and the AI audit are free for charities.</p>
   </div>
 </section>
 
 <!-- ===== FINAL CTA ===== -->
 <section class="section final-cta">
   <div class="wrap">
-    <h2>Find out if AI knows your charity.</h2>
-    <a href="#check" class="btn btn-primary">Get your free AI check</a>
+    <h2>AI is looking for charities. Make sure it finds yours.</h2>
+    <a href="#check" class="btn btn-primary">Get my free audit</a>
   </div>
 </section>
 
 
 <footer>
   <div class="footer-links">
-    <a href="#check">Free AI check</a>
+    <a href="#check">Free AI audit</a>
     <a href="/onboard">Claim your profile</a>
     <a href="/guides">Guides</a>
     <a href="/causes">Causes</a>
@@ -472,6 +532,51 @@
     if (el3 && d.causes) el3.textContent = d.causes;
   }).catch(function() {});
 
+  // Live AI traffic: /api/ai-traffic is one cached row, refreshed every 3 hours
+  // from GiveReady's own logs (OpenAI, Anthropic, Perplexity; charity, cause and guide pages).
+  (function() {
+    var SMALLW = { 'for': 1, 'and': 1, 'of': 1, 'the': 1, 'in': 1, 'on': 1, 'to': 1, 'a': 1 }, UP = { 'us': 'US', 'uk': 'UK', 'usa': 'USA', 'sa': 'SA', 'ngo': 'NGO' };
+    function title(slug) {
+      return decodeURIComponent(slug).split('-').map(function(w, i) {
+        var l = w.toLowerCase();
+        if (UP[l]) return UP[l];
+        if (i > 0 && SMALLW[l]) return l;
+        return l.charAt(0).toUpperCase() + l.slice(1);
+      }).join(' ');
+    }
+    function what(route) {
+      var m;
+      if ((m = route.match(/^\/nonprofits\/([^\/?#]+)/))) return 'the profile of ' + title(m[1]);
+      if ((m = route.match(/^\/causes\/([^\/?#]+)/))) return 'the ' + title(m[1]).toLowerCase() + ' cause page';
+      if ((m = route.match(/^\/guides\/([^\/?#]+)/))) return 'the guide "' + title(m[1]) + '"';
+      return null;
+    }
+    function ago(ts) {
+      var t = Date.parse(String(ts).replace(' ', 'T') + 'Z'), m = Math.max(0, Math.round((Date.now() - t) / 60000));
+      if (isNaN(t)) return '';
+      if (m < 60) return m <= 1 ? 'just now' : m + ' min ago';
+      var h = Math.round(m / 60); if (h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
+      var d = Math.round(h / 24); return d + (d === 1 ? ' day ago' : ' days ago');
+    }
+    fetch('/api/ai-traffic').then(function(r) { return r.json(); }).then(function(d) {
+      if (!d || !d.total) throw new Error('none');
+      var n = Number(d.total).toLocaleString('en-GB');
+      ['ai-week-big', 'stat-ai-week'].forEach(function(id) { var el = document.getElementById(id); if (el) el.textContent = n; });
+      var pill = document.getElementById('live-pill-text'); if (pill) pill.textContent = n + ' AI visits to charity pages this week';
+      var feed = document.getElementById('ai-feed'); feed.innerHTML = '';
+      (d.recent || []).filter(function(e) { return what(e.route || ''); }).slice(0, 6).forEach(function(e) {
+        var li = document.createElement('li'), l = document.createElement('span'), r = document.createElement('span'), a = document.createElement('a'), b = document.createElement('span');
+        b.className = 'who'; b.textContent = e.vendor;
+        l.appendChild(b); l.appendChild(document.createTextNode(' read '));
+        a.href = e.route; a.textContent = what(e.route); l.appendChild(a);
+        r.className = 'when'; r.textContent = ago(e.last_hit);
+        li.appendChild(l); li.appendChild(r); feed.appendChild(li);
+      });
+    }).catch(function() {
+      var feed = document.getElementById('ai-feed'); if (feed) feed.innerHTML = '<li>The live AI traffic feed is updating. Check back in a few minutes.</li>';
+    });
+  })();
+
   // Free AI check form -> /api/charity/claim-request (no login, no email send)
   (function() {
     var f = document.getElementById('check-form');
@@ -490,11 +595,11 @@
         body: JSON.stringify({
           email: email,
           charity_registration_number: reg || name,
-          message: 'ai-check | name: ' + name + ' | website: ' + (site || '-') + ' | reg: ' + (reg || '-')
+          message: 'ai-audit | name: ' + name + ' | website: ' + (site || '-') + ' | reg: ' + (reg || '-')
         })
       }).then(function(r) {
         if (r.status === 204 || r.ok) {
-          f.reset(); msg.textContent = 'Got it. Your AI check will arrive by email within a few working days.'; msg.classList.add('ok');
+          f.reset(); msg.textContent = 'Got it. Your AI Visibility Audit will arrive by email within a few working days.'; msg.classList.add('ok');
         } else { throw new Error(r.status); }
       }).catch(function() {
         msg.textContent = 'That didn’t go through. Email geordie@testventures.net and we’ll run it by hand.'; msg.classList.add('err');

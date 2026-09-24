@@ -6000,6 +6000,122 @@ async function handleAdminDrafts(db, env, request) {
   });
 }
 
+// ── AI traffic summary for the public home page (2026-09-24) ─────────────
+//
+// The home page shows "N AI visits to charity pages this week" and a feed of
+// the latest reads. That must NOT scan discovery_hits per page view: a 7-day
+// window is ~17k rows, and ~150 home page views would spend the 5M/day D1
+// free tier (see 01-Projects/GiveReady/2026-09-02-d1-rows-read-diagnosis.md).
+//
+// So: refreshAiTraffic() runs the scan in scheduled() every third hour and
+// writes one JSON row to stats_cache ('ai_traffic_7d'). /api/ai-traffic reads
+// that single row. If the row is missing or older than 6 hours (first deploy,
+// or the cron stopped), the endpoint recomputes once and writes it back, so the
+// next request is cheap again. Only OpenAI, Anthropic and Perplexity count, and
+// only charity, cause and guide pages, so "AI visits" means what it says.
+const AI_VENDORS = [
+  ['OpenAI (ChatGPT)', /GPTBot|OAI-SearchBot|ChatGPT-User/i],
+  ['Anthropic (Claude)', /ClaudeBot|Claude-User|Claude-SearchBot|anthropic-ai/i],
+  ['Perplexity', /PerplexityBot|Perplexity-User/i],
+];
+function aiVendorFor(ua) {
+  for (const [name, re] of AI_VENDORS) if (re.test(ua || '')) return name;
+  return null;
+}
+
+async function refreshAiTraffic(db) {
+  const rows = await db.prepare(
+    `SELECT user_agent, route, COUNT(*) AS hits, MAX(created_at) AS last_hit
+       FROM discovery_hits
+      WHERE created_at > datetime('now', '-7 days')
+        AND (route LIKE '/nonprofits/%' OR route LIKE '/causes/%' OR route LIKE '/guides/%')
+        AND (user_agent LIKE '%GPTBot%' OR user_agent LIKE '%OAI-SearchBot%' OR user_agent LIKE '%ChatGPT-User%'
+          OR user_agent LIKE '%ClaudeBot%' OR user_agent LIKE '%Claude-User%' OR user_agent LIKE '%Claude-SearchBot%'
+          OR user_agent LIKE '%anthropic-ai%' OR user_agent LIKE '%PerplexityBot%' OR user_agent LIKE '%Perplexity-User%')
+      GROUP BY user_agent, route`
+  ).all();
+  const byVendor = {};
+  let total = 0;
+  const recent = [];
+  for (const r of rows.results || []) {
+    const vendor = aiVendorFor(r.user_agent);
+    if (!vendor) continue;
+    total += r.hits;
+    byVendor[vendor] = (byVendor[vendor] || 0) + r.hits;
+    recent.push({ vendor, route: r.route, last_hit: r.last_hit });
+  }
+  recent.sort((a, b) => (a.last_hit < b.last_hit ? 1 : -1));
+  const value = {
+    window_hours: 168,
+    total,
+    by_vendor: byVendor,
+    recent: recent.slice(0, 8),
+    computed_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
+  };
+  await db.prepare(
+    `INSERT OR REPLACE INTO stats_cache (key, value, updated_at) VALUES ('ai_traffic_7d', ?1, datetime('now'))`
+  ).bind(JSON.stringify(value)).run();
+  return value;
+}
+
+async function handleAiTraffic(db) {
+  let value = null;
+  try {
+    const row = await db.prepare(
+      `SELECT value, updated_at FROM stats_cache WHERE key = 'ai_traffic_7d'
+         AND updated_at > datetime('now', '-6 hours')`
+    ).first();
+    if (row && row.value) value = JSON.parse(row.value);
+  } catch (e) { /* fall through to a one-off refresh */ }
+  if (!value) {
+    try { value = await refreshAiTraffic(db); }
+    catch (e) { value = { window_hours: 168, total: null, by_vendor: {}, recent: [], error: 'unavailable' }; }
+  }
+  return new Response(JSON.stringify(value), {
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=600', ...CORS_HEADERS },
+  });
+}
+
+// AI Visibility Audit requests (2026-09-24). The home-page form posts to
+// /api/charity/claim-request with a message starting "ai-audit |" (or the
+// earlier "ai-check |"). This lists them for the morning digest so a lead is
+// seen the day it arrives. Read-only, admin token required.
+async function handleAdminAuditRequests(db, env, request, url) {
+  const authCheck = checkAdminAuth(env, request);
+  if (authCheck) return authCheck;
+  let hours = parseInt(url.searchParams.get('hours') || '168', 10);
+  if (!Number.isFinite(hours) || hours < 1) hours = 168;
+  if (hours > 2160) hours = 2160;
+  const rows = await db.prepare(`
+    SELECT id, email, charity_registration_number, message, status, created_at
+    FROM claim_requests
+    WHERE (message LIKE 'ai-audit |%' OR message LIKE 'ai-check |%')
+      AND created_at >= datetime('now', ?1)
+    ORDER BY created_at DESC
+    LIMIT 200
+  `).bind(`-${hours} hours`).all();
+  const field = (msg, key) => {
+    const m = (msg || '').match(new RegExp(key + ':\\s*([^|]*)'));
+    const v = m ? m[1].trim() : '';
+    return v && v !== '-' ? v : null;
+  };
+  const requests = (rows.results || []).map((r) => ({
+    created_at: r.created_at,
+    email: r.email,
+    charity: field(r.message, 'name') || r.charity_registration_number,
+    website: field(r.message, 'website'),
+    registration: field(r.message, 'reg'),
+    status: r.status,
+    is_test: /\bTEST\b/.test(r.message || '') || r.charity_registration_number === 'TEST',
+  }));
+  return json({
+    window_hours: hours,
+    count: requests.filter((r) => !r.is_test).length,
+    count_including_tests: requests.length,
+    requests,
+  });
+}
+
 async function handleAdminApprove(db, env, request, slug) {
   const authCheck = checkAdminAuth(env, request);
   if (authCheck) return authCheck;
@@ -9263,6 +9379,7 @@ const _httpHandler = {
       if (path === '/api/registry/revoked') return handleRegistryRevoked(env.DB, url);
       if (path === '/api/causes') return handleListCauses(env.DB);
       if (path === '/api/stats') return handleStats(env.DB);
+      if (path === '/api/ai-traffic') return handleAiTraffic(env.DB);
 
       // Onboard endpoint
       if (path === '/api/onboard' && request.method === 'POST') {
@@ -9289,6 +9406,9 @@ const _httpHandler = {
       }
       if (path === '/api/admin/drafts') {
         return handleAdminDrafts(env.DB, env, request);
+      }
+      if (path === '/api/admin/audit-requests') {
+        return handleAdminAuditRequests(env.DB, env, request, url);
       }
       const approveMatch = path.match(/^\/api\/admin\/approve\/([a-z0-9-]+)$/);
       if (approveMatch && request.method === 'POST') {
@@ -9803,6 +9923,20 @@ export default {
         console.error(`[Reconcile] run failed: ${e.message}`);
       }
     })());
+
+    // AI traffic summary for the home page, every third hour (2026-09-24).
+    // ~17k index rows per run, 8 runs a day. Independent try: it can never
+    // block the reconciler or the daily housekeeping below.
+    if (new Date(event.scheduledTime).getUTCHours() % 3 === 0) {
+      ctx.waitUntil((async () => {
+        try {
+          const v = await refreshAiTraffic(env.DB);
+          console.log(`[AiTraffic] ${v.total} AI visits to charity pages in 7d`);
+        } catch (e) {
+          console.error(`[AiTraffic] refresh failed: ${(e && e.message) || e}`);
+        }
+      })());
+    }
 
     // ── Daily housekeeping ────────────────────────────────────────────────
     //
