@@ -23,10 +23,32 @@ function grab(name) {
   throw new Error('unterminated');
 }
 
+function grabConst(name) {
+  const i = src.indexOf(`const ${name} =`);
+  assert.ok(i > -1, `${name} not found`);
+  return src.slice(i, src.indexOf(';\n', i) + 1);
+}
+function grabFn(name) {
+  const i = src.indexOf(`function ${name}(`);
+  assert.ok(i > -1, `${name} not found`);
+  let depth = 0;
+  for (let k = src.indexOf('{', i); k < src.length; k++) {
+    if (src[k] === '{') depth++;
+    else if (src[k] === '}' && --depth === 0) return src.slice(i, k + 1);
+  }
+  throw new Error('unterminated');
+}
 const H = new Function(
-  'function json(o){return {__json:o};}\n'
+  'function json(o, s){return {__json:o, status: s || 200};}\n'
   + 'function checkAdminAuth(env, req){ return req.ok ? null : {__denied:true}; }\n'
-  + grab('handleAdminAuditRequests') + '\nreturn { handleAdminAuditRequests };'
+  + 'const logged = []; async function logOnboardingEvent(db, step, d){ logged.push([step, d]); }\n'
+  + 'const CORS_HEADERS = {};\n'
+  + ['AUDIT_NOTIFY_TO', 'AUDIT_FROM', 'AUDIT_STATUSES'].map(grabConst).join('\n') + '\n'
+  + ['escHtml', 'auditField'].map(grabFn).join('\n') + '\n'
+  + ['handleAdminAuditRequests', 'sendResend', 'sendAuditRequestEmails', 'auditSig', 'handleAdminAuditStatus', 'handleAuditApprove', 'handleClaimRequest'].map((n) => grab(n)).join('\n')
+  + '\nfunction checkRateLimit(){ return null; } function isValidEmail(e){ return /@/.test(e); }'
+  + '\nfunction apiError(c, m){ return { __err: c, m }; }'
+  + '\nreturn { handleAdminAuditRequests, sendAuditRequestEmails, auditSig, handleAdminAuditStatus, handleAuditApprove, handleClaimRequest, logged };'
 )();
 
 function stubDb(results) {
@@ -35,7 +57,7 @@ function stubDb(results) {
     calls,
     prepare(sql) {
       const rec = { sql, binds: [] }; calls.push(rec);
-      const api = { bind(...b) { rec.binds = b; return api; }, async all() { return { results }; } };
+      const api = { bind(...b) { rec.binds = b; return api; }, async all() { return { results }; }, async run() { return { meta: { changes: 1 } }; } };
       return api;
     },
   };
@@ -75,4 +97,71 @@ test('clamps the window and treats "-" as empty', async () => {
   assert.equal(r.requests[0].registration, null);
   const r2 = (await H.handleAdminAuditRequests(stubDb([]), {}, { ok: true }, U('?hours=abc'))).__json;
   assert.equal(r2.window_hours, 168);
+});
+
+
+// ---- emails, status, approval ------------------------------------------------
+function mockFetch(ok = true) {
+  const sent = [];
+  globalThis.fetch = async (url, opts) => { sent.push(JSON.parse(opts.body)); return { ok, status: ok ? 200 : 403, text: async () => 'nope' }; };
+  return sent;
+}
+const env = { RESEND_API_KEY: 're_test', ADMIN_TOKEN: 'secret-admin' };
+
+test('an audit request emails the charity and Geordie; a TEST request emails nobody', async () => {
+  const sent = mockFetch();
+  const waits = [];
+  const ctx = { waitUntil: (p) => waits.push(p) };
+  const req = (message, email = 'joe@cks.org') => ({ headers: { get: () => '1.2.3.4' },
+    json: async () => ({ email, charity_registration_number: 'City Kids Surfing', message }) });
+  await H.handleClaimRequest(stubDb([]), req('ai-audit | name: City Kids Surfing | website: https://x.org | reg: 1182899'), env, ctx);
+  await Promise.all(waits);
+  assert.equal(sent.length, 2);
+  assert.deepEqual(sent.map((m) => m.to[0]).sort(), ['geordie@testventures.net', 'joe@cks.org']);
+  assert.match(sent.find((m) => m.to[0] === 'joe@cks.org').subject, /City Kids Surfing/);
+  const before = sent.length;
+  await H.handleClaimRequest(stubDb([]), req('ai-audit | TEST from Claude'), env, ctx);
+  await Promise.all(waits);
+  assert.equal(sent.length, before);
+});
+
+test('a Resend rejection is logged as audit_email_failed', async () => {
+  mockFetch(false);
+  const ok = await H.sendAuditRequestEmails(env, stubDb([]), { email: 'a@b.org', message: 'ai-audit | name: X' });
+  assert.equal(ok, false);
+  assert.equal(H.logged.at(-1)[0], 'audit_email_failed');
+});
+
+test('status endpoint: admin only, valid statuses only', async () => {
+  const req = (ok, body) => ({ ok, json: async () => body });
+  assert.deepEqual(await H.handleAdminAuditStatus(stubDb([]), env, req(false, {})), { __denied: true });
+  const bad = await H.handleAdminAuditStatus(stubDb([]), env, req(true, { id: '1', status: 'hacked' }));
+  assert.equal(bad.status, 400);
+  const db = stubDb([]); db.prepare = ((orig) => (sql) => { const a = orig(sql); a.run = async () => ({ meta: { changes: 1 } }); return a; })(db.prepare.bind(db));
+  const good = await H.handleAdminAuditStatus(db, env, req(true, { id: '1', status: 'audit_drafted' }));
+  assert.equal(good.status, 200);
+  assert.deepEqual(db.calls.at(-1).binds.slice(0, 1), ['audit_drafted']);
+});
+
+test('approve link: wrong signature refused, right one approves only a drafted audit', async () => {
+  const sig = await H.auditSig(env, 'abc');
+  assert.equal(sig.length, 64);
+  const row = (status) => ({ status, email: 'joe@cks.org', message: 'ai-audit | name: City Kids Surfing' });
+  function db(status) {
+    const calls = [];
+    return { calls, prepare(sql) { const rec = { sql, binds: [] }; calls.push(rec);
+      const api = { bind(...b) { rec.binds = b; return api; }, async first() { return row(status); }, async run() { return { meta: { changes: 1 } }; } };
+      return api; } };
+  }
+  const U = (q) => new URL('https://www.giveready.org/api/admin/audit-approve' + q);
+  const forged = await H.handleAuditApprove(db('audit_drafted'), env, U('?id=abc&sig=' + '0'.repeat(64)));
+  assert.equal(forged.status, 403);
+  const d1 = db('audit_drafted');
+  const ok = await H.handleAuditApprove(d1, env, U(`?id=abc&sig=${sig}`));
+  assert.equal(ok.status, 200);
+  assert.ok(d1.calls.some((c) => /SET status = 'audit_approved'/.test(c.sql)));
+  const d2 = db('pending');
+  const notReady = await H.handleAuditApprove(d2, env, U(`?id=abc&sig=${sig}`));
+  assert.equal(notReady.status, 409);
+  assert.ok(!d2.calls.some((c) => /audit_approved/.test(c.sql)));
 });

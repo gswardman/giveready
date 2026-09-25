@@ -464,7 +464,7 @@
     <div class="check-card">
       <span class="tag">Free AI Visibility Audit</span>
       <h2>How does your charity measure up?</h2>
-      <p class="lead">Your full audit arrives by email as a PDF within a few working days. Free, no account, no card.</p>
+      <p class="lead">Your full audit arrives by email as a PDF within two working days. Free, no account, no card.</p>
       <form id="check-form" novalidate>
         <label>Charity name<input name="name" required autocomplete="organization" /></label>
         <label>Website<input name="website" type="url" placeholder="https://" /></label>
@@ -605,7 +605,7 @@
       var rt = rate(d.bot_visits_7d); if (rt) set('ai-rate', rt);
       var bars = document.getElementById('ai-bars');
       var cos = Object.keys(mo.by_company || {}).map(function(k) { return [k, mo.by_company[k]]; })
-        .filter(function(x) { return x[1] > 0; }).sort(function(a, b) { return b[1] - a[1]; });
+        .filter(function(x) { return x[1] >= 10; }).sort(function(a, b) { return b[1] - a[1]; });
       var max = cos.length ? cos[0][1] : 1;
       cos.forEach(function(x) {
         var row = document.createElement('div'); row.className = 'ai-bar'; row.title = x[0] + ': ' + fmt(x[1]) + ' visits in 30 days';
@@ -700,7 +700,7 @@
         })
       }).then(function(r) {
         if (r.status === 204 || r.ok) {
-          f.reset(); msg.textContent = 'Got it. Your AI Visibility Audit will arrive by email within a few working days.'; msg.classList.add('ok');
+          f.reset(); msg.textContent = 'Got it. Your AI Visibility Audit will arrive by email within two working days.'; msg.classList.add('ok');
         } else { throw new Error(r.status); }
       }).catch(function() {
         msg.textContent = 'That didn’t go through. Email geordie@testventures.net and we’ll run it by hand.'; msg.classList.add('err');

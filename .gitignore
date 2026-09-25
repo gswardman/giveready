@@ -44,3 +44,4 @@ mcp-publisher
 
 # IRS bulk data (316MB of downloaded registry files, regenerable)
 data/irs/
+.pillar-preview.html

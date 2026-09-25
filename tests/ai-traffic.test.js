@@ -116,3 +116,13 @@ test('profile lookup reads one cached row', async () => {
   assert.equal(bad.status, 400);
   assert.ok(db.calls.every((c) => !/discovery_hits/.test(c.sql)));
 });
+
+test('a cached week row from before bot_visits_7d existed is refreshed, not served', async () => {
+  const db = stubDb({ cache: {
+    ai_traffic_7d: { total: 2089, recent: [] },               // old shape
+    ai_traffic_30d: { total: 1, by_company: {}, profiles_read: 1, profiles: {} },
+  }, hits: [] });
+  const body = JSON.parse(await (await H.handleAiTraffic(db)).text());
+  assert.equal(body.bot_visits_7d, 10170);
+  assert.ok(db.calls.some((c) => /FROM traffic_rollup/.test(c.sql)));
+});

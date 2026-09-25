@@ -228,15 +228,22 @@ test('session token — tampered token produces different hash', async () => {
   assert.notEqual(storedHash, tamperedHash);
 });
 
-test('magic-link expiry — 15-minute window boundary check', () => {
+test('magic-link expiry — 24-hour window boundary check (was 15 min until 2026-09-25)', () => {
+  const TTL = 24 * 60 * 60 * 1000;           // MAGIC_LINK_TTL_MS in src/index.js
   const now = Date.now();
-  const fifteenMinAgo = new Date(now - 15 * 60 * 1000 - 1000).toISOString();
-  const justUnderFifteen = new Date(now - 14 * 60 * 1000).toISOString();
+  const issuedJustOver = now - TTL - 1000;   // issued 24h + 1s ago
+  const issuedTwoHours = now - 2 * 60 * 60 * 1000;
+  assert.ok(new Date(issuedJustOver + TTL) < new Date(now), 'a link issued 24h+ ago is expired');
+  assert.ok(new Date(issuedTwoHours + TTL) > new Date(now), 'a link opened 2h later still works');
+});
 
-  // A row created 15+ min ago is expired
-  assert.ok(new Date(fifteenMinAgo) < new Date(now - 15 * 60 * 1000));
-  // A row created under 15 min ago is still valid
-  assert.ok(new Date(justUnderFifteen) > new Date(now - 15 * 60 * 1000));
+test('magic-link token format — only 32 hex chars reach the database', () => {
+  const ok = (t) => !!t && /^[a-f0-9]{32}$/i.test(t);
+  assert.ok(ok(randomHex(16)));
+  assert.ok(!ok(''));
+  assert.ok(!ok(null));
+  assert.ok(!ok('x'.repeat(32)));
+  assert.ok(!ok(randomHex(16) + '"><script>'));
 });
 
 test('session expiry — 24-hour window', () => {
