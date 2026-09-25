@@ -131,7 +131,7 @@ GiveReady went from never cited to cited in most Perplexity answers in about two
 
 It moves around. Today's reading was 4 of 10, and single days swing by two or three either way. ChatGPT has cited us in 11 of 24 readings. Claude has cited us in none, for the Brave reason above, and we have not fixed that yet.
 
-A second, smaller example. In mid-September we did the same work on the website of the Finn Wardman World Explorer Fund, a small grant fund I run. On 23 September the first applicant we could trace arrived after asking ChatGPT. That is one applicant, the only one tracked so far, not a trend.
+A second, smaller example. In mid-September we did the same work on the website of the Finn Wardman World Explorer Fund, a small grant fund I run. Since then, four applicants have told us they found the fund by asking an AI assistant. That is a small number, but it is why GiveReady now helps charities with this.
 
 ## Step 4: Measure it monthly
 
