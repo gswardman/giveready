@@ -292,6 +292,22 @@ function recordTraffic(db, route, userAgent, country) {
     });
 }
 
+// The value stored in discovery_hits.ref for a logged request.
+// ?ref= wins when present and well-formed (guide-<slug> links, unchanged).
+// 2026-10-01: otherwise a well-formed ?utm_source= is kept as 'utm-<source>'.
+// Assistants strip the Referer header, so classifyReferrer() never sees them,
+// but OpenAI appends ?utm_source=openai to the links it cites. Before this the
+// parameter was dropped and every human click from a ChatGPT answer logged as
+// referrer 'none'. Rides the existing ref column and idx_discovery_ref, so no
+// migration. The 'utm-' prefix keeps it clear of every ref LIKE 'guide-%' query.
+function discoveryRefFromUrl(url) {
+  const ref = url.searchParams.get('ref');
+  if (ref && /^[a-z0-9_-]{1,80}$/i.test(ref)) return ref;
+  const utm = url.searchParams.get('utm_source');
+  if (utm && /^[a-z0-9._-]{1,40}$/i.test(utm)) return 'utm-' + utm.toLowerCase();
+  return null;
+}
+
 // Referrer classification for the guide->donation funnel (migration 018).
 // Kept in code (not stored) so the AI-assistant list can grow without re-tagging rows.
 function classifyReferrer(referrer) {
@@ -3893,6 +3909,31 @@ const LEARN_MANIFEST = [
         a: 'Weeks, not days. GiveReady\'s first Perplexity citation came about two weeks after its first guides went live on 30 May 2026, and it took two months to reach 9 of 10 daily questions.' },
     ],
   },
+  {
+    slug: 'agentic-giving-for-charities',
+    title: 'Agentic Giving for Charities: What It Is and What to Do First (2026)',
+    description: 'What agentic giving is, what Donorbox and Fundraise Up offer, what GiveReady measured in its own logs, and the five things a small charity should do before paying for anything.',
+    published: '2026-10-06',
+    updated: '2026-10-06',
+    ref: 'pillar-agentic-giving',
+    author: { name: 'Geordie Wardman', url: 'https://www.testventures.net' },
+    tags: ['agentic-giving', 'ai-visibility', 'charities', 'nonprofits'],
+    linked_causes: [],
+    faq: [
+      { q: 'What is agentic giving?',
+        a: 'Agentic giving is when an AI assistant researches charities for a donor, recommends one, and in some cases completes the donation once the donor confirms the amount and the recipient. Discovery and payment are separate parts, and most of a small charity\'s work is in discovery.' },
+      { q: 'Can AI assistants make donations to my charity today?',
+        a: 'In a few cases, through platforms such as Donorbox, which lists campaigns in Stripe Directory and needs a US Stripe account for early access. Nobody has published how many gifts agents have completed, so treat it as small and unproven.' },
+      { q: 'Do small charities need to buy an agentic giving product?',
+        a: 'Not yet. Check what AI says about you, make your facts identical everywhere, say exactly what a gift pays for, and make sure your donation page works from a link with the amount filled in. Ask any provider which assistants can complete a gift, how many have been completed, what it costs and how charities are verified.' },
+      { q: 'How many donors use AI to find charities?',
+        a: 'Donorbox cites a study in which 4.5% of 1,728 surveyed donors use AI to find and research causes. That is a vendor-reported figure we have not verified.' },
+      { q: 'Do people click donate links that AI assistants cite?',
+        a: 'Very few that we can see. In the seven days to 6 October 2026, GiveReady logged 2,015 clicks on donate links; 1,596 came from known crawlers, 409 from scripts that walk through many charities, and 10 looked like a person.' },
+      { q: 'What is the first thing a charity should do about agentic giving?',
+        a: 'Ask ChatGPT, Google, Perplexity and Claude who your charity is and what it does, and note whether each names you, misses you or gets you wrong. Then make your name, registration number and one-line description identical everywhere they appear.' },
+    ],
+  },
 ];
 
 // Which guides feature each nonprofit. GENERATED from public/guides/*.md by
@@ -4094,7 +4135,7 @@ async function handleGuide(env, slug, section = 'guides') {
   const published = frontmatter.published || meta.published || '';
   const updated = frontmatter.updated || meta.updated || published;
   const linkedCauses = (frontmatter.linked_causes || meta.linked_causes || []).filter(Boolean);
-  const bodyHtml = _renderMarkdown(body).replace('<p>[[audit-form]]</p>', isLearn ? learnAuditBlock() : '');
+  const bodyHtml = _renderMarkdown(body).replace('<p>[[audit-form]]</p>', isLearn ? learnAuditBlock(meta.ref) : '');
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -4237,8 +4278,10 @@ ${OPERATOR_FOOTER_PLAIN}
 }
 
 
-function learnAuditBlock() {
+function learnAuditBlock(pageRef) {
   const ref = 'pillar-found-by-ai';
+  // 2026-10-06: article 2 passes its own ref so its audit requests are counted apart from the pillar's.
+  const formRef = /^[a-z0-9-]{1,40}$/.test(pageRef || '') ? pageRef : ref;
   return `<section class="audit-box" id="check">
 <h2>Don't want to do this by hand?</h2>
 <p>We'll ask ChatGPT, Claude and Perplexity 19 questions about your charity and email you a one-page report within two working days: whether you're named, who is named instead, and three fixes in order. Free, no account, no card.</p>
@@ -4257,7 +4300,7 @@ function learnAuditBlock() {
 </section>
 <script>
 (function() {
-  var REF = ${JSON.stringify(ref)};
+  var REF = ${JSON.stringify(formRef)};
   var f = document.getElementById('check-form'), msg = document.getElementById('check-msg');
   f.addEventListener('submit', function(e) {
     e.preventDefault();
@@ -7713,7 +7756,7 @@ async function handleGuideFunnel(db, env, request, url) {
   // Walker set is judged over the fixed lookback, never the reported window.
   const walkerSinceArg = `-${CLICK_OUT_WALKER_LOOKBACK_HOURS} hours`;
 
-  const [guideRows, npRefRows, donateRows, donations, clickOutRows, clickOutTotals, clickOutHumanUAs, clickOutWalkerUAs] = await Promise.all([
+  const [guideRows, npRefRows, donateRows, donations, clickOutRows, clickOutTotals, clickOutHumanUAs, clickOutWalkerUAs, utmRows] = await Promise.all([
     db.prepare(
       `SELECT referrer, COUNT(*) as hits FROM discovery_hits
        WHERE route LIKE '/guides/%' AND created_at > datetime('now', ?1)
@@ -7796,7 +7839,29 @@ async function handleGuideFunnel(db, env, request, url) {
          AND (${CLICK_OUT_WALKER_SQL})
        GROUP BY user_agent ORDER BY hits DESC LIMIT 10`
     ).bind(sinceArg, walkerSinceArg).all().catch(() => ({ results: [] })),
+    // 2026-10-01: visits carrying ?utm_source= (stored as ref 'utm-<source>' by
+    // discoveryRefFromUrl). The range predicate on ref uses idx_discovery_ref;
+    // a LIKE would not. Bots split out with the same string filter as /out so
+    // a crawler re-fetching a cited URL is not counted as a person.
+    db.prepare(
+      `SELECT ref, route,
+         SUM(CASE WHEN (${CLICK_OUT_BOT_SQL}) THEN 0 ELSE 1 END) as human_hits,
+         SUM(CASE WHEN (${CLICK_OUT_BOT_SQL}) THEN 1 ELSE 0 END) as bot_hits
+       FROM discovery_hits
+       WHERE ref >= 'utm-' AND ref < 'utm.' AND created_at > datetime('now', ?1)
+       GROUP BY ref, route ORDER BY human_hits DESC LIMIT 50`
+    ).bind(sinceArg).all().catch(() => ({ results: [] })),
   ]);
+
+  const utmBySource = {};
+  let utmHuman = 0;
+  let utmBot = 0;
+  for (const row of utmRows.results || []) {
+    const src = String(row.ref).slice(4);
+    utmBySource[src] = (utmBySource[src] || 0) + (row.human_hits || 0);
+    utmHuman += row.human_hits || 0;
+    utmBot += row.bot_hits || 0;
+  }
 
   const guideViews = { ai_assistant: 0, search: 0, internal: 0, other: 0, none: 0, total: 0 };
   for (const row of guideRows.results || []) {
@@ -7850,9 +7915,20 @@ async function handleGuideFunnel(db, env, request, url) {
       // walking a listing is a crawler the filter missed, whatever it calls itself.
       human_by_user_agent: clickOutHumanUAs.results || [],
     },
+    // Human visits arriving from an AI answer, identified by utm_source because
+    // the Referer is stripped. Counts only routes that discovery_hits logs
+    // (guides, causes, nonprofits, learn, donate and the agent files), not the
+    // home page.
+    ai_utm_visits: {
+      total: utmHuman,
+      bot_hits_excluded: utmBot,
+      by_source: utmBySource,
+      by_route: (utmRows.results || []).slice(0, 25),
+    },
     donations_in_period_context: donations,
     notes: [
       'Attribution starts at migration 018 deploy; rows before that have null referrer/ref.',
+      'ai_utm_visits starts at the 2026-10-01 deploy; visits before it carried utm_source but it was not stored. Logged routes only, home page excluded.',
       'ai_assistant = Referer from perplexity.ai, chatgpt.com, claude.ai, copilot, gemini, you.com, phind, poe.',
       'from_guide_ref counts donate-page views carrying ?ref=guide-<slug>.',
       'donations_in_period_context is all settled donations, NOT yet linked to referral rows.',
@@ -9998,8 +10074,7 @@ const _httpHandler = {
       if (path === '/mcp' || path === '/mcp/sse' || path === '/.well-known/ai-plugin.json' || path === '/.well-known/mcp.json' || path === '/.well-known/mcp' || path === '/.well-known/mcp/server-card.json' || path === '/llms.txt' || path === '/agents.md' || path === '/AGENTS.md' || path === '/causes' || path === '/guides' || path === '/learn' || path.startsWith('/learn/') || path === '/sitemap.xml' || path.startsWith('/causes/') || path.startsWith('/guides/') || path.startsWith('/nonprofits/') || path === '/api/needs-enrichment' || path === '/api/enrichments/stats' || path === '/api/agents/leaderboard' || path === '/api/agents/exemplars' || path === '/api/agents/funnel' || path === '/api/agents/named-first-seen' || path === '/agents' || path.startsWith('/api/enrich/') || path.startsWith('/donate/') || path.startsWith('/api/wallet-proof/') || (path.startsWith('/api/nonprofits/') && path.endsWith('/payable')) || path.startsWith('/wallet-proof/')) {
         const ua = request.headers.get('User-Agent');
         const referrer = (request.headers.get('Referer') || '').slice(0, 300) || null;
-        let refParam = url.searchParams.get('ref');
-        if (refParam && !/^[a-z0-9_-]{1,80}$/i.test(refParam)) refParam = null;
+        const refParam = discoveryRefFromUrl(url);
         ctx.waitUntil(logDiscoveryHit(env.DB, path, ua, referrer, refParam));
       }
       // /mcp — content-negotiated. POST = JSON-RPC over Streamable HTTP (2025-03-26).
