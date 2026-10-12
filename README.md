@@ -28,19 +28,24 @@ USDC on Solana works anywhere. A nonprofit needs a smartphone and a wallet app. 
 
 ```
 giveready/
-├── src/index.js              # Cloudflare Worker — API + x402 endpoint
-├── mcp-server/               # MCP server for AI agents (Claude, etc.)
-├── public/
-│   ├── index.html            # Landing page (static, served by Cloudflare)
+├── src/
+│   ├── index.js              # Cloudflare Worker: API, pages, x402, admin, cron
+│   ├── payable.js            # Payability report for agents (/payable)
+│   ├── wallet-proof.js       # Ed25519 proof that a charity controls its wallet
+│   └── wallet-proof-page.js  # Signing page for the wallet proof
+├── mcp-server/               # MCP server for AI agents (published as giveready-mcp)
+├── public/                   # Static assets served by the Worker
 │   ├── widget/               # Embeddable donate button (zero dependencies)
-│   ├── llms.txt              # LLM crawler metadata
-│   ├── AGENTS.md             # Agent discovery guide
-│   └── openapi.json          # OpenAPI spec for ai-plugin.json
+│   ├── guides/  learn/       # Long-form guides, rendered from markdown
+│   └── openapi.json          # OpenAPI spec
+├── migrations/               # Numbered D1 migrations, idempotent, run on deploy
+├── tests/                    # Node test runner suite (npm test, runs offline)
+├── scripts/                  # Data import, smoke tests and monitoring jobs
+├── docs/                     # Deploy notes, incident write-ups, design specs
 ├── test-client/              # x402 payment protocol test client
-├── scripts/                  # Data import utilities
 ├── schema.sql                # D1 database schema
 ├── seed.sql                  # Nonprofit seed data
-├── deploy.sh                 # Deployment script (./deploy.sh)
+├── deploy.sh                 # Test, tag, migrate, deploy (./deploy.sh)
 └── wrangler.toml             # Cloudflare Workers config
 ```
 
