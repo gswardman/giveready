@@ -576,23 +576,6 @@ function lintRecommendationText(value) {
   return null;
 }
 
-function lintRecommendationRow(row) {
-  const errors = [];
-  const fields = ['why_recommended', 'best_next_action'];
-  for (const f of fields) {
-    const e = lintRecommendationText(row[f]);
-    if (e) errors.push(`${f}: ${e}`);
-  }
-  for (const arrField of ['recommended_for', 'trust_signals']) {
-    const arr = Array.isArray(row[arrField]) ? row[arrField] : [];
-    for (const item of arr) {
-      const e = lintRecommendationText(item);
-      if (e) errors.push(`${arrField} item: ${e}`);
-    }
-  }
-  return errors;
-}
-
 async function handleRecommend(db, url, request) {
   const cause = url.searchParams.get('cause');
   const country = url.searchParams.get('country');
