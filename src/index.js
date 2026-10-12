@@ -5487,7 +5487,7 @@ function generateSlug(name) {
 
 // Helper: validate email loosely
 function isValidEmail(email) {
-  return email && email.includes('@');
+  return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
 // ============================================
@@ -5675,11 +5675,9 @@ async function handleClaim(db, env, request, slug) {
   if (body.mission) { updates.push(`mission = ?${idx}`); params.push(body.mission); idx++; }
   if (body.description) { updates.push(`description = ?${idx}`); params.push(body.description); idx++; }
   if (body.city) { updates.push(`city = ?${idx}`); params.push(body.city); idx++; }
-  if (body.website) { updates.push(`website = ?${idx}`); params.push(body.website); idx++; }
   if (body.founded_year) { updates.push(`founded_year = ?${idx}`); params.push(parseInt(body.founded_year)); idx++; }
-  if (body.usdc_wallet) { updates.push(`usdc_wallet = ?${idx}`); params.push(body.usdc_wallet); idx++; }
-  if (body.donation_url) { updates.push(`donation_url = ?${idx}`); params.push(body.donation_url); idx++; }
-  if (body.contact_email) { updates.push(`contact_email = ?${idx}`); params.push(email); idx++; }
+  // website, donation_url, usdc_wallet and contact_email are payment and
+  // contact routes. They wait for verification and the charity dashboard.
 
   if (updates.length > 0) {
     updates.push(`updated_at = datetime('now')`);
@@ -5895,7 +5893,7 @@ async function handleOnboard(db, request) {
   const claim_slug = body.claim_slug;
   if (claim_slug) {
     const existing = await db.prepare(
-      `SELECT id, slug, name FROM nonprofits WHERE slug = ?1`
+      `SELECT id, slug, name, verified, verification_status, claimed_by_email FROM nonprofits WHERE slug = ?1`
     ).bind(claim_slug).first();
 
     if (!existing) {
@@ -5906,21 +5904,30 @@ async function handleOnboard(db, request) {
       return error('Valid email required to claim a page', 400);
     }
 
+    // A claim is unproven until the email link is clicked, so it can never
+    // touch a page someone has already verified.
+    if (existing.verified || (existing.verification_status && existing.verification_status !== 'unverified')) {
+      return error('This page has already been claimed. Contact support if you believe this is an error.', 409);
+    }
+
     // Update the nonprofit with enriched data from the claimant
     const updates = [];
     const params = [];
     let paramIdx = 1;
 
-    // Always update contact email and mark as claim-pending
-    updates.push(`contact_email = ?${paramIdx}`); params.push(email); paramIdx++;
+    // Record who is claiming. contact_email is only set once the claim is
+    // verified (handleVerify), so an unproven claimant can't take over the
+    // address donors and admins see.
+    updates.push(`claimed_by_email = ?${paramIdx}`); params.push(email); paramIdx++;
+    updates.push(`claimed_at = datetime('now')`);
 
     if (mission) { updates.push(`mission = ?${paramIdx}`); params.push(mission); paramIdx++; }
     if (description) { updates.push(`description = ?${paramIdx}`); params.push(description); paramIdx++; }
     if (city) { updates.push(`city = ?${paramIdx}`); params.push(city); paramIdx++; }
-    if (website) { updates.push(`website = ?${paramIdx}`); params.push(website); paramIdx++; }
     if (founded_year) { updates.push(`founded_year = ?${paramIdx}`); params.push(parseInt(founded_year)); paramIdx++; }
-    if (usdc_wallet) { updates.push(`usdc_wallet = ?${paramIdx}`); params.push(usdc_wallet); paramIdx++; }
-    if (donation_url_override) { updates.push(`donation_url = ?${paramIdx}`); params.push(donation_url_override); paramIdx++; }
+    // website, donation_url and usdc_wallet decide where donors and agent
+    // payments go. They are set from the charity dashboard after
+    // verification (handleCharityProfilePatch), never from an unproven claim.
 
     updates.push(`updated_at = datetime('now')`);
 
@@ -9788,6 +9795,12 @@ async function handleCharityProfilePatch(db, request) {
 
   updates.push(`updated_at = datetime('now')`);
   params.push(auth.session.active_nonprofit_id);
+
+  // A wallet proof belongs to the address that signed it. Changing the
+  // address must drop the proof, or /payable would vouch for the new one.
+  if (audit.some(c => c.field === 'usdc_wallet')) {
+    updates.push('wallet_signature = NULL', 'wallet_proved_at = NULL', 'wallet_proof_message = NULL');
+  }
 
   await db.prepare(
     `UPDATE nonprofits SET ${updates.join(', ')} WHERE id = ?${idx}`
