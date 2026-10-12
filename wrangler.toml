@@ -12,7 +12,7 @@ not_found_handling = "none"
 # Hourly on-chain reconciliation. Donations paid straight from a donor's wallet
 # (the QR / solana: link on /donate/<slug>) never reach the Worker, so a
 # scheduled pass over each nonprofit's USDC token account is the only way they
-# get recorded. See scheduled() in src/index.js.
+# get recorded. See scheduled() in src/index.js and src/cron/reconcile.js.
 [triggers]
 crons = ["17 * * * *"]
 

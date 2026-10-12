@@ -25,7 +25,7 @@
 // This endpoint deliberately does NOT score need, rank charities, or recommend.
 // It reports. The judgement belongs to whoever is spending the money.
 
-// Solana mainnet USDC. Same constant as USDC_MINT_SOLANA in src/index.js — the
+// Solana mainnet USDC. Same constant as USDC_MINT_SOLANA in src/api/donate.js — the
 // directory has always been USDC-denominated and this endpoint must not disagree
 // with the donate page about what asset it is asking for.
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';

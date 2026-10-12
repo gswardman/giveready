@@ -31,7 +31,7 @@
 //    dependency and no hand-rolled curve arithmetic.
 
 // Base58 decode, inlined rather than imported. `bs58` is in package.json but
-// src/index.js has no imports at all — it is one self-contained module — and this
+// the Worker has no third-party imports at all — it is self-contained — and this
 // file cannot be test-deployed from the Cowork sandbox, which has no route to the
 // Cloudflare API. Twenty lines here is cheaper than a bundling surprise on a live
 // worker that serves the whole directory.
