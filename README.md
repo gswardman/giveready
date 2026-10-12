@@ -1,3 +1,5 @@
+[![test](https://github.com/gswardman/giveready/actions/workflows/test.yml/badge.svg)](https://github.com/gswardman/giveready/actions/workflows/test.yml)
+
 # GiveReady
 
 Open-source infrastructure for AI agents to discover youth nonprofits and send them money directly. No intermediary. No platform fees. Nonprofits keep 100%.
