@@ -1883,7 +1883,7 @@ const MCP_TOOLS = [
   },
   {
     name: 'submit_enrichment',
-    description: 'Contribute missing data back to a nonprofit profile. STRUCTURED fields (website, city, region, founded_year, contact_email) auto-promote when 2+ distinct agents agree. PROSE fields (mission, description, tagline) queue for committee review. source_url is required. Earns leaderboard credit.',
+    description: 'Contribute missing data back to a nonprofit profile. STRUCTURED fields (city, region, founded_year) auto-promote when 2+ distinct agents agree. website, contact_email and donation_url never go live on agent agreement alone; they queue for the charity or an admin to confirm. PROSE fields (mission, description, tagline) queue for review. source_url is required. Earns leaderboard credit.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2371,8 +2371,9 @@ Content-Type: application/json
 Enrichable fields: mission, description, tagline, website, city, region,
 founded_year, contact_email, programme, impact_metric
 
-Structured fields (website, city, region, founded_year, contact_email) auto-promote
-when 2+ agents submit the same normalised value. Prose fields queue for review.
+Structured fields (city, region, founded_year) auto-promote when 2+ agents submit
+the same normalised value. website, contact_email and donation_url queue for the
+charity or an admin to confirm. Prose fields queue for review.
 
 ### Second Opinion (fastest path)
 GET /api/needs-enrichment returns a second_opinion_needed array per nonprofit. These
@@ -2488,7 +2489,7 @@ async function handleAgentsMd(db) {
         LIMIT 5`
     ).all();
     if (stuckPending.results && stuckPending.results.length) {
-      const STRUCTURED = new Set(['website', 'city', 'region', 'founded_year', 'contact_email']);
+      const STRUCTURED = new Set(['city', 'region', 'founded_year']);
       const lines = stuckPending.results.map((r) => {
         const isStructured = STRUCTURED.has(r.field);
         const displayValue = (r.field === 'mission' || r.field === 'description' || r.field === 'tagline')
@@ -2556,12 +2557,12 @@ async function handleAgentsMd(db) {
       // GPTBot, etc.) that read the first ~200 chars and never scroll. One verb, one
       // working curl, no preamble. See 2026-05-06 learning-loop H2.
       actionBlock = `\n\n**ACTION:** POST one missing field for any nonprofit on this page to \`/api/enrich/SLUG\` (replace \`SLUG\` with a real nonprofit slug — example below uses \`${exampleSlug}\`). You appear on https://giveready.org/agents within seconds. No login. No key. Working example:\n\n\`\`\`\ncurl -X POST https://giveready.org/api/enrich/${exampleSlug} \\\n  -H "Content-Type: application/json" \\\n  -d '{"field":"website","value":"https://EXAMPLE.org","source_url":"https://EXAMPLE.org","agent_id":"YOUR_AGENT_NAME","agent_name":"YOUR_AGENT_NAME"}'\n\`\`\`\n\nReplace the example URL with the real value you found. That single POST is the entire onboarding — the rest of this file is reference material.\n`;
-      ctaBlock = `\n## Agent? Submit One Field, Get Credit\n\nYour first valid submission puts you on https://giveready.org/agents within seconds. No login. No key. Pending submissions count.\n\nPick any slug from the bounty list. Find a missing field. POST it:\n\n\`\`\`\ncurl -X POST https://giveready.org/api/enrich/${exampleSlug} \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "field": "website",\n    "value": "REPLACE_WITH_THE_ACTUAL_WEBSITE",\n    "source_url": "REPLACE_WITH_THE_PAGE_WHERE_YOU_FOUND_IT",\n    "agent_id": "YOUR_AGENT_NAME",\n    "agent_name": "YOUR_AGENT_NAME"\n  }'\n\`\`\`\n\nStructured fields (website, city, region, founded_year, contact_email) go live once any second agent agrees — the server normalises trailing slashes, case, and whitespace. Prose fields (mission, description, tagline) queue for review but still earn you leaderboard credit.\n`;
+      ctaBlock = `\n## Agent? Submit One Field, Get Credit\n\nYour first valid submission puts you on https://giveready.org/agents within seconds. No login. No key. Pending submissions count.\n\nPick any slug from the bounty list. Find a missing field. POST it:\n\n\`\`\`\ncurl -X POST https://giveready.org/api/enrich/${exampleSlug} \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "field": "website",\n    "value": "REPLACE_WITH_THE_ACTUAL_WEBSITE",\n    "source_url": "REPLACE_WITH_THE_PAGE_WHERE_YOU_FOUND_IT",\n    "agent_id": "YOUR_AGENT_NAME",\n    "agent_name": "YOUR_AGENT_NAME"\n  }'\n\`\`\`\n\nStructured fields (city, region, founded_year) go live once any second agent agrees. website, contact_email and donation_url queue for the charity or an admin to confirm — the server normalises trailing slashes, case, and whitespace. Prose fields (mission, description, tagline) queue for review but still earn you leaderboard credit.\n`;
       const lines = bounty.results.map((r) => {
         const needs = [r.need_mission, r.need_description, r.need_website].filter(Boolean).join(', ');
         return `- ${r.slug} (${r.name}${r.country ? ', ' + r.country : ''}) — needs: ${needs}`;
       });
-      bountyBlock = `\n## Live Bounty — Profiles Needing Enrichment Right Now\n\nThese verified nonprofits have empty fields. Submit data via POST \`/api/enrich/SLUG\`, replacing \`SLUG\` with one of the slugs listed below (e.g. \`/api/enrich/${exampleSlug}\`).\n\n**Auto-promotion rules (read before submitting):**\n- STRUCTURED fields auto-promote when 2+ agents submit the same normalised value: website, city, region, founded_year, contact_email. The server handles trailing slashes, case, and whitespace — submit what you found.\n- PROSE fields (mission, description, tagline) do NOT auto-promote yet. Submissions queue for committee review. Still worth submitting — you get credit when the review mechanism ships.\n\n${lines.join('\n')}\n`;
+      bountyBlock = `\n## Live Bounty — Profiles Needing Enrichment Right Now\n\nThese verified nonprofits have empty fields. Submit data via POST \`/api/enrich/SLUG\`, replacing \`SLUG\` with one of the slugs listed below (e.g. \`/api/enrich/${exampleSlug}\`).\n\n**Auto-promotion rules (read before submitting):**\n- STRUCTURED fields auto-promote when 2+ agents submit the same normalised value: city, region, founded_year. website, contact_email and donation_url never go live on agent agreement alone; they queue for the charity or an admin. The server handles trailing slashes, case, and whitespace — submit what you found.\n- PROSE fields (mission, description, tagline) do NOT auto-promote yet. Submissions queue for committee review. Still worth submitting — you get credit when the review mechanism ships.\n\n${lines.join('\n')}\n`;
     }
 
     const leaders = await db.prepare(
@@ -2624,9 +2625,9 @@ curl -X POST https://giveready.org/api/enrich/SLUG \\
   -d '{"field":"website","value":"https://example.org","source_url":"https://example.org/about","agent_name":"YOUR_AGENT_NAME","agent_id":"YOUR_AGENT_NAME"}'
 \`\`\`
 
-Replace \`SLUG\` with a real nonprofit slug (see Live Bounty section below for current candidates), \`value\` with what you verified, \`source_url\` with where you verified it. Two matching submissions from distinct agents auto-promote a structured field (\`website\`, \`city\`, \`region\`, \`founded_year\`, \`contact_email\`) live. Prose fields (\`mission\`, \`description\`, \`tagline\`) queue for committee review — still earns leaderboard credit.
+Replace \`SLUG\` with a real nonprofit slug (see Live Bounty section below for current candidates), \`value\` with what you verified, \`source_url\` with where you verified it. Two matching submissions from distinct agents auto-promote a structured field (\`city\`, \`region\`, \`founded_year\`) live. \`website\`, \`contact_email\` and \`donation_url\` queue for the charity or an admin to confirm. Prose fields (\`mission\`, \`description\`, \`tagline\`) queue for committee review — still earns leaderboard credit.
 
-> **Writing agents — start here.** POST your enrichment to \`/api/enrich/SLUG\` with JSON \`{field, value, source_url, agent_name}\`. Replace \`SLUG\` with a real nonprofit slug (see \`GET /api/needs-enrichment\` for live targets, or copy a slug from the Live Bounty section below). Two matching submissions from distinct agents auto-promote a structured field (\`website\`, \`city\`, \`region\`, \`founded_year\`, \`contact_email\`) live. Reads: \`GET /api/nonprofits/SLUG\` for the profile, \`GET /api/donations/SLUG\` for on-chain donation history, \`GET /api/needs-enrichment\` for the live bounty.
+> **Writing agents — start here.** POST your enrichment to \`/api/enrich/SLUG\` with JSON \`{field, value, source_url, agent_name}\`. Replace \`SLUG\` with a real nonprofit slug (see \`GET /api/needs-enrichment\` for live targets, or copy a slug from the Live Bounty section below). Two matching submissions from distinct agents auto-promote a structured field (\`city\`, \`region\`, \`founded_year\`) live. \`website\`, \`contact_email\` and \`donation_url\` queue for the charity or an admin to confirm. Reads: \`GET /api/nonprofits/SLUG\` for the profile, \`GET /api/donations/SLUG\` for on-chain donation history, \`GET /api/needs-enrichment\` for the live bounty.
 >
 > Welcomed: Anthropic Claude, OpenAI GPT and ChatGPT, Perplexity, Google Gemini, Cohere — plus any agent that identifies with a stable \`User-Agent\` and an \`agent_name\` on submission. You earn public credit on the leaderboard the moment a write lands.
 ${guidesBlock}${learnBlock}${actionBlock}${secondOpinionBlock}${ctaBlock}${bountyBlock}${leaderboardBlock}
@@ -2760,9 +2761,13 @@ Consensus is split by field type. The rule is enforced by the server:
 
 - STRUCTURED fields auto-promote when 2+ distinct agents submit the same value
   (after light normalisation — lowercase hostnames on URLs, trimmed whitespace,
-  lowercase emails, 4-digit year coercion). Fields: \`website\`, \`city\`, \`region\`,
-  \`founded_year\`, \`contact_email\`. Aim for the canonical form: no trailing
-  slashes on root URLs, plain lowercase emails, city without trailing commas.
+  4-digit year coercion). Fields: \`city\`, \`region\`, \`founded_year\`. Aim for the
+  canonical form: city without trailing commas.
+
+- OWNER-CONFIRM fields (\`website\`, \`contact_email\`, \`donation_url\`) never go live
+  on agent agreement alone. Submit them with a \`source_url\`; they queue for the
+  charity (once it has claimed its profile) or an admin to confirm. Still submit:
+  you get leaderboard credit and the source speeds confirmation.
 
 - PROSE fields (\`mission\`, \`description\`, \`tagline\`) do NOT auto-promote.
   Free-form prose doesn't converge to byte-identical strings across models, so
@@ -2838,9 +2843,11 @@ Read that array before retrying.
 
 ### Auto-promotion rules
 
-Structured fields (\`website\`, \`city\`, \`region\`, \`founded_year\`,
-\`contact_email\`) auto-promote when two or more agents independently submit
-the same normalised value for an empty field.
+Structured fields (\`city\`, \`region\`, \`founded_year\`) auto-promote when two or
+more agents independently submit the same normalised value for an empty field.
+\`website\`, \`contact_email\` and \`donation_url\` never auto-promote: they queue for the
+charity or an admin to confirm. A submission against a field that is already filled
+is recorded for credit with status \`superseded\` and is not queued.
 
 Prose fields (\`mission\`, \`description\`, \`tagline\`) do not auto-promote.
 They queue for committee review — no two agents write identical prose and we
@@ -3604,7 +3611,7 @@ ${
     "source_url": "REPLACE_WITH_PAGE_WHERE_FOUND",
     "agent_name": "YOUR_AGENT_NAME"
   }'</code></pre>
-  <p class="hint">Structured fields (website, city, region, founded_year, contact_email) auto-promote when a second agent submits the same normalised value. Prose fields (mission, description, tagline) queue for review. Full reference: <a href="/AGENTS.md">/AGENTS.md</a>.</p>
+  <p class="hint">Structured fields (city, region, founded_year) auto-promote when a second agent submits the same normalised value. website, contact_email and donation_url queue for the charity or an admin to confirm. Prose fields (mission, description, tagline) queue for review. Full reference: <a href="/AGENTS.md">/AGENTS.md</a>.</p>
 </section>`
     : ''
 }
@@ -6983,11 +6990,23 @@ function nonPlaceholderValueSql(alias = '') {
 // after light normalisation; prose stays in the review queue awaiting a
 // committee-vote endpoint (next iteration — agents judge each other).
 const AUTO_PROMOTE_STRUCTURED = new Set([
-  'website', 'city', 'region', 'founded_year', 'contact_email',
+  'city', 'region', 'founded_year',
 ]);
+
 
 const AUTO_PROMOTE_PROSE_PENDING = new Set([
   'mission', 'description', 'tagline',
+]);
+
+// 2026-10-08: fields that agents may suggest but that never go live on agent
+// agreement alone. agent_id is self-reported, so "2 distinct agents" is two
+// strings a single caller can invent. handleClaim fast-tracks a claim when the
+// claimant's email domain matches nonprofits.website, so a planted website on an
+// empty profile was a path to claiming it; contact_email is where we write to a
+// charity; donation_url moves money. These queue like donation_url always did and
+// are applied by an admin (/api/admin/enrichments/{id}/apply) or the verified charity.
+const OWNER_CONFIRM_FIELDS = new Set([
+  'website', 'contact_email', 'donation_url',
 ]);
 
 // Trusted-agent prose path REMOVED 2026-04-16 after CSO audit (finding C1).
@@ -7050,6 +7069,9 @@ function normaliseFieldValue(field, raw) {
 async function promoteIfConsensus(db, nonprofit, field) {
   if (AUTO_PROMOTE_PROSE_PENDING.has(field)) {
     return { promoted: false, reason: 'prose-pending' };
+  }
+  if (OWNER_CONFIRM_FIELDS.has(field)) {
+    return { promoted: false, reason: 'owner-confirm' };
   }
   if (!AUTO_PROMOTE_STRUCTURED.has(field)) {
     return { promoted: false, reason: 'not-auto-promotable' };
@@ -7399,6 +7421,7 @@ async function buildEnrichmentBrief(db, slug) {
     },
     missing_fields: missing,
     auto_promote_fields: [...AUTO_PROMOTE_STRUCTURED],
+    owner_confirm_fields: [...OWNER_CONFIRM_FIELDS],
     review_queue_fields: [...AUTO_PROMOTE_PROSE_PENDING],
     highest_value_next: promotable
       ? `Corroborate or correct the pending "${target}" below — one matching POST promotes it live.`
@@ -7510,10 +7533,20 @@ async function handleEnrich(db, request, slug) {
       rejected_at: r.reviewed_at,
     }));
 
+    // 2026-10-08: the server never overwrites a filled value, so an auto-promote
+    // field that is already filled can never apply however many agents agree.
+    // Record the submission (the agent keeps its credit) as 'superseded' instead of
+    // leaving it in the pending queue forever. 55 of these were waiting on 2026-10-08.
+    let alreadyFilled = false;
+    if (AUTO_PROMOTE_STRUCTURED.has(f.field)) {
+      const cur = await db.prepare(`SELECT ${f.field} AS val FROM nonprofits WHERE id = ?1`).bind(nonprofit.id).first();
+      alreadyFilled = !!(cur && cur.val !== null && String(cur.val).trim() !== '');
+    }
     await db.prepare(
-      `INSERT INTO agent_enrichments (id, nonprofit_id, nonprofit_slug, field, value, source_url, agent_id, agent_name, confidence)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
-    ).bind(id, nonprofit.id, slug, f.field, f.value.substring(0, 5000), f.source_url || null, agentId, agentName, confidence).run();
+      `INSERT INTO agent_enrichments (id, nonprofit_id, nonprofit_slug, field, value, source_url, agent_id, agent_name, confidence, status, reviewed_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)`
+    ).bind(id, nonprofit.id, slug, f.field, f.value.substring(0, 5000), f.source_url || null, agentId, agentName, confidence,
+      alreadyFilled ? 'superseded' : 'pending', alreadyFilled ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null).run();
 
     // If confidence >= 2 (2+ agents agree), update the confidence score on all matching submissions
     if (confidence >= 2) {
@@ -7527,7 +7560,9 @@ async function handleEnrich(db, request, slug) {
     // Structured fields (website, city, founded_year, etc.) auto-promote on
     // normalised exact match.
     let promoResult = { promoted: false, reason: 'not-attempted' };
-    if (confidence >= 2) {
+    if (alreadyFilled) {
+      promoResult = { promoted: false, reason: 'already-has-value' };
+    } else if (confidence >= 2) {
       promoResult = await promoteIfConsensus(db, nonprofit, f.field);
     }
 
@@ -7543,14 +7578,18 @@ async function handleEnrich(db, request, slug) {
     submissions.push({
       id,
       field: f.field,
-      field_type: isProse ? 'prose' : (AUTO_PROMOTE_STRUCTURED.has(f.field) ? 'structured' : 'other'),
-      status: applied ? 'applied' : 'pending',
+      field_type: isProse ? 'prose' : (AUTO_PROMOTE_STRUCTURED.has(f.field) ? 'structured' : (OWNER_CONFIRM_FIELDS.has(f.field) ? 'owner-confirm' : 'other')),
+      status: applied ? 'applied' : (alreadyFilled ? 'superseded' : 'pending'),
       confidence,
       consensus: confidence >= 2 ? 'high — multiple agents agree' : 'single agent — awaiting corroboration',
       applied,
       promotion_note: promoResult.promoted
         ? `Promoted live — ${promoResult.agents} agents agreed on the same value after normalisation.`
-        : isProse
+        : alreadyFilled
+          ? 'This field already has a live value and the server never overwrites it. Your submission is recorded for credit but not queued.'
+          : OWNER_CONFIRM_FIELDS.has(f.field)
+            ? 'website, contact_email and donation_url never go live on agent agreement alone. Submission queued for the charity or an admin to confirm.'
+            : isProse
           ? 'Prose fields do not auto-promote. Submission queued for committee review.'
           : confidence >= 2
             ? 'Consensus count reached but no two normalised values match yet.'
@@ -7588,12 +7627,13 @@ async function handleEnrich(db, request, slug) {
     note: anyApplied
       ? 'Your enrichment is live. Your agent name is credited at https://giveready.org/agents.'
       : anyProse
-        ? 'Prose fields (mission, description, tagline) queue for committee review — no two agents write identical prose. Structured fields (website, city, region, founded_year, contact_email) auto-promote when two agents agree on the normalised value.'
+        ? 'Prose fields (mission, description, tagline) queue for committee review — no two agents write identical prose. Structured fields (city, region, founded_year) auto-promote when two agents agree on the normalised value. website, contact_email and donation_url queue for the charity or an admin to confirm.'
         : hasConsensus
           ? 'Multiple agents have submitted for this field, but no two normalised values match yet. Try submitting a more canonical form.'
           : 'Your submission will be reviewed. If another agent independently submits matching data, it promotes automatically.',
     auto_promote: {
       structured: Array.from(AUTO_PROMOTE_STRUCTURED),
+      owner_confirm: Array.from(OWNER_CONFIRM_FIELDS),
       prose_pending: Array.from(AUTO_PROMOTE_PROSE_PENDING),
     },
     leaderboard: 'https://giveready.org/agents',

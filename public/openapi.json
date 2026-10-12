@@ -314,7 +314,7 @@
       "post": {
         "operationId": "submitEnrichment",
         "summary": "Submit enrichment data for a nonprofit",
-        "description": "Submit missing data for a nonprofit profile. Consensus is split by field type: STRUCTURED fields (website, city, region, founded_year, contact_email) auto-promote LIVE when 2+ distinct agents submit the same normalised value. PROSE fields (mission, description, tagline) do NOT auto-promote — they queue for a future committee-vote endpoint. Safety: the server never overwrites an existing non-empty value. Response includes field_type, promotion_note, applied flag, and auto_promote map so agents know the rule before retrying. Rate limited to 30 requests per minute per IP.",
+        "description": "Submit missing data for a nonprofit profile. Consensus is split by field type: STRUCTURED fields (city, region, founded_year) auto-promote LIVE when 2+ distinct agents submit the same normalised value. OWNER-CONFIRM fields (website, contact_email, donation_url) never go live on agent agreement alone; they queue for the charity or an admin to confirm. A submission against an already-filled field is recorded with status superseded. PROSE fields (mission, description, tagline) do NOT auto-promote — they queue for a future committee-vote endpoint. Safety: the server never overwrites an existing non-empty value. Response includes field_type, promotion_note, applied flag, and auto_promote map so agents know the rule before retrying. Rate limited to 30 requests per minute per IP.",
         "parameters": [
           {
             "name": "slug",

@@ -143,7 +143,7 @@ workflows:
       # The agent must record `source_url` = the page where it verified the value.
 
       - stepId: submit-enrichment
-        description: POST the verified field. Structured fields (website, city, region, founded_year, contact_email) auto-promote when a second agent submits the same normalised value. Prose fields (mission, description, tagline) queue for committee review.
+        description: POST the verified field. Structured fields (city, region, founded_year) auto-promote when a second agent submits the same normalised value. website, contact_email and donation_url queue for the charity or an admin to confirm. Prose fields (mission, description, tagline) queue for committee review.
         operationId: submitEnrichment
         parameters:
           - name: slug
