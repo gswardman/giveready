@@ -24,27 +24,20 @@ import { webcrypto } from 'node:crypto';
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
 // ============================================================
-// Copy of the helpers we want to test, from src/index.js.
-// Kept inline so the tests are dependency-free and don't import
-// the Worker (which has Cloudflare-specific globals).
+// The helpers under test, imported from the modules that own them.
 // ============================================================
 
-function randomHex(bytes) {
-  const buf = new Uint8Array(bytes);
-  globalThis.crypto.getRandomValues(buf);
-  return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
-}
+import { randomHex, sha256Hex } from '../src/lib/crypto.js';
+import { getCookie as getCookieFromRequest, MAGIC_LINK_TTL_MS } from '../src/auth/magic-link.js';
+import { ALLOWED_PROFILE_FIELDS } from '../src/auth/charity-api.js';
+import { isKnownAgent } from '../src/lib/user-agents.js';
 
-async function sha256Hex(input) {
-  const data = new TextEncoder().encode(input);
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
-}
-
+// The Worker's getCookie reads the Cookie header off a Request. The tests below
+// are written against the raw header string, so wrap it in a Request.
 function getCookie(cookieHeader, name) {
-  const re = new RegExp('(?:^|; )' + name + '=([^;]*)');
-  const m = (cookieHeader || '').match(re);
-  return m ? decodeURIComponent(m[1]) : null;
+  const headers = new Headers();
+  if (cookieHeader) headers.set('Cookie', cookieHeader);
+  return getCookieFromRequest(new Request('https://www.giveready.org/', { headers }), name);
 }
 
 // Profile completeness rubric (pulled from public/dashboard.html renderStrength)
@@ -229,7 +222,8 @@ test('session token — tampered token produces different hash', async () => {
 });
 
 test('magic-link expiry — 24-hour window boundary check (was 15 min until 2026-09-25)', () => {
-  const TTL = 24 * 60 * 60 * 1000;           // MAGIC_LINK_TTL_MS in src/index.js
+  const TTL = MAGIC_LINK_TTL_MS;
+  assert.equal(TTL, 24 * 60 * 60 * 1000);
   const now = Date.now();
   const issuedJustOver = now - TTL - 1000;   // issued 24h + 1s ago
   const issuedTwoHours = now - 2 * 60 * 60 * 1000;
@@ -285,12 +279,7 @@ test('rate-limit window — 5 requests in 1 hour (mock logic)', () => {
 });
 
 test('field allowlist — only allowed fields accepted for PATCH', () => {
-  const ALLOWED = [
-    'name', 'tagline', 'mission', 'description', 'website',
-    'city', 'region', 'country', 'founded_year',
-    'beneficiaries_per_year', 'donation_url', 'contact_email',
-    'logo_url', 'annual_budget_usd', 'budget_year', 'team_size',
-  ];
+  const ALLOWED = ALLOWED_PROFILE_FIELDS;
 
   // Attacker tries to patch verified, claimed_by_email, or arbitrary columns
   const patch = {
@@ -306,11 +295,9 @@ test('field allowlist — only allowed fields accepted for PATCH', () => {
 });
 
 test('CSO regression (April 16) — isNoiseAgent allowlist of verified crawlers', () => {
-  const VERIFIED = new Set(['GPTBot', 'ClaudeBot', 'Amazonbot', 'Google-Extended', 'PerplexityBot']);
-  const isVerifiedAgent = (ua) => {
-    for (const name of VERIFIED) if (ua.includes(name)) return true;
-    return false;
-  };
+  // isKnownAgent is the allowlist behind isNoiseAgent: substring match against
+  // KNOWN_AGENT_PATTERNS, never a prefix check.
+  const isVerifiedAgent = isKnownAgent;
 
   assert.ok(isVerifiedAgent('Mozilla/5.0 (compatible; ClaudeBot/1.0; +https://claude.ai/bot)'));
   assert.ok(isVerifiedAgent('Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)'));

@@ -13,27 +13,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { discoveryRefFromUrl as f } from '../src/lib/telemetry.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-
-function loadFn() {
-  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
-  const i = src.indexOf('function discoveryRefFromUrl(');
-  assert.ok(i > -1, 'discoveryRefFromUrl not found in src/index.js');
-  let depth = 0;
-  let body = null;
-  for (let k = src.indexOf('{', i); k < src.length; k++) {
-    if (src[k] === '{') depth++;
-    else if (src[k] === '}' && --depth === 0) { body = src.slice(i, k + 1); break; }
-  }
-  assert.ok(body, 'unterminated discoveryRefFromUrl');
-  return new Function(body + '\nreturn discoveryRefFromUrl;')();
-}
-
-const f = loadFn();
 const U = (p) => new URL('https://www.giveready.org' + p);
 
 test('ChatGPT citation link is stored as utm-openai', () => {

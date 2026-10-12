@@ -29,44 +29,37 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { handleOutboundDonate } from '../src/api/donate.js';
+import { readSrc } from './_src.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-
-/** Pull handleOutboundDonate out of the Worker source by brace matching. */
+/**
+ * The handler, imported from the module that owns it. Its funnel write goes
+ * through the real logOnboardingEvent, so `logged` is read back from the
+ * onboarding_events INSERT the stub database records (binds: id, step,
+ * outcome, nonprofit_id, slug, actor_hash, email_domain, reason, user_agent).
+ */
 function loadHandler() {
-  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
-  const i = src.indexOf('async function handleOutboundDonate(');
-  assert.ok(i > -1, 'handleOutboundDonate not found in src/index.js');
-  let depth = 0;
-  let body = null;
-  for (let k = src.indexOf('{', i); k < src.length; k++) {
-    if (src[k] === '{') depth++;
-    else if (src[k] === '}' && --depth === 0) { body = src.slice(i, k + 1); break; }
-  }
-  assert.ok(body, 'unterminated handleOutboundDonate');
-
   const logged = [];
-  const preamble = `
-    const __logged = [];
-    async function logOnboardingEvent(db, step, fields) { __logged.push({ step, ...fields }); }
-  `;
-  const fn = new Function(preamble + body + '\nreturn { handleOutboundDonate, __logged };')();
-  return { handler: fn.handleOutboundDonate, logged: fn.__logged };
+  return { handler: handleOutboundDonate, logged };
 }
 
 /** db.prepare(...).bind(...).first() resolves to `row`; pass null for a miss. */
 function stubDb(row, opts = {}) {
   return {
-    prepare() {
+    prepare(sql) {
       return {
-        bind() {
+        bind(...binds) {
           return {
             async first() {
               if (opts.throws) throw new Error('D1 exploded');
               return row;
+            },
+            async run() {
+              if (/INSERT INTO onboarding_events/.test(sql) && opts.logged) {
+                const [, step, outcome, nonprofit_id, slug, , , reason, user_agent] = binds;
+                opts.logged.push({ step, outcome, nonprofit_id, slug, reason, user_agent });
+              }
+              return { meta: { changes: 1 } };
             },
           };
         },
@@ -112,7 +105,7 @@ test('happy path: redirects off-site with all four UTMs and the guide in utm_con
 
 test('the click is logged as donate_click_out with slug and ref', async () => {
   const { handler, logged } = loadHandler();
-  await handler(stubDb(ROW), req, U('/out/waves-for-change?ref=guide-x'), 'waves-for-change');
+  await handler(stubDb(ROW, { logged }), req, U('/out/waves-for-change?ref=guide-x'), 'waves-for-change');
   assert.equal(logged.length, 1);
   assert.equal(logged[0].step, 'donate_click_out');
   assert.equal(logged[0].slug, 'waves-for-change');
@@ -223,7 +216,8 @@ test('the redirect is noindex and uncacheable', async () => {
 // (or /donate/<slug> when the stored URL is GiveReady's own page). Before this
 // they linked the charity directly and the funnel could not see the click.
 test('profile and listing Donate buttons route through /out, never the raw charity URL', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+  // Profile page, cause listing pages, and the admin funnel that reads the clicks.
+  const src = readSrc('pages/nonprofit.js') + '\n' + readSrc('pages/causes.js') + '\n' + readSrc('admin/funnels.js');
   assert.ok(!src.includes('href="${extHref(n.donation_url)}" rel="noopener">Donate'), 'listing links the charity directly');
   assert.ok(!src.includes('let dHref = extHref(np.donation_url);'), 'profile links the charity directly');
   assert.ok(src.includes('`/out/${escHtml(np.slug)}`'), 'profile Donate goes through /out');
@@ -232,14 +226,14 @@ test('profile and listing Donate buttons route through /out, never the raw chari
 });
 
 test('nonprofit pages no longer link a per-slug /AGENTS.md URL', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+  const src = readSrc('pages/nonprofit.js');
   assert.ok(!src.includes('href="/AGENTS.md?from=np'), 'per-slug manifest link still present');
 });
 
 // 2026-09-11: the funnel's click-out count was a crawler counter with a
 // 25-row cap. Bots are excluded from both the rows and an uncapped total.
 test('funnel click-outs exclude bot user agents and count humans uncapped', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+  const src = readSrc('admin/funnels.js');
   assert.ok(src.includes('const CLICK_OUT_BOT_SQL'), 'bot predicate exists');
   assert.ok(src.includes("user_agent LIKE '%bot%'"), 'generic bot marker excluded');
   assert.ok(src.includes("user_agent LIKE 'GiveReady-Smoketest/%'"), 'smoke test still excluded');
@@ -253,7 +247,7 @@ test('funnel click-outs exclude bot user agents and count humans uncapped', () =
 // filter passed all of it. A UA that hits more than 20 distinct charities in
 // the window is excluded behaviourally, and the exclusion is reported.
 test('funnel click-outs exclude a UA that walks more than 5 distinct charities', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+  const src = readSrc('admin/funnels.js');
   assert.ok(src.includes('const CLICK_OUT_WALKER_MIN_SLUGS = 5'), 'walker threshold is 5 distinct slugs');
   assert.ok(src.includes('HAVING COUNT(DISTINCT slug) > ${CLICK_OUT_WALKER_MIN_SLUGS}'), 'walker predicate is per-UA distinct-slug count');
   assert.ok(src.includes('AND NOT (${CLICK_OUT_WALKER_SQL})'), 'walker predicate applied to the row query');
@@ -267,7 +261,7 @@ test('funnel click-outs exclude a UA that walks more than 5 distinct charities',
 // trips N=5 in 24h but does in 7d. The walker set is now built over a fixed
 // 30d lookback (?2) and applied to every window, so 24h is a subset of 7d.
 test('funnel walker set is judged over a fixed 30d lookback, not the reported window', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+  const src = readSrc('admin/funnels.js');
   assert.ok(src.includes('const CLICK_OUT_WALKER_LOOKBACK_HOURS = 720'), 'lookback is 720h');
   const walkerSql = src.slice(src.indexOf('const CLICK_OUT_WALKER_SQL'), src.indexOf('async function handleGuideFunnel'));
   assert.ok(walkerSql.includes("datetime('now', ?2)"), 'walker subquery binds the lookback arg, not the window arg');

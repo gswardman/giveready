@@ -1,23 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
-
-function loadFn(name) {
-  const i = src.indexOf(`function ${name}(`);
-  assert.ok(i > -1, `${name} not found`);
-  let depth = 0, body = null;
-  for (let k = src.indexOf('{', i); k < src.length; k++) {
-    if (src[k] === '{') depth++;
-    else if (src[k] === '}' && --depth === 0) { body = src.slice(i, k + 1); break; }
-  }
-  return new Function(body + `\nreturn ${name};`)();
-}
-const validDonationUrl = loadFn('validDonationUrl');
+import {
+  validDonationUrl,
+  ENRICHABLE_FIELDS,
+  AUTO_PROMOTE_STRUCTURED,
+} from '../src/api/enrichment.js';
+import { readSrc } from './_src.js';
 
 test('accepts a charity donate page and keeps path case and fragment', () => {
   assert.equal(validDonationUrl('https://give.friendsforyouth.org/give/369410/#!/donation/checkout'),
@@ -42,9 +30,7 @@ test('rejects http, giveready.org, credentials, junk', () => {
 });
 
 test('donation_url is enrichable but never auto-promotes', () => {
-  const enrichable = src.slice(src.indexOf('const ENRICHABLE_FIELDS'), src.indexOf('function validDonationUrl'));
-  assert.ok(enrichable.includes("'donation_url'"));
-  const auto = src.slice(src.indexOf('const AUTO_PROMOTE_STRUCTURED'), src.indexOf('const AUTO_PROMOTE_PROSE_PENDING'));
-  assert.ok(!auto.includes('donation_url'), 'donation_url must not auto-promote');
-  assert.ok(src.includes("enrichment.field === 'donation_url' && !validDonationUrl(enrichment.value)"), 'admin apply re-validates');
+  assert.ok(ENRICHABLE_FIELDS.has('donation_url'));
+  assert.ok(!AUTO_PROMOTE_STRUCTURED.has('donation_url'), 'donation_url must not auto-promote');
+  assert.ok(readSrc('admin/enrichments.js').includes("enrichment.field === 'donation_url' && !validDonationUrl(enrichment.value)"), 'admin apply re-validates');
 });

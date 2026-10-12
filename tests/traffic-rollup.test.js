@@ -2,18 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { routeClassFor } from '../src/lib/user-agents.js';
+import { ROOT, readSrc } from './_src.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+const trafficSrc = readSrc('admin/traffic.js');
+const telemetrySrc = readSrc('lib/telemetry.js');
+const indexSrc = readSrc('index.js');
 
-// Lift routeClassFor out of the worker. Same trick as guide-links.test.js:
-// the function is pure and has no imports, so it evaluates standalone.
+// routeClassFor is pure and imported directly from the module that owns it.
 function loadRouteClassFor() {
-  const i = src.indexOf('function routeClassFor(route) {');
-  assert.ok(i > -1, 'routeClassFor missing');
-  const end = src.indexOf('\n}\n', i) + 3;
-  return new Function(src.slice(i, end) + '\nreturn routeClassFor;')();
+  return routeClassFor;
 }
 
 test('routeClassFor: the four classes added with migration 026', () => {
@@ -59,9 +57,9 @@ test('routeClassFor: existing classes are unchanged', () => {
 // the thing that actually classifies stored rows. They drifted apart once
 // before. Both must name every class.
 test('the SQL CASE mirrors routeClassFor', () => {
-  const i = src.indexOf("WHEN route IN ('/AGENTS.md','/agents.md')");
+  const i = trafficSrc.indexOf("WHEN route IN ('/AGENTS.md','/agents.md')");
   assert.ok(i > -1, 'SQL route_class CASE missing');
-  const sql = src.slice(i, src.indexOf('END AS route_class', i));
+  const sql = trafficSrc.slice(i, trafficSrc.indexOf('END AS route_class', i));
   for (const cls of ['home', 'nonprofits-list', 'out', 'search']) {
     assert.ok(sql.includes(`'${cls}'`), `SQL CASE missing ${cls}`);
   }
@@ -72,9 +70,9 @@ test('the SQL CASE mirrors routeClassFor', () => {
 });
 
 test('recordTraffic upserts counters and never inserts a row per request', () => {
-  const i = src.indexOf('function recordTraffic(');
+  const i = telemetrySrc.indexOf('function recordTraffic(');
   assert.ok(i > -1, 'recordTraffic missing');
-  const body = src.slice(i, src.indexOf('\n}\n', i));
+  const body = telemetrySrc.slice(i, telemetrySrc.indexOf('\n}\n', i));
   // A counter, not a log. If this ever becomes a plain INSERT the table grows
   // with traffic and becomes the next discovery_hits.
   assert.ok(body.includes('ON CONFLICT(bucket, route_class, agent_class) DO UPDATE SET hits = hits + 1'));
@@ -85,9 +83,9 @@ test('recordTraffic upserts counters and never inserts a row per request', () =>
 });
 
 test('recordTraffic is called at the fetch choke point, unawaited', () => {
-  const i = src.indexOf('async fetch(request, env, ctx) {');
+  const i = indexSrc.indexOf('async fetch(request, env, ctx) {');
   assert.ok(i > -1, 'fetch entry missing');
-  const head = src.slice(i, i + 1600);
+  const head = indexSrc.slice(i, i + 1600);
   assert.ok(head.includes('ctx.waitUntil(recordTraffic('), 'recordTraffic not wired into fetch');
   // Above the HEAD rewrite, so a HEAD is counted once as itself.
   assert.ok(
@@ -108,8 +106,8 @@ test('migration 026 creates both tables with counter primary keys', () => {
 // and would make the share look like a real number on the first morning after
 // deploy, when the counter has only covered part of the window.
 test('admin traffic reports a null denominator when migration 026 is absent', () => {
-  assert.ok(src.includes('discovery_logged_share_pct'));
-  assert.ok(/let trafficRollup = null;/.test(src));
+  assert.ok(trafficSrc.includes('discovery_logged_share_pct'));
+  assert.ok(/let trafficRollup = null;/.test(trafficSrc));
 });
 
 // REGRESSION. The first live call after deploy returned
@@ -117,14 +115,14 @@ test('admin traffic reports a null denominator when migration 026 is absent', ()
 // and was divided into a 60-minute discovery_hits count. A share is only
 // meaningful once the counter covers the whole reported window.
 test('no share is computed over a window the counter does not cover', () => {
-  assert.ok(src.includes('SELECT MIN(bucket) AS b FROM traffic_rollup'), 'earliest bucket not read');
-  assert.ok(src.includes('const coversFullWindow = !!(earliestBucket && earliestBucket <= sinceBucket);'));
+  assert.ok(trafficSrc.includes('SELECT MIN(bucket) AS b FROM traffic_rollup'), 'earliest bucket not read');
+  assert.ok(trafficSrc.includes('const coversFullWindow = !!(earliestBucket && earliestBucket <= sinceBucket);'));
   assert.ok(
-    src.includes('edge_requests_in_period: (trafficRollup && trafficRollup.covers_full_window)'),
+    trafficSrc.includes('edge_requests_in_period: (trafficRollup && trafficRollup.covers_full_window)'),
     'edge_requests_in_period must be null on a partial window'
   );
   assert.ok(
-    /discovery_logged_share_pct:\s*\n?\s*\(trafficRollup && trafficRollup\.covers_full_window && trafficRollup\.total_requests > 0\)/.test(src),
+    /discovery_logged_share_pct:\s*\n?\s*\(trafficRollup && trafficRollup\.covers_full_window && trafficRollup\.total_requests > 0\)/.test(trafficSrc),
     'share must be guarded by covers_full_window'
   );
 });

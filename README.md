@@ -31,7 +31,15 @@ USDC on Solana works anywhere. A nonprofit needs a smartphone and a wallet app. 
 ```
 giveready/
 ├── src/
-│   ├── index.js              # Cloudflare Worker: API, pages, x402, admin, cron
+│   ├── index.js              # Worker entry: router, fetch/scheduled exports
+│   ├── lib/                  # Shared helpers: HTTP/CORS, rate limit, telemetry,
+│   │                         #   user-agent classification, HTML escaping, validation
+│   ├── api/                  # JSON API: directory/search, nonprofits, recommend,
+│   │                         #   registry, stats, donate (x402), enrichment, agents, MCP
+│   ├── auth/                 # Claim flow, magic-link login, charity dashboard API
+│   ├── admin/                # Admin auth and token-gated admin endpoints
+│   ├── pages/                # Server-rendered HTML, llms.txt, AGENTS.md, sitemap, guides
+│   ├── cron/                 # Scheduled jobs (on-chain USDC reconciliation)
 │   ├── payable.js            # Payability report for agents (/payable)
 │   ├── wallet-proof.js       # Ed25519 proof that a charity controls its wallet
 │   └── wallet-proof-page.js  # Signing page for the wallet proof

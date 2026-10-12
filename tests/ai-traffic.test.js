@@ -7,34 +7,14 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {
+  aiVendorFor,
+  aiCompanyFor,
+  handleAiTraffic,
+  handleAiTrafficProfile,
+} from '../src/api/ai-traffic.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
-function grab(name, kw = 'async function') {
-  const i = src.indexOf(`${kw} ${name}(`);
-  assert.ok(i > -1, `${name} not found`);
-  let depth = 0;
-  for (let k = src.indexOf('{', i); k < src.length; k++) {
-    if (src[k] === '{') depth++;
-    else if (src[k] === '}' && --depth === 0) return src.slice(i, k + 1);
-  }
-  throw new Error('unterminated');
-}
-function grabConst(name, end) {
-  const i = src.indexOf(`const ${name} =`);
-  assert.ok(i > -1, `${name} not found`);
-  return src.slice(i, src.indexOf(end, i) + end.length);
-}
-const H = new Function(
-  'const CORS_HEADERS = {};\nfunction json(o, s){ return { __json: o, status: s || 200 }; }\n' +
-  grabConst('AI_VENDORS', '];') + '\n' + grabConst('AI_COMPANIES', '];') + '\n' + grabConst('AI_COMPANY_SQL', '`;') + '\n' +
-  ['aiVendorFor', 'aiCompanyFor', 'cachedJson'].map((n) => grab(n, 'function')).join('\n') + '\n' +
-  ['refreshAiTraffic', 'refreshAiTraffic30d', 'readCache', 'handleAiTraffic', 'handleAiTrafficProfile'].map((n) => grab(n)).join('\n') +
-  '\nreturn { aiVendorFor, aiCompanyFor, handleAiTraffic, handleAiTrafficProfile };'
-)();
+const H = { aiVendorFor, aiCompanyFor, handleAiTraffic, handleAiTrafficProfile };
 
 // cache: { key: valueObject } for fresh rows; hits: discovery_hits GROUP BY rows
 function stubDb({ cache = {}, hits = [], rollup = 10170 } = {}) {

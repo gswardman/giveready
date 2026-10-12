@@ -26,34 +26,15 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { handleSearch, handleListNonprofits } from '../src/api/directory.js';
+import { handleRegistryEins, handleRegistryRevoked } from '../src/api/registry.js';
+import { readSrc } from './_src.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+/** The handlers, imported from the modules that own them. */
+const H = { handleSearch, handleListNonprofits, handleRegistryEins, handleRegistryRevoked };
 
-/** Pull the handlers out of the Worker source by brace matching. */
-function loadHandlers() {
-  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
-  const grab = (name) => {
-    const i = src.indexOf(`async function ${name}(`);
-    assert.ok(i > -1, `${name} not found in src/index.js`);
-    let depth = 0;
-    for (let k = src.indexOf('{', i); k < src.length; k++) {
-      if (src[k] === '{') depth++;
-      else if (src[k] === '}' && --depth === 0) return src.slice(i, k + 1);
-    }
-    throw new Error(`unterminated ${name}`);
-  };
-  const names = ['handleSearch', 'handleListNonprofits', 'handleRegistryEins', 'handleRegistryRevoked'];
-  const body = 'function json(o){return {__json:o};}\n'
-    + names.map(grab).join('\n\n')
-    + `\nreturn {${names.join(',')}};`;
-  // eslint-disable-next-line no-new-func
-  return new Function(body)();
-}
-
-const H = loadHandlers();
+/** The handlers return a Response; the assertions below read its JSON body. */
+const body = async (res) => res.json();
 
 function stubDb() {
   const calls = [];
@@ -129,21 +110,21 @@ test('handleSearch: results carry the registry columns', async () => {
 
 test('handleListNonprofits: page moves the offset', async () => {
   const { db } = stubDb();
-  const r = await H.handleListNonprofits(db, U('/api/nonprofits?page=5&limit=100'));
-  assert.equal(r.__json.offset, 400);
+  const r = await body(await H.handleListNonprofits(db, U('/api/nonprofits?page=5&limit=100')));
+  assert.equal(r.offset, 400);
 });
 
 test('handleListNonprofits: page=1 and no page agree', async () => {
   const { db } = stubDb();
-  const a = await H.handleListNonprofits(db, U('/api/nonprofits?limit=50'));
-  const b = await H.handleListNonprofits(db, U('/api/nonprofits?page=1&limit=50'));
-  assert.equal(a.__json.offset, b.__json.offset);
+  const a = await body(await H.handleListNonprofits(db, U('/api/nonprofits?limit=50')));
+  const b = await body(await H.handleListNonprofits(db, U('/api/nonprofits?page=1&limit=50')));
+  assert.equal(a.offset, b.offset);
 });
 
 test('handleListNonprofits: explicit offset beats page', async () => {
   const { db } = stubDb();
-  const r = await H.handleListNonprofits(db, U('/api/nonprofits?offset=77&page=9&limit=10'));
-  assert.equal(r.__json.offset, 77);
+  const r = await body(await H.handleListNonprofits(db, U('/api/nonprofits?offset=77&page=9&limit=10')));
+  assert.equal(r.offset, 77);
 });
 
 test('handleListNonprofits: country filters the total too', async () => {
@@ -196,10 +177,10 @@ test('handleRegistryEins: only 9-digit-shaped ids are used as a fallback key', a
 
 test('handleRegistryRevoked: revoked and reinstated stay in separate arrays', async () => {
   const { db } = stubDb();
-  const r = await H.handleRegistryRevoked(db, U('/api/registry/revoked'));
-  assert.ok(Array.isArray(r.__json.revoked));
-  assert.ok(Array.isArray(r.__json.reinstated));
-  assert.ok(!('nonprofits' in r.__json), 'a merged list would publish an accusation against reinstated charities');
+  const r = await body(await H.handleRegistryRevoked(db, U('/api/registry/revoked')));
+  assert.ok(Array.isArray(r.revoked));
+  assert.ok(Array.isArray(r.reinstated));
+  assert.ok(!('nonprofits' in r), 'a merged list would publish an accusation against reinstated charities');
 });
 
 // ---------------------------------------------------------------------------
@@ -255,7 +236,7 @@ test('handleListNonprofits: no filters still uses the cached count', async () =>
 });
 
 test('sitemap does not print a fetchable write endpoint', async () => {
-  const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+  const src = readSrc('pages/sitemap.js');
   const i = src.indexOf('AGENT-ACTION: this file lists pages to READ');
   assert.ok(i > -1, 'sitemap agent comment missing');
   const block = src.slice(i, i + 900);

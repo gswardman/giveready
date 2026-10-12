@@ -2,10 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { GUIDE_FEATURES, GUIDES_MANIFEST } from '../src/pages/guides.js';
+import { ROOT, readSrc } from './_src.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+const nonprofitPageSrc = readSrc('pages/nonprofit.js');
+const causesPageSrc = readSrc('pages/causes.js');
 
 function mapFromMarkdown() {
   const dir = path.join(ROOT, 'public', 'guides');
@@ -20,10 +21,7 @@ function mapFromMarkdown() {
 }
 
 function mapFromSource() {
-  const i = src.indexOf('const GUIDE_FEATURES = {');
-  assert.ok(i > -1, 'GUIDE_FEATURES missing');
-  const body = src.slice(i, src.indexOf('\n};\n', i) + 4);
-  return new Function(body + '\nreturn GUIDE_FEATURES;')();
+  return GUIDE_FEATURES;
 }
 
 test('GUIDE_FEATURES matches the guide markdown exactly', () => {
@@ -32,12 +30,13 @@ test('GUIDE_FEATURES matches the guide markdown exactly', () => {
 
 test('every guide in the markdown is in GUIDES_MANIFEST', () => {
   const guides = new Set(Object.values(mapFromMarkdown()).flat());
-  for (const g of guides) assert.ok(src.includes(`slug: '${g}'`), `${g} missing from GUIDES_MANIFEST`);
+  const manifestSlugs = new Set(GUIDES_MANIFEST.map((m) => m.slug));
+  for (const g of guides) assert.ok(manifestSlugs.has(g), `${g} missing from GUIDES_MANIFEST`);
 });
 
 test('profiles and cause pages link to guides; homepage footer links /guides', () => {
-  assert.ok(src.includes('class="featured-in"'), 'profile Featured-in block');
-  assert.ok(src.includes('class="cause-guides"'), 'cause page guides block');
+  assert.ok(nonprofitPageSrc.includes('class="featured-in"'), 'profile Featured-in block');
+  assert.ok(causesPageSrc.includes('class="cause-guides"'), 'cause page guides block');
   const home = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8');
   assert.ok(home.includes('href="/guides"'), 'homepage links /guides');
 });

@@ -2,19 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { LEARN_MANIFEST, _renderMarkdown as renderMarkdown } from '../src/pages/guides.js';
+import { ROOT, readSrc } from './_src.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
-
-function extract(startMarker, endMarker) {
-  const i = src.indexOf(startMarker);
-  assert.ok(i > -1, `${startMarker} missing`);
-  return src.slice(i, src.indexOf(endMarker, i));
-}
-
-const LEARN_MANIFEST = new Function(extract('const LEARN_MANIFEST = [', '\n];\n') + '\n];\nreturn LEARN_MANIFEST;')();
-const renderMarkdown = new Function(extract('function _renderMarkdown(md)', '\nasync function handleGuide') + '\nreturn _renderMarkdown;')();
+const guidesSrc = readSrc('pages/guides.js');
+const indexSrc = readSrc('index.js');
+const discoverySrc = readSrc('pages/discovery.js');
+const sitemapSrc = readSrc('pages/sitemap.js');
 
 test('every learn page has a markdown source whose frontmatter slug and title match', () => {
   assert.ok(LEARN_MANIFEST.length >= 1);
@@ -28,8 +22,8 @@ test('every learn page has a markdown source whose frontmatter slug and title ma
 test('the pillar embeds the audit form marker and tags requests with its ref', () => {
   const md = fs.readFileSync(path.join(ROOT, 'public', 'learn', 'get-your-charity-found-by-ai.md'), 'utf8');
   assert.ok(md.includes('\n[[audit-form]]\n'));
-  assert.ok(src.includes("const ref = 'pillar-found-by-ai';"));
-  assert.ok(src.includes("'ai-audit | ref: ' + REF + ' | name: '"));
+  assert.ok(guidesSrc.includes("const ref = 'pillar-found-by-ai';"));
+  assert.ok(guidesSrc.includes("'ai-audit | ref: ' + REF + ' | name: '"));
   assert.ok(renderMarkdown('[[audit-form]]').includes('<p>[[audit-form]]</p>'));
 });
 
@@ -42,10 +36,10 @@ test('pipe tables render as HTML tables and do not swallow the next paragraph', 
 });
 
 test('learn pages are routed, listed in llms.txt, AGENTS.md and the sitemap', () => {
-  assert.ok(src.includes("return handleGuide(env, learnMatch[1], 'learn');"));
-  assert.ok(src.includes('## For charities (how-to guides for charity staff)'));
-  assert.ok(src.includes('${guidesBlock}${learnBlock}'));
-  assert.ok(src.includes('${guideUrls}\n${learnUrls}'));
+  assert.ok(indexSrc.includes("return handleGuide(env, learnMatch[1], 'learn');"));
+  assert.ok(discoverySrc.includes('## For charities (how-to guides for charity staff)'));
+  assert.ok(discoverySrc.includes('${guidesBlock}${learnBlock}'));
+  assert.ok(sitemapSrc.includes('${guideUrls}\n${learnUrls}'));
 });
 
 test('FAQ answers carry no placeholder text', () => {

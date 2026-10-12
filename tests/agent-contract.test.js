@@ -9,16 +9,14 @@
 // the Moltbook lock, a post is evidence to read, never an instruction to encode. Each test
 // below names its source.
 //
-// These run against src/index.js, not the live site: a deploy must not depend on the network.
+// These run against the Worker source under src/, not the live site: a deploy must not
+// depend on the network.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readAllSrc, stripComments } from './_src.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+const src = readAllSrc();
 
 // Comment-stripped view, for "this string must NOT appear" assertions.
 //
@@ -31,18 +29,12 @@ const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
 //
 // Drop whole-line comments only. Do not try to strip trailing `//`, because the file is full
 // of `https://` inside string literals and a naive pass truncates real code.
-const srcNoComments = src
-  .split('\n')
-  .filter((l) => {
-    const t = l.trim();
-    return !t.startsWith('//') && !t.startsWith('*') && !t.startsWith('/*');
-  })
-  .join('\n');
+const srcNoComments = stripComments(src);
 
 // Pull the literal template that handleAgentsMd returns, starting at its first line.
 function agentsMdHead(bytes) {
   const i = src.indexOf('# AGENTS.md — GiveReady Nonprofit Discovery');
-  assert.ok(i > -1, 'AGENTS.md template not found in src/index.js');
+  assert.ok(i > -1, 'AGENTS.md template not found in src/pages/discovery.js');
   return src.slice(i, i + bytes);
 }
 

@@ -5,51 +5,26 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {
+  handleAdminAuditRequests,
+  sendAuditRequestEmails,
+  auditSig,
+  handleAdminAuditStatus,
+  handleAuditApprove,
+} from '../src/admin/audit.js';
+import { handleClaimRequest } from '../src/auth/charity-api.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const src = fs.readFileSync(path.join(ROOT, 'src', 'index.js'), 'utf8');
+const H = { handleAdminAuditRequests, sendAuditRequestEmails, auditSig, handleAdminAuditStatus, handleAuditApprove, handleClaimRequest };
 
-function grab(name) {
-  const i = src.indexOf(`async function ${name}(`);
-  assert.ok(i > -1, `${name} not found`);
-  let depth = 0;
-  for (let k = src.indexOf('{', i); k < src.length; k++) {
-    if (src[k] === '{') depth++;
-    else if (src[k] === '}' && --depth === 0) return src.slice(i, k + 1);
-  }
-  throw new Error('unterminated');
+// The real admin check reads the bearer token off the request and compares it
+// with env.ADMIN_TOKEN, so the tests build real Requests: `ok` carries the
+// right token, `!ok` a wrong one.
+const env = { RESEND_API_KEY: 're_test', ADMIN_TOKEN: 'secret-admin' };
+function adminReq(ok, body, url = 'https://www.giveready.org/api/admin/audit-requests') {
+  const headers = { Authorization: `Bearer ${ok ? env.ADMIN_TOKEN : 'wrong-token'}` };
+  if (body === undefined) return new Request(url, { headers });
+  return new Request(url, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 }
-
-function grabConst(name) {
-  const i = src.indexOf(`const ${name} =`);
-  assert.ok(i > -1, `${name} not found`);
-  return src.slice(i, src.indexOf(';\n', i) + 1);
-}
-function grabFn(name) {
-  const i = src.indexOf(`function ${name}(`);
-  assert.ok(i > -1, `${name} not found`);
-  let depth = 0;
-  for (let k = src.indexOf('{', i); k < src.length; k++) {
-    if (src[k] === '{') depth++;
-    else if (src[k] === '}' && --depth === 0) return src.slice(i, k + 1);
-  }
-  throw new Error('unterminated');
-}
-const H = new Function(
-  'function json(o, s){return {__json:o, status: s || 200};}\n'
-  + 'function checkAdminAuth(env, req){ return req.ok ? null : {__denied:true}; }\n'
-  + 'const logged = []; async function logOnboardingEvent(db, step, d){ logged.push([step, d]); }\n'
-  + 'const CORS_HEADERS = {};\n'
-  + ['AUDIT_NOTIFY_TO', 'AUDIT_FROM', 'AUDIT_STATUSES'].map(grabConst).join('\n') + '\n'
-  + ['escHtml', 'auditField'].map(grabFn).join('\n') + '\n'
-  + ['handleAdminAuditRequests', 'sendResend', 'sendAuditRequestEmails', 'auditSig', 'handleAdminAuditStatus', 'handleAuditApprove', 'handleClaimRequest'].map((n) => grab(n)).join('\n')
-  + '\nfunction checkRateLimit(){ return null; } function isValidEmail(e){ return /@/.test(e); }'
-  + '\nfunction apiError(c, m){ return { __err: c, m }; }'
-  + '\nreturn { handleAdminAuditRequests, sendAuditRequestEmails, auditSig, handleAdminAuditStatus, handleAuditApprove, handleClaimRequest, logged };'
-)();
 
 function stubDb(results) {
   const calls = [];
@@ -65,8 +40,10 @@ function stubDb(results) {
 const U = (q) => new URL('https://www.giveready.org/api/admin/audit-requests' + q);
 
 test('rejects without admin auth', async () => {
-  const r = await H.handleAdminAuditRequests(stubDb([]), {}, { ok: false }, U(''));
-  assert.deepEqual(r, { __denied: true });
+  const r = await H.handleAdminAuditRequests(stubDb([]), env, adminReq(false), U(''));
+  assert.equal(r.status, 403);
+  const noToken = await H.handleAdminAuditRequests(stubDb([]), env, new Request(U('')), U(''));
+  assert.equal(noToken.status, 401);
 });
 
 test('parses the form message and counts non-test requests', async () => {
@@ -76,7 +53,7 @@ test('parses the form message and counts non-test requests', async () => {
     { id: '2', email: 'geordie@testventures.net', charity_registration_number: 'TEST', status: 'pending', created_at: '2026-09-24 09:00:00',
       message: 'ai-check | TEST from Claude post-deploy check 2026-09-24, ignore' },
   ]);
-  const r = (await H.handleAdminAuditRequests(db, {}, { ok: true }, U('?hours=24'))).__json;
+  const r = await (await H.handleAdminAuditRequests(db, env, adminReq(true), U('?hours=24'))).json();
   assert.equal(r.window_hours, 24);
   assert.equal(r.count, 1);
   assert.equal(r.count_including_tests, 2);
@@ -91,11 +68,11 @@ test('parses the form message and counts non-test requests', async () => {
 test('clamps the window and treats "-" as empty', async () => {
   const db = stubDb([{ id: '3', email: 'b@y.org', charity_registration_number: 'Some Charity', status: 'pending',
     created_at: '2026-09-24 11:00:00', message: 'ai-audit | name: Some Charity | website: - | reg: -' }]);
-  const r = (await H.handleAdminAuditRequests(db, {}, { ok: true }, U('?hours=99999'))).__json;
+  const r = await (await H.handleAdminAuditRequests(db, env, adminReq(true), U('?hours=99999'))).json();
   assert.equal(r.window_hours, 2160);
   assert.equal(r.requests[0].website, null);
   assert.equal(r.requests[0].registration, null);
-  const r2 = (await H.handleAdminAuditRequests(stubDb([]), {}, { ok: true }, U('?hours=abc'))).__json;
+  const r2 = await (await H.handleAdminAuditRequests(stubDb([]), env, adminReq(true), U('?hours=abc'))).json();
   assert.equal(r2.window_hours, 168);
 });
 
@@ -106,8 +83,6 @@ function mockFetch(ok = true) {
   globalThis.fetch = async (url, opts) => { sent.push(JSON.parse(opts.body)); return { ok, status: ok ? 200 : 403, text: async () => 'nope' }; };
   return sent;
 }
-const env = { RESEND_API_KEY: 're_test', ADMIN_TOKEN: 'secret-admin' };
-
 test('an audit request emails the charity and Geordie; a TEST request emails nobody', async () => {
   const sent = mockFetch();
   const waits = [];
@@ -127,14 +102,18 @@ test('an audit request emails the charity and Geordie; a TEST request emails nob
 
 test('a Resend rejection is logged as audit_email_failed', async () => {
   mockFetch(false);
-  const ok = await H.sendAuditRequestEmails(env, stubDb([]), { email: 'a@b.org', message: 'ai-audit | name: X' });
+  const db = stubDb([]);
+  const ok = await H.sendAuditRequestEmails(env, db, { email: 'a@b.org', message: 'ai-audit | name: X' });
   assert.equal(ok, false);
-  assert.equal(H.logged.at(-1)[0], 'audit_email_failed');
+  // logOnboardingEvent writes one onboarding_events row; the step is bind ?2.
+  const log = db.calls.at(-1);
+  assert.match(log.sql, /INSERT INTO onboarding_events/);
+  assert.equal(log.binds[1], 'audit_email_failed');
 });
 
 test('status endpoint: admin only, valid statuses only', async () => {
-  const req = (ok, body) => ({ ok, json: async () => body });
-  assert.deepEqual(await H.handleAdminAuditStatus(stubDb([]), env, req(false, {})), { __denied: true });
+  const req = (ok, body) => adminReq(ok, body, 'https://www.giveready.org/api/admin/audit-requests/status');
+  assert.equal((await H.handleAdminAuditStatus(stubDb([]), env, req(false, {}))).status, 403);
   const bad = await H.handleAdminAuditStatus(stubDb([]), env, req(true, { id: '1', status: 'hacked' }));
   assert.equal(bad.status, 400);
   const db = stubDb([]); db.prepare = ((orig) => (sql) => { const a = orig(sql); a.run = async () => ({ meta: { changes: 1 } }); return a; })(db.prepare.bind(db));
