@@ -16,8 +16,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+      # The test suite uses only node:test and has no package dependencies,
+      # so CI skips npm install and can't be broken by lockfile drift.
       - run: npm test
       - name: Syntax check the Worker
         run: node --check src/index.js
