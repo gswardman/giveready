@@ -45,4 +45,16 @@ mcp-publisher
 # IRS bulk data (316MB of downloaded registry files, regenerable)
 data/irs/
 .pillar-preview.html
+
+# Local tooling and editor leftovers
 .claude/settings.local.json
+__pycache__/
+*.pyc
+*.bak
+*.bak.*
+*.bak-*
+
+# Generated data. Regenerate with the scripts in scripts/; not for a public repo
+# (bulk every.org import, scraped nonprofit contact lists).
+migrations/004-everyorg-bulk-enrich.sql
+unclaimed-nonprofits*.csv

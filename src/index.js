@@ -6232,7 +6232,7 @@ async function handleAdminDrafts(db, env, request) {
 // The home page shows "N AI visits to charity pages this week" and a feed of
 // the latest reads. That must NOT scan discovery_hits per page view: a 7-day
 // window is ~17k rows, and ~150 home page views would spend the 5M/day D1
-// free tier (see 01-Projects/GiveReady/2026-09-02-d1-rows-read-diagnosis.md).
+// free tier (see docs/DEPLOY-d1-rows-read-fix-2026-09-02.md).
 //
 // So: refreshAiTraffic() runs the scan in scheduled() every third hour and
 // writes one JSON row to stats_cache ('ai_traffic_7d'). /api/ai-traffic reads
@@ -6408,8 +6408,8 @@ async function handleAiTrafficProfile(db, url) {
 //
 // Flow: the home-page form posts an "ai-audit | ..." claim_request (status
 // 'pending'). The charity gets a confirmation and Geordie gets a notification,
-// both via Resend. The hourly audit pipeline (GitHub Actions, private repo
-// 01-Projects/GiveReady/ai-audit) drafts the report, sets 'audit_drafted' and
+// both via Resend. The hourly audit pipeline (GitHub Actions, in a separate
+// private repo) drafts the report, sets 'audit_drafted' and
 // emails Geordie the PDF with a signed approve link. Clicking it sets
 // 'audit_approved'; the next pipeline run sends the PDF to the charity and
 // sets 'audit_sent'. A bad run sets 'audit_failed'.
@@ -7005,9 +7005,8 @@ const AUTO_PROMOTE_PROSE_PENDING = new Set([
 // could impersonate a trusted model ("i-claude-poison-charities" matches
 // "claude") and mass-poison mission/description/tagline across the ~40k
 // directory at rate-limit ceiling (30 writes/min/IP, cyclable across isolates).
-// Prose fields now stay queued for the committee-vote mechanism. See
-// 01-Projects/GiveReady/CSO-Audit-2026-04-16.md for the full finding and the
-// HMAC-signed path back to a trusted-agent v2.
+// Prose fields now stay queued for the committee-vote mechanism. The planned
+// route back is an HMAC-signed trusted-agent v2 (security audit, 2026-04-16).
 
 // Light normalisation so trivial formatting differences don't block consensus.
 // URLs: lowercase host + path, strip www., strip trailing slash, strip tracking
@@ -10514,7 +10513,7 @@ export default {
     //
     // Added 2026-09-02 after D1 rows_read hit 99% of the 5,000,000/day free-tier
     // limit and the site returned 1101 on every database route for four hours.
-    // See 01-Projects/GiveReady/2026-09-02-d1-rows-read-diagnosis.md.
+    // See docs/DEPLOY-d1-rows-read-fix-2026-09-02.md.
     if (new Date(event.scheduledTime).getUTCHours() === 3) {
       // AI traffic, 30-day view for the home page (2026-09-24). Own try.
       ctx.waitUntil((async () => {
