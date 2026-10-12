@@ -14,7 +14,7 @@ cd giveready
 wrangler d1 create giveready-db
 ```
 
-This outputs a database ID. Copy it into `wrangler.toml` replacing `YOUR_DATABASE_ID_HERE`.
+This outputs a database ID. Copy it into `wrangler.toml` as the `database_id` (replacing the one committed there, which belongs to the live giveready.org database).
 
 ## Step 2: Run the Schema
 
